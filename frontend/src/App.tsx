@@ -14,15 +14,8 @@ import AdminConsole from './pages/AdminConsole';
 function App() {
   return (
     <BrowserRouter>
-      <div className="App">
-        <header className="app-header">
-          <h1>Aureum: Artchain Provenance Trail</h1>
-          <nav className="app-nav">
-            {/* Navigation will be dynamic based on auth status */}
-          </nav>
-        </header>
-
-        <main className="app-main">
+      <div className="min-h-screen bg-[#0B0F17] text-slate-100 flex flex-col font-sans">
+        <main className="flex-1">
           <Routes>
             <Route path="/" element={<LandingPage />} />
             <Route path="/login" element={<LoginPage />} />
@@ -36,10 +29,6 @@ function App() {
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
         </main>
-
-        <footer className="app-footer">
-          <p>&copy; {new Date().getFullYear()} Aureum. All rights reserved.</p>
-        </footer>
       </div>
     </BrowserRouter>
   );
