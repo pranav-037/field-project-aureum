@@ -4,7 +4,7 @@
   "description": "Aureum: Artchain Provenance Trail - Physical-to-digital chain of custody for fine art",
   "main": "backend/dist/index.js",
   "scripts": {
-    "postinstall": "npm --prefix backend install && npm --prefix frontend install && npm --prefix backend run prisma:generate",
+    "postinstall": "npm --prefix backend install --include=dev && npm --prefix frontend install --include=dev && npm --prefix backend run prisma:generate",
     "build": "npm --prefix frontend run build && npm --prefix backend run build",
     "start": "npm --prefix backend run prisma:push && node backend/dist/index.js",
     "dev:backend": "npm --prefix backend run dev",
