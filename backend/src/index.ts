@@ -6,6 +6,8 @@ import { PrismaClient } from '@prisma/client';
 import path from 'path';
 import fs from 'fs';
 
+import { AuthService } from './services/auth.service';
+
 const app = express();
 const PORT = process.env.PORT || 3000;
 export const prisma = new PrismaClient();
@@ -19,6 +21,20 @@ app.use(express.json());
 // Basic API route
 app.get('/api', (req: Request, res: Response) => {
   res.json({ message: 'Aureum API is running!' });
+});
+
+// Authentication routes
+app.post(['/api/login', '/api/auth/login'], async (req: Request, res: Response) => {
+  try {
+    const { email, password } = req.body;
+    if (!email || !password) {
+      return res.status(400).json({ error: 'Email and password are required' });
+    }
+    const result = await AuthService.login(email, password);
+    res.json(result);
+  } catch (error) {
+    res.status(401).json({ error: (error as Error).message || 'Invalid credentials' });
+  }
 });
 
 // Health check

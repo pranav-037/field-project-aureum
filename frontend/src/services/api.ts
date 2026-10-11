@@ -16,9 +16,16 @@ export const userApi = {
     api.post('/users', data),
 };
 
+// Auth API
+export const authApi = {
+  login: (data: { email: string; password: string }) => api.post('/login', data),
+};
+
 // Artwork API
 export const artworkApi = {
   getAll: () => api.get('/artworks'),
+  getById: (id: string) => api.get(`/artworks/${id}`),
+  getTransfers: (artworkId: string) => api.get(`/artworks/${artworkId}/transfers`),
   create: (data: {
     title: string;
     artist: string;
