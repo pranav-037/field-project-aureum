@@ -1,0 +1,50 @@
+Vite / React JSX Parse Error
+================================
+
+URL:
+http://localhost:5173
+
+Error:
+[plugin:vite:oxc] Transform failed with 1 error:
+[PARSE_ERROR] Expected corresponding JSX closing tag for 'div'.
+
+Location:
+src/pages/RegisterPage.tsx:389:21
+
+File shown in the error overlay:
+C:/ .claude_code/aureum-test/frontend/src/pages/RegisterPage.tsx
+(Displayed path appears to be: C:/.claude_code/aureum-test/frontend/src/pages/RegisterPage.tsx)
+
+Relevant opening tag:
+Line 353:
+<div className="grid grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-6">
+
+Parser diagnostic:
+- The <div> opened at line 353 has not been closed by the time the parser reaches line 389.
+- At line 389, the parser encounters a JSX fragment closing tag:
+  </>
+- The parser expected a corresponding </div> closing tag instead.
+
+Stack trace:
+at transformWithOxc (file:///C:/.claude_code/aureum-test/frontend/node_modules/vite/dist/node/chunks/node.js:7581:19)
+at TransformPluginContext.transform (file:///C:/.claude_code/aureum-test/frontend/node_modules/vite/dist/node/chunks/node.js:7653:26)
+at EnvironmentPluginContainer.transform (file:///C:/.claude_code/aureum-test/frontend/node_modules/vite/dist/node/chunks/node.js:8545:51)
+at async loadAndTransform (file:///C:/.claude_code/aureum-test/frontend/node_modules/vite/dist/node/chunks/node.js:20184:26)
+at async viteTransformMiddleware (file:///C:/.claude_code/aureum-test/frontend/node_modules/vite/dist/node/chunks/node.js:20404:20)
+
+Likely cause:
+A missing </div> closing tag somewhere between lines 353 and 389 in RegisterPage.tsx, or a JSX element was closed in the wrong order.
+
+Recommended debugging steps:
+1. Open src/pages/RegisterPage.tsx.
+2. Inspect lines 340-395, especially the <div> opened at line 353.
+3. Match every opening JSX tag with its closing tag.
+4. Before the fragment closing tag at line 389, add </div> if that grid div's contents are complete there.
+5. Verify nested elements close in reverse order of opening.
+6. Save the file and let Vite recompile.
+
+Important:
+Do not add </div> blindly without inspecting the surrounding JSX. The correct fix depends on the nesting structure.
+
+Additional note:
+The overlay says it can be dismissed by clicking outside or pressing Esc, but this only hides the overlay; it does not fix the parse error.
