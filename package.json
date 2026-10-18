@@ -8,7 +8,10 @@
     "build": "npm --prefix frontend run build && npm --prefix backend run build",
     "start": "npm --prefix backend run prisma:push && node backend/dist/index.js",
     "dev:backend": "npm --prefix backend run dev",
-    "dev:frontend": "npm --prefix frontend run dev"
+    "dev:frontend": "npm --prefix frontend run dev",
+    "blockchain:compile": "npm --prefix blockchain run compile",
+    "blockchain:test": "npm --prefix blockchain run test",
+    "blockchain:deploy:local": "npm --prefix blockchain run deploy:local"
   },
   "engines": {
     "node": ">=18.0.0"
