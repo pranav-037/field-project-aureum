@@ -1,5 +1,8 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+import { useWallet } from '../contexts/WalletContext';
+import { useArtchainContract } from '../hooks/useArtchainContract';
+import WalletButton from '../components/WalletButton';
 
 interface Artwork {
   id: string;
@@ -145,14 +148,43 @@ const CollectorDashboard: React.FC = () => {
     setTimeout(() => setCopiedTx(null), 2000);
   };
 
-  const handleAcceptTransfer = () => {
-    setIncomingAccepted(true);
-    setTransactions(prev =>
-      prev.map(t =>
-        t.id === 'tx-101' ? { ...t, status: 'COMPLETED' as const } : t
-      )
-    );
-    setShowIncomingModal(false);
+  const { isConnected, account } = useWallet();
+  const { acceptTransfer: acceptTransferOnChain } = useArtchainContract();
+  const [isSigningTx, setIsSigningTx] = useState(false);
+  const [signingError, setSigningError] = useState<string | null>(null);
+  const [confirmedTx, setConfirmedTx] = useState<string | null>(null);
+
+  const handleAcceptTransfer = async () => {
+    setSigningError(null);
+    if (isConnected) {
+      try {
+        setIsSigningTx(true);
+        // Attempt on-chain signature via MetaMask
+        const receipt = await acceptTransferOnChain(1);
+        setConfirmedTx(receipt.txHash);
+        setIncomingAccepted(true);
+        setTransactions(prev =>
+          prev.map(t =>
+            t.id === 'tx-101' ? { ...t, status: 'COMPLETED' as const, txHash: receipt.txHash } : t
+          )
+        );
+        setTimeout(() => setShowIncomingModal(false), 2000);
+      } catch (err: any) {
+        console.warn('On-chain signature error:', err);
+        setSigningError(err?.message || 'Transaction rejected in wallet.');
+      } finally {
+        setIsSigningTx(false);
+      }
+    } else {
+      // Offline / demo state
+      setIncomingAccepted(true);
+      setTransactions(prev =>
+        prev.map(t =>
+          t.id === 'tx-101' ? { ...t, status: 'COMPLETED' as const } : t
+        )
+      );
+      setShowIncomingModal(false);
+    }
   };
 
   return (
@@ -211,13 +243,8 @@ const CollectorDashboard: React.FC = () => {
 
           {/* Right Action / Profile Controls */}
           <div className="flex items-center gap-3">
-            {/* Collector Role Pill */}
-            <div className="hidden sm:inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-slate-900/90 border border-slate-700/80 text-xs font-medium text-slate-300">
-              <span className="w-2 h-2 rounded-full bg-amber-400 shadow-[0_0_8px_#f59e0b]"></span>
-              <span className="text-amber-200 font-semibold">Collector</span>
-              <span className="text-slate-500">•</span>
-              <span className="font-mono text-slate-400 text-[11px]">0x71C...49A2</span>
-            </div>
+            {/* Web3 Wallet Button */}
+            <WalletButton />
 
             <Link
               to="/institution/dashboard"
@@ -831,23 +858,58 @@ const CollectorDashboard: React.FC = () => {
                 <span className="font-mono text-indigo-400">0x8f2d...29b1</span>
               </div>
               <div className="flex justify-between">
-                <span className="text-slate-400">NFC Security Binding:</span>
-                <span className="font-mono text-emerald-400">NFC-VERIFIED-9844</span>
+                <span className="text-slate-400">Recipient Signer:</span>
+                <span className="font-mono text-amber-300">
+                  {account ? `${account.slice(0, 8)}...${account.slice(-6)}` : 'Demo Wallet (Not Connected)'}
+                </span>
               </div>
             </div>
+
+            {signingError && (
+              <div className="p-3 rounded-xl bg-red-950/60 border border-red-500/40 text-red-200 text-xs">
+                ⚠️ {signingError}
+              </div>
+            )}
+
+            {confirmedTx && (
+              <div className="p-3 rounded-xl bg-emerald-950/60 border border-emerald-500/40 text-emerald-200 text-xs flex flex-col gap-1">
+                <div className="flex items-center gap-1.5 font-semibold text-emerald-300">
+                  <span>✓</span> Transaction Confirmed On-Chain!
+                </div>
+                <span className="font-mono text-[11px] text-slate-300 break-all">{confirmedTx}</span>
+              </div>
+            )}
 
             <div className="flex items-center gap-3">
               <button
                 onClick={handleAcceptTransfer}
-                className="flex-1 py-3 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-semibold text-xs shadow-lg shadow-emerald-600/30 transition cursor-pointer flex items-center justify-center gap-2"
+                disabled={isSigningTx}
+                className={`flex-1 py-3 rounded-xl ${
+                  isSigningTx
+                    ? 'bg-emerald-800 text-slate-300 cursor-wait'
+                    : 'bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white cursor-pointer'
+                } font-semibold text-xs shadow-lg shadow-emerald-600/30 transition flex items-center justify-center gap-2`}
               >
-                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" />
-                </svg>
-                Sign & Accept Physical Custody
+                {isSigningTx ? (
+                  <>
+                    <svg className="w-4 h-4 animate-spin text-white" viewBox="0 0 24 24" fill="none">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path>
+                    </svg>
+                    Signing in MetaMask...
+                  </>
+                ) : (
+                  <>
+                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" />
+                    </svg>
+                    {isConnected ? 'Sign in MetaMask & Accept Custody' : 'Accept Physical Custody'}
+                  </>
+                )}
               </button>
               <button
                 onClick={() => setShowIncomingModal(false)}
+                disabled={isSigningTx}
                 className="px-4 py-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold text-xs transition cursor-pointer"
               >
                 Decline

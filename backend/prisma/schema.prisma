@@ -1,4 +1,4 @@
-// Prisma Schema for Aureum (simplified for basic app)
+// Prisma Schema for Aureum
 datasource db {
   provider = "sqlite"
   url      = env("DATABASE_URL")
@@ -9,42 +9,90 @@ generator client {
 }
 
 model User {
-  id       String   @id @default(cuid())
-  email    String   @unique
-  name     String
-  role     String   // ADMIN, AUTHENTICATOR, VIEWER
-  password String   // Add password field (plain text for demo - NOT SECURE) @default("")
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id            String   @id @default(cuid())
+  email         String   @unique
+  name          String
+  role          String   // ADMIN, AUTHENTICATOR, VIEWER, COLLECTOR
+  password      String   @default("")
+  walletAddress String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
+model Institution {
+  id            String    @id @default(cuid())
+  name          String
+  walletAddress String    @unique
+  status        String    // APPROVED, REVOKED, PENDING
+  approvedAt    DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
 }
 
 model Artwork {
-  id                 String   @id @default(cuid())
-  title              String
-  artist             String
-  year               String?
-  medium             String
-  dimensions         String
-  metadataCid        String
-  imageCids          String   // Simplified: CSV or JSON string
-  documentCids       String   // Simplified: CSV or JSON string
-  bindingReference   String
-  status             String   // VERIFIED, BROKEN, UNVERIFIABLE, DISPUTED
-  ownerId            String   // Reference to User.id
-  createdAt          DateTime @default(now())
-  updatedAt          DateTime @updatedAt
+  id                  String   @id @default(cuid())
+  blockchainArtworkId String?  @unique
+  txHash              String?
+  blockNumber         Int?
+  title               String
+  artist              String
+  year                String?
+  medium              String
+  dimensions          String
+  metadataCid         String
+  imageCids           String   // CSV or JSON string
+  documentCids        String   // CSV or JSON string
+  bindingReference    String
+  status              String   // VERIFIED, BROKEN, UNVERIFIABLE, DISPUTED
+  ownerId             String   // Reference to User.id or wallet address
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
 }
 
 model Transfer {
-  id           String   @id @default(cuid())
-  artworkId    String
-  sellerId     String
-  buyerId      String?
-  transferDate DateTime
-  priceVisibility String   // PUBLIC, PARTIES_AND_AUTHORISED, HIDDEN
-  txHash       String
-  blockNumber  Int
-  status       String   // PENDING, FINALIZED, EXPIRED, CANCELLED
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  id                   String   @id @default(cuid())
+  blockchainTransferId String?  @unique
+  artworkId            String
+  sellerId             String
+  buyerId              String?
+  transferDate         DateTime
+  priceVisibility      String   // PUBLIC, PARTIES_AND_AUTHORISED, HIDDEN
+  txHash               String
+  blockNumber          Int
+  status               String   // PENDING, FINALIZED, EXPIRED, CANCELLED
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+}
+
+model Amendment {
+  id                    String   @id @default(cuid())
+  blockchainAmendmentId String   @unique
+  blockchainArtworkId   String
+  issuerAddress         String
+  reason                String
+  txHash                String
+  blockNumber           Int
+  createdAt             DateTime @default(now())
+}
+
+model DisputeFlag {
+  id                  String    @id @default(cuid())
+  blockchainFlagId    String    @unique
+  blockchainArtworkId String
+  flaggerAddress      String
+  flagType            Int
+  reason              String
+  evidenceRef         String
+  active              Boolean   @default(true)
+  txHash              String
+  blockNumber         Int
+  createdAt           DateTime  @default(now())
+  resolvedAt          DateTime?
+  resolverAddress     String?
+}
+
+model SyncState {
+  id               String   @id @default("singleton")
+  lastBlockIndexed Int      @default(0)
+  updatedAt        DateTime @updatedAt
 }

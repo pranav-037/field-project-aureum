@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { artworkApi } from '../services/api';
+import { artworkApi, ipfsApi } from '../services/api';
+import { useWallet } from '../contexts/WalletContext';
+import WalletButton from '../components/WalletButton';
 
 const ArtworkRegistration: React.FC = () => {
   const navigate = useNavigate();
@@ -45,31 +47,68 @@ const ArtworkRegistration: React.FC = () => {
     }
   };
 
+  const { account } = useWallet();
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
     setLoading(true);
 
     try {
+      let uploadedImageCids: string[] = [];
+      let uploadedDocCids: string[] = [];
+
+      // Upload images to IPFS if provided
+      if (formData.images.length > 0) {
+        try {
+          const res = await ipfsApi.uploadMultiple(formData.images);
+          if (res.data?.files) {
+            uploadedImageCids = res.data.files.map((f: any) => f.cid);
+          }
+        } catch (ipfsErr) {
+          console.warn('Could not pin images to IPFS:', ipfsErr);
+        }
+      }
+
+      // Upload documents to IPFS if provided
+      if (formData.documents.length > 0) {
+        try {
+          const res = await ipfsApi.uploadMultiple(formData.documents);
+          if (res.data?.files) {
+            uploadedDocCids = res.data.files.map((f: any) => f.cid);
+          }
+        } catch (ipfsErr) {
+          console.warn('Could not pin documents to IPFS:', ipfsErr);
+        }
+      }
+
       const artworkData = {
         title: formData.title,
         artist: formData.artist,
         year: formData.year || undefined,
         medium: formData.medium,
         dimensions: formData.dimensions,
+        edition: formData.edition || '1 of 1',
+        authenticationMethod: formData.authenticationMethod || 'NFC Cryptographic Provenance Anchor',
+        bindingReference: formData.bindingReference || `NFC-UUID-${Date.now()}`,
+        imageCids: uploadedImageCids,
+        documentCids: uploadedDocCids,
         ownerId: 'current-institution-id',
+        ownerAddress: account || undefined,
       };
 
-      try {
-        await artworkApi.create(artworkData);
-      } catch (apiErr) {
-        console.warn('API error, falling back to client-side record creation:', apiErr);
-      }
+      const res = await artworkApi.create(artworkData);
+      const onChainId = res.data?.blockchainArtworkId;
+      const txHash = res.data?.txHash;
 
-      setSuccess(`Genesis Record created for "${formData.title}" with physical NFC binding.`);
+      const successMsg = onChainId
+        ? `Genesis Record #${onChainId} created on-chain (Tx: ${txHash?.slice(0, 10)}...) with physical NFC binding.`
+        : `Genesis Record created for "${formData.title}" with physical NFC binding.`;
+
+      setSuccess(successMsg);
       setTimeout(() => {
         navigate('/institution/dashboard');
-      }, 2000);
+      }, 2500);
     } catch (err: any) {
       console.error('Registration error:', err);
       setError(err?.response?.data?.error || 'Registration failed. Please try again.');
@@ -113,6 +152,7 @@ const ArtworkRegistration: React.FC = () => {
           </Link>
 
           <div className="flex items-center gap-4">
+            <WalletButton />
             <Link to="/institution/dashboard" className="text-xs font-semibold px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300">
               Institution Dashboard
             </Link>
