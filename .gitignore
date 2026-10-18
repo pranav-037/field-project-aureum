@@ -32,3 +32,6 @@ pnpm-debug.log*
 .idea/
 .DS_Store
 Thumbs.db
+
+# Local IPFS cache storage
+storage/

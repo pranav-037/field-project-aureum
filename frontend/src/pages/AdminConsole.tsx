@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+import WalletButton from '../components/WalletButton';
 
 const AdminConsole: React.FC = () => {
   const navigate = useNavigate();
@@ -35,6 +36,7 @@ const AdminConsole: React.FC = () => {
           </Link>
 
           <div className="flex items-center gap-4">
+            <WalletButton />
             <Link to="/collector/dashboard" className="text-xs font-semibold px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300">
               Collector Dashboard
             </Link>

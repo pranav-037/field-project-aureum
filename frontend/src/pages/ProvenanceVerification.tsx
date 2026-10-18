@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { artworkApi } from '../services/api';
+import WalletButton from '../components/WalletButton';
 
 interface TransferRecord {
   id: string;
@@ -14,6 +15,7 @@ interface TransferRecord {
 
 interface ArtworkData {
   id: string;
+  blockchainArtworkId?: string | null;
   title: string;
   artist: string;
   year?: string;
@@ -26,6 +28,7 @@ interface ArtworkData {
   integrityStatus: string;
   metadataCid?: string;
   bindingReference?: string;
+  onChainVerified?: boolean;
   transfers: TransferRecord[];
 }
 
@@ -43,6 +46,7 @@ const mockDemoArtwork: ArtworkData = {
   integrityStatus: 'VERIFIED',
   metadataCid: 'QmZtmD2qt8fQgdfmkW4m6JqWcstVkAbD9ldWgjXF2',
   bindingReference: 'NFC-SECURE-9024',
+  onChainVerified: true,
   transfers: [
     {
       id: 'txf-001',
@@ -84,7 +88,6 @@ const ProvenanceVerification: React.FC = () => {
     setLoading(true);
 
     try {
-      // 1. Attempt backend API query if searchBy is artworkId
       let foundData: ArtworkData | null = null;
       if (searchBy === 'artworkId') {
         try {
@@ -92,6 +95,17 @@ const ProvenanceVerification: React.FC = () => {
           if (res.data) {
             const raw = res.data;
             let transfers: TransferRecord[] = [];
+            let onChainVerified = false;
+
+            try {
+              const provRes = await artworkApi.getProvenance(raw.id);
+              if (provRes.data?.source === 'BLOCKCHAIN_VERIFIED') {
+                onChainVerified = true;
+              }
+            } catch {
+              // fallback
+            }
+
             try {
               const transferRes = await artworkApi.getTransfers(raw.id);
               if (Array.isArray(transferRes.data)) {
@@ -111,6 +125,7 @@ const ProvenanceVerification: React.FC = () => {
 
             foundData = {
               id: raw.id,
+              blockchainArtworkId: raw.blockchainArtworkId,
               title: raw.title,
               artist: raw.artist,
               year: raw.year,
@@ -118,11 +133,12 @@ const ProvenanceVerification: React.FC = () => {
               dimensions: raw.dimensions,
               authenticator: 'Aureum Certified Authenticator',
               genesisTimestamp: raw.createdAt,
-              genesisTxHash: '0x' + (raw.id.replace(/[^a-fA-F0-9]/g, '') + 'abcdef0123456789').slice(0, 40),
+              genesisTxHash: raw.txHash || '0x' + (raw.id.replace(/[^a-fA-F0-9]/g, '') + 'abcdef0123456789').slice(0, 40),
               status: raw.status || 'VERIFIED',
-              integrityStatus: raw.status || 'VERIFIED',
+              integrityStatus: onChainVerified ? 'CRYPTOGRAPHICALLY_VERIFIED' : (raw.status || 'VERIFIED'),
               metadataCid: raw.metadataCid,
               bindingReference: raw.bindingReference,
+              onChainVerified,
               transfers: transfers,
             };
           }
@@ -133,7 +149,6 @@ const ProvenanceVerification: React.FC = () => {
 
       // 2. Fallback to mock data for demonstration
       if (!foundData) {
-        // Provide mock data
         await new Promise((resolve) => setTimeout(resolve, 600));
         foundData = {
           ...mockDemoArtwork,
@@ -208,6 +223,7 @@ const ProvenanceVerification: React.FC = () => {
             <Link to="/login" className="text-slate-400 hover:text-slate-200 transition">
               Sign In
             </Link>
+            <WalletButton />
             <Link
               to="/register"
               className="hidden sm:inline-flex px-3.5 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold shadow-md transition"

@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+import WalletButton from '../components/WalletButton';
 
 const InstitutionDashboard: React.FC = () => {
   const navigate = useNavigate();
@@ -90,8 +91,11 @@ const InstitutionDashboard: React.FC = () => {
             </Link>
           </div>
 
-          {/* Profile & Mode Controls */}
+          {/* Right Action Area */}
           <div className="flex items-center gap-3">
+            {/* Web3 Connected Wallet */}
+            <WalletButton />
+
             <div className="hidden sm:inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-slate-900/90 border border-slate-700/80 text-xs font-medium text-slate-300">
               <span className="w-2 h-2 rounded-full bg-indigo-400 shadow-[0_0_8px_#6366f1]"></span>
               <span className="text-indigo-200 font-semibold">Metropolitan Guild</span>

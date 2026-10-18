@@ -38,10 +38,10 @@ export class AuthService {
     );
 
     // Return user without password
-    const { id, email: userEmail, name: userName, role: userRole, createdAt, updatedAt } = user;
+    const { id, email: userEmail, name: userName, role: userRole, walletAddress, createdAt, updatedAt } = user;
     return {
       token,
-      user: { id, email: userEmail, name: userName, role: userRole, createdAt, updatedAt }
+      user: { id, email: userEmail, name: userName, role: userRole, walletAddress: walletAddress || null, createdAt, updatedAt }
     };
   }
 
@@ -60,10 +60,10 @@ export class AuthService {
     );
 
     // Return user without password
-    const { id, email: userEmail, name: userName, role: userRole, createdAt, updatedAt } = user;
+    const { id, email: userEmail, name: userName, role: userRole, walletAddress, createdAt, updatedAt } = user;
     return {
       token,
-      user: { id, email: userEmail, name: userName, role: userRole, createdAt, updatedAt }
+      user: { id, email: userEmail, name: userName, role: userRole, walletAddress: walletAddress || null, createdAt, updatedAt }
     };
   }
 
