@@ -103,6 +103,27 @@ export function useArtchainContract() {
   }, [readContract]);
 
   /**
+   * Fetches the list of previous owners for an artwork by reading Transfer events.
+   * Returns an array of addresses ordered from oldest to newest (excluding the zero address which represents minting).
+   */
+  const getPreviousOwners = useCallback(async (artworkId: number | string): Promise<string[]> => {
+    if (!readContract) return [];
+    try {
+      // Build a filter for the Transfer event of the given tokenId
+      const filter = readContract.filters.Transfer(null, null, BigInt(artworkId));
+      const events = await readContract.queryFilter(filter, 0, 'latest');
+      const owners = events
+        .map((e: any) => e.args?.from as string)
+        .filter((addr) => addr && addr !== ethers.constants.AddressZero);
+      // Remove duplicates while preserving order
+      return Array.from(new Set(owners));
+    } catch (err) {
+      console.warn('Failed to fetch previous owners:', err);
+      return [];
+    }
+  }, [readContract]);
+
+  /**
    * Fetches on-chain transfer details
    */
   const getTransfer = useCallback(async (transferId: number | string): Promise<OnChainTransfer | null> => {
@@ -218,6 +239,7 @@ export function useArtchainContract() {
     writeContract,
     getArtwork,
     getCurrentOwner,
+    getPreviousOwners,
     getTransfer,
     acceptTransfer,
     cancelTransfer,

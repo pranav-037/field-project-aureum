@@ -76,6 +76,7 @@ const ProvenanceVerification: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [copiedHash, setCopiedHash] = useState<string | null>(null);
+  const [previousOwners, setPreviousOwners] = useState<string[]>([]);
 
   const handleSearch = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -188,6 +189,19 @@ const ProvenanceVerification: React.FC = () => {
       return dateString;
     }
   };
+
+  // Load previous owners when artwork data becomes available
+  useEffect(() => {
+    if (!artworkData) return;
+    (async () => {
+      try {
+        const owners = await getPreviousOwners(artworkData.id);
+        setPreviousOwners(owners);
+      } catch (e) {
+        console.warn('Failed to load previous owners:', e);
+      }
+    })();
+  }, [artworkData, getPreviousOwners]);
 
   return (
     <div className="min-h-screen bg-[#0B0F17] text-slate-100 flex flex-col selection:bg-indigo-500/30 selection:text-indigo-200">
@@ -535,6 +549,17 @@ const ProvenanceVerification: React.FC = () => {
                     </p>
                   </div>
                 </div>
+                {/* 4. Previous Owners List */}
+                {previousOwners.length > 0 && (
+                  <div className="mt-6">
+                    <h4 className="text-sm font-semibold text-amber-300 uppercase tracking-wider">Previous Owners</h4>
+                    <ul className="list-disc list-inside text-xs text-slate-300 mt-2 space-y-1">
+                      {previousOwners.map((addr, i) => (
+                        <li key={i}>{addr}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
               </div>
             </div>
 
