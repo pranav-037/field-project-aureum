@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { artworkApi } from '../services/api';
 import WalletButton from '../components/WalletButton';
+import { useArtchainContract } from '../hooks/useArtchainContract';
 
 interface TransferRecord {
   id: string;
@@ -77,6 +78,8 @@ const ProvenanceVerification: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [copiedHash, setCopiedHash] = useState<string | null>(null);
   const [previousOwners, setPreviousOwners] = useState<string[]>([]);
+
+  const { getPreviousOwners } = useArtchainContract();
 
   const handleSearch = async (e: React.FormEvent) => {
     e.preventDefault();

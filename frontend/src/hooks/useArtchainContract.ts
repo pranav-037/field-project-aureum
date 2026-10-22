@@ -114,7 +114,7 @@ export function useArtchainContract() {
       const events = await readContract.queryFilter(filter, 0, 'latest');
       const owners = events
         .map((e: any) => e.args?.from as string)
-        .filter((addr) => addr && addr !== ethers.constants.AddressZero);
+        .filter((addr) => addr && addr !== ethers.ZeroAddress);
       // Remove duplicates while preserving order
       return Array.from(new Set(owners));
     } catch (err) {
