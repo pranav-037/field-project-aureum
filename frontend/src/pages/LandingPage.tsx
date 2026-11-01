@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 
 const LandingPage: React.FC = () => {
@@ -18,6 +18,50 @@ const LandingPage: React.FC = () => {
   const dashboardUrl = currentUser?.role === 'ADMIN' || currentUser?.role === 'AUTHENTICATOR'
     ? '/institution/dashboard'
     : '/collector/dashboard';
+
+  // Smooth scroll handler for tabs on the same page
+  const handleNavScroll = (e: React.MouseEvent<HTMLAnchorElement>, targetId: string) => {
+    e.preventDefault();
+    const element = document.getElementById(targetId);
+    if (element) {
+      const navOffset = 80; // height of sticky navbar
+      const elementPosition = element.getBoundingClientRect().top;
+      const offsetPosition = elementPosition + window.pageYOffset - navOffset;
+
+      window.scrollTo({
+        top: Math.max(0, offsetPosition),
+        behavior: 'smooth'
+      });
+      window.history.pushState(null, '', `#${targetId}`);
+    }
+  };
+
+  const scrollToTop = (e: React.MouseEvent) => {
+    if (!currentUser) {
+      e.preventDefault();
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      window.history.pushState(null, '', window.location.pathname);
+    }
+  };
+
+  // Handle direct navigation with hash e.g. /#features or /#how-it-works
+  useEffect(() => {
+    if (window.location.hash) {
+      const id = window.location.hash.replace('#', '');
+      const element = document.getElementById(id);
+      if (element) {
+        setTimeout(() => {
+          const navOffset = 80;
+          const elementPosition = element.getBoundingClientRect().top;
+          const offsetPosition = elementPosition + window.pageYOffset - navOffset;
+          window.scrollTo({
+            top: Math.max(0, offsetPosition),
+            behavior: 'smooth'
+          });
+        }, 150);
+      }
+    }
+  }, []);
 
   const handleConnectWallet = () => {
     if (!walletConnected) {
@@ -41,7 +85,11 @@ const LandingPage: React.FC = () => {
       <nav className="sticky top-0 z-50 backdrop-blur-xl bg-[#0B0F17]/80 border-b border-slate-800/80 transition-all duration-300">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-20 flex items-center justify-between">
           {/* Brand Logo */}
-          <Link to={currentUser ? dashboardUrl : "/"} className="flex items-center gap-3 group">
+          <Link
+            to={currentUser ? dashboardUrl : "/"}
+            onClick={scrollToTop}
+            className="flex items-center gap-3 group"
+          >
             <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-amber-500 via-indigo-600 to-violet-500 p-[1.5px] shadow-lg shadow-indigo-500/20 group-hover:shadow-indigo-500/40 transition duration-300">
               <div className="w-full h-full bg-[#0B0F17] rounded-[10px] flex items-center justify-center">
                 <svg className="w-5 h-5 text-amber-400 group-hover:scale-110 transition duration-300" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -62,19 +110,31 @@ const LandingPage: React.FC = () => {
             </div>
           </Link>
 
-          {/* Navigation Links */}
+          {/* Navigation Links with Smooth Scrolling */}
           <div className="hidden md:flex items-center gap-8 text-sm font-medium text-slate-300">
-            <a href="#features" className="hover:text-amber-300 transition duration-200">
+            <a
+              href="#features"
+              onClick={(e) => handleNavScroll(e, 'features')}
+              className="hover:text-amber-300 transition duration-200 cursor-pointer"
+            >
               Features
             </a>
-            <a href="#how-it-works" className="hover:text-indigo-300 transition duration-200">
+            <a
+              href="#how-it-works"
+              onClick={(e) => handleNavScroll(e, 'how-it-works')}
+              className="hover:text-indigo-300 transition duration-200 cursor-pointer"
+            >
               How It Works
             </a>
             <Link to="/verify" className="hover:text-indigo-300 transition duration-200 flex items-center gap-1">
               Verify Artwork
               <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
             </Link>
-            <a href="#about" className="hover:text-amber-300 transition duration-200">
+            <a
+              href="#about"
+              onClick={(e) => handleNavScroll(e, 'about')}
+              className="hover:text-amber-300 transition duration-200 cursor-pointer"
+            >
               About
             </a>
           </div>
@@ -123,7 +183,7 @@ const LandingPage: React.FC = () => {
       </nav>
 
       {/* 2. Hero Section */}
-      <section className="relative overflow-hidden pt-12 pb-24 md:pt-20 md:pb-32">
+      <section id="hero" className="relative overflow-hidden pt-12 pb-24 md:pt-20 md:pb-32 scroll-mt-24">
         {/* Ambient Gradient Glows */}
         <div className="absolute top-1/4 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[650px] h-[350px] bg-gradient-to-tr from-indigo-600/20 via-violet-600/15 to-amber-500/10 blur-[130px] rounded-full pointer-events-none -z-10"></div>
         <div className="absolute top-10 right-10 w-96 h-96 bg-indigo-500/10 blur-[100px] rounded-full pointer-events-none -z-10"></div>
@@ -274,8 +334,120 @@ const LandingPage: React.FC = () => {
         </div>
       </section>
 
-      {/* 3. "How It Works" Section Redesign (Modern 3-Column Glass Card Layout) */}
-      <section id="how-it-works" className="py-24 relative border-t border-slate-800/60 bg-[#0B0F17]">
+      {/* 3. Features Section */}
+      <section id="features" className="py-24 relative border-t border-slate-800/60 bg-[#090D15] scroll-mt-20">
+        <div className="absolute top-1/3 right-1/4 w-96 h-96 bg-amber-500/5 blur-[140px] rounded-full pointer-events-none -z-10"></div>
+        <div className="absolute bottom-10 left-10 w-80 h-80 bg-indigo-600/5 blur-[120px] rounded-full pointer-events-none -z-10"></div>
+
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
+          <div className="max-w-3xl mx-auto text-center space-y-4 mb-16">
+            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-500/10 border border-amber-500/20 text-xs font-semibold text-amber-300 uppercase tracking-wider">
+              Core Capabilities
+            </div>
+            <h2 className="text-3xl sm:text-4xl lg:text-5xl font-extrabold text-white tracking-tight">
+              Enterprise Features for Fine Art Custody
+            </h2>
+            <p className="text-base sm:text-lg text-slate-400">
+              Built on Ethereum smart contracts, decentralized IPFS storage, and physical NFC cryptographic chips.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+            {/* Feature 1 */}
+            <div className="group rounded-2xl bg-slate-900/40 backdrop-blur-md border border-slate-800/80 p-7 hover:border-amber-500/40 hover:bg-slate-900/60 transition duration-300">
+              <div className="w-12 h-12 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-400 mb-5 group-hover:scale-110 transition duration-300">
+                <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 11c0 3.517-1.009 6.799-2.753 9.571m-3.44-2.04l.054-.09A13.916 13.916 0 008 11a4 4 0 118 0c0 1.017-.07 2.019-.203 3m-2.118 6.844A21.88 21.88 0 0015.171 17m3.839 1.132c.645-2.266.99-4.659.99-7.132A8 8 0 004 11m0 0a8 8 0 001.243 4.293" />
+                </svg>
+              </div>
+              <h3 className="text-lg font-bold text-white mb-2 group-hover:text-amber-300 transition">
+                Physical NFC Binding
+              </h3>
+              <p className="text-sm text-slate-400 leading-relaxed">
+                Tamper-evident cryptoseals permanently bind each physical artwork's canvas or sculpture directly to its on-chain Genesis certificate.
+              </p>
+            </div>
+
+            {/* Feature 2 */}
+            <div className="group rounded-2xl bg-slate-900/40 backdrop-blur-md border border-slate-800/80 p-7 hover:border-indigo-500/40 hover:bg-slate-900/60 transition duration-300">
+              <div className="w-12 h-12 rounded-xl bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center text-indigo-400 mb-5 group-hover:scale-110 transition duration-300">
+                <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+                </svg>
+              </div>
+              <h3 className="text-lg font-bold text-white mb-2 group-hover:text-indigo-300 transition">
+                Dual-Signature Escrow
+              </h3>
+              <p className="text-sm text-slate-400 leading-relaxed">
+                Custody transitions require multi-party cryptographic authorization, preventing unilateral transfers and eliminating counterfeit re-entry.
+              </p>
+            </div>
+
+            {/* Feature 3 */}
+            <div className="group rounded-2xl bg-slate-900/40 backdrop-blur-md border border-slate-800/80 p-7 hover:border-violet-500/40 hover:bg-slate-900/60 transition duration-300">
+              <div className="w-12 h-12 rounded-xl bg-violet-500/10 border border-violet-500/20 flex items-center justify-center text-violet-400 mb-5 group-hover:scale-110 transition duration-300">
+                <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+                </svg>
+              </div>
+              <h3 className="text-lg font-bold text-white mb-2 group-hover:text-violet-300 transition">
+                IPFS Decentralized Vault
+              </h3>
+              <p className="text-sm text-slate-400 leading-relaxed">
+                Preserve archival appraisal documents, multispectral imaging, and restoration histories permanently across immutable decentralized storage.
+              </p>
+            </div>
+
+            {/* Feature 4 */}
+            <div className="group rounded-2xl bg-slate-900/40 backdrop-blur-md border border-slate-800/80 p-7 hover:border-emerald-500/40 hover:bg-slate-900/60 transition duration-300">
+              <div className="w-12 h-12 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400 mb-5 group-hover:scale-110 transition duration-300">
+                <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                </svg>
+              </div>
+              <h3 className="text-lg font-bold text-white mb-2 group-hover:text-emerald-300 transition">
+                Instant Public Verification
+              </h3>
+              <p className="text-sm text-slate-400 leading-relaxed">
+                Prospective buyers, auction houses, and insurers can audit complete historical chains of custody instantly without specialized software.
+              </p>
+            </div>
+
+            {/* Feature 5 */}
+            <div className="group rounded-2xl bg-slate-900/40 backdrop-blur-md border border-slate-800/80 p-7 hover:border-amber-500/40 hover:bg-slate-900/60 transition duration-300">
+              <div className="w-12 h-12 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-400 mb-5 group-hover:scale-110 transition duration-300">
+                <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                </svg>
+              </div>
+              <h3 className="text-lg font-bold text-white mb-2 group-hover:text-amber-300 transition">
+                Institutional Guild RBAC
+              </h3>
+              <p className="text-sm text-slate-400 leading-relaxed">
+                Role-based on-chain authorization tailored for accredited museum curators, independent appraisers, and sovereign art galleries.
+              </p>
+            </div>
+
+            {/* Feature 6 */}
+            <div className="group rounded-2xl bg-slate-900/40 backdrop-blur-md border border-slate-800/80 p-7 hover:border-indigo-500/40 hover:bg-slate-900/60 transition duration-300">
+              <div className="w-12 h-12 rounded-xl bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center text-indigo-400 mb-5 group-hover:scale-110 transition duration-300">
+                <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                </svg>
+              </div>
+              <h3 className="text-lg font-bold text-white mb-2 group-hover:text-indigo-300 transition">
+                Zero-Knowledge Privacy
+              </h3>
+              <p className="text-sm text-slate-400 leading-relaxed">
+                Preserve confidential valuation records and collector identities while allowing cryptographic proof of authenticity and provenance.
+              </p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* 4. "How It Works" Section Redesign (Modern 3-Column Glass Card Layout) */}
+      <section id="how-it-works" className="py-24 relative border-t border-slate-800/60 bg-[#0B0F17] scroll-mt-20">
         {/* Subtle Ambient Glow */}
         <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-3/4 h-80 bg-indigo-600/5 blur-[120px] rounded-full pointer-events-none"></div>
 
@@ -379,7 +551,62 @@ const LandingPage: React.FC = () => {
         </div>
       </section>
 
-      {/* 4. High-End Call To Action Banner */}
+      {/* 5. About Section */}
+      <section id="about" className="py-24 relative border-t border-slate-800/60 bg-[#090D15] scroll-mt-20">
+        <div className="absolute top-1/2 left-1/3 -translate-x-1/2 -translate-y-1/2 w-[550px] h-[300px] bg-indigo-600/10 blur-[130px] rounded-full pointer-events-none -z-10"></div>
+
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 items-center">
+            <div className="lg:col-span-6 space-y-6">
+              <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-violet-500/10 border border-violet-500/20 text-xs font-semibold text-violet-300 uppercase tracking-wider">
+                About The Protocol
+              </div>
+              <h2 className="text-3xl sm:text-4xl font-extrabold text-white tracking-tight">
+                Restoring Trust & Authenticity to Global Fine Art
+              </h2>
+              <p className="text-base text-slate-300 leading-relaxed">
+                For centuries, the international fine art market has suffered from forged paper certificates, opaque provenance trails, and unverified custodial transfers. Aureum Artchain bridges this divide by bonding physical masterworks with cryptographic certainty.
+              </p>
+              <p className="text-sm text-slate-400 leading-relaxed">
+                Engineered in collaboration with certified art conservators and Web3 cryptography specialists, our platform empowers museums, private collectors, and reputable auction houses with permanent provenance verifiability.
+              </p>
+
+              <div className="grid grid-cols-2 gap-4 pt-4 border-t border-slate-800/80">
+                <div className="p-4 rounded-xl bg-slate-900/60 border border-slate-800">
+                  <p className="text-sm font-bold text-white">Trustless Provenance</p>
+                  <p className="text-xs text-slate-400 mt-1">Immutable on-chain history that cannot be manipulated or backdated.</p>
+                </div>
+                <div className="p-4 rounded-xl bg-slate-900/60 border border-slate-800">
+                  <p className="text-sm font-bold text-white">Museum Standards</p>
+                  <p className="text-xs text-slate-400 mt-1">Fully compatible with international museum registrar cataloging norms.</p>
+                </div>
+              </div>
+            </div>
+
+            <div className="lg:col-span-6">
+              <div className="p-8 rounded-2xl bg-gradient-to-tr from-slate-900/90 via-indigo-950/40 to-slate-900/90 border border-slate-800 shadow-2xl space-y-6">
+                <h3 className="text-xl font-bold text-white">The Aureum Guarantee</h3>
+                <div className="space-y-4 text-sm text-slate-300">
+                  <div className="flex items-start gap-3">
+                    <span className="flex-shrink-0 w-6 h-6 rounded-full bg-emerald-500/20 text-emerald-400 flex items-center justify-center text-xs font-bold">✓</span>
+                    <p><strong className="text-white">Tamper Detection:</strong> Any physical removal or disruption of the NFC cryptoseal invalidates downstream verification status.</p>
+                  </div>
+                  <div className="flex items-start gap-3">
+                    <span className="flex-shrink-0 w-6 h-6 rounded-full bg-indigo-500/20 text-indigo-400 flex items-center justify-center text-xs font-bold">✓</span>
+                    <p><strong className="text-white">Cryptographic Handoff:</strong> Eliminates disputed provenance by requiring digital signatures from both institutions and collectors.</p>
+                  </div>
+                  <div className="flex items-start gap-3">
+                    <span className="flex-shrink-0 w-6 h-6 rounded-full bg-amber-500/20 text-amber-400 flex items-center justify-center text-xs font-bold">✓</span>
+                    <p><strong className="text-white">Perpetual Preservation:</strong> Metadata, spectral scans, and archival appraisals remain accessible across IPFS forever.</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* 6. High-End Call To Action Banner */}
       <section className="py-20 relative overflow-hidden bg-gradient-to-b from-[#0B0F17] via-slate-900/60 to-[#0B0F17] border-t border-slate-800/60">
         <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 text-center relative z-10">
           <div className="rounded-3xl p-10 sm:p-14 bg-gradient-to-tr from-slate-900/90 via-indigo-950/40 to-slate-900/90 border border-slate-700/60 shadow-2xl shadow-indigo-950/40 backdrop-blur-xl space-y-6">
@@ -410,7 +637,7 @@ const LandingPage: React.FC = () => {
         </div>
       </section>
 
-      {/* 5. Minimalist Footer */}
+      {/* 7. Minimalist Footer */}
       <footer className="border-t border-slate-800/80 py-12 bg-[#080B11] text-slate-400 text-sm">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between gap-6">
           <div className="flex items-center gap-2">
@@ -418,10 +645,37 @@ const LandingPage: React.FC = () => {
             <span className="text-xs text-slate-500">• Artchain Provenance Trail</span>
           </div>
           <div className="flex items-center gap-6 text-xs text-slate-400">
-            <a href="#features" className="hover:text-slate-200 transition">Features</a>
-            <a href="#how-it-works" className="hover:text-slate-200 transition">How It Works</a>
-            <Link to="/verify" className="hover:text-slate-200 transition">Verification Portal</Link>
-            <a href="#privacy" className="hover:text-slate-200 transition">Privacy</a>
+            <a
+              href="#hero"
+              onClick={scrollToTop}
+              className="hover:text-slate-200 transition cursor-pointer"
+            >
+              Back to Top
+            </a>
+            <a
+              href="#features"
+              onClick={(e) => handleNavScroll(e, 'features')}
+              className="hover:text-slate-200 transition cursor-pointer"
+            >
+              Features
+            </a>
+            <a
+              href="#how-it-works"
+              onClick={(e) => handleNavScroll(e, 'how-it-works')}
+              className="hover:text-slate-200 transition cursor-pointer"
+            >
+              How It Works
+            </a>
+            <a
+              href="#about"
+              onClick={(e) => handleNavScroll(e, 'about')}
+              className="hover:text-slate-200 transition cursor-pointer"
+            >
+              About
+            </a>
+            <Link to="/verify" className="hover:text-slate-200 transition">
+              Verification Portal
+            </Link>
           </div>
           <p className="text-xs text-slate-500">
             &copy; {new Date().getFullYear()} Aureum Artchain Protocol. All rights reserved.

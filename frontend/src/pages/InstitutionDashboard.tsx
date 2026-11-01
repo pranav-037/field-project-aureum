@@ -42,6 +42,28 @@ const InstitutionDashboard: React.FC = () => {
     setTimeout(() => setCopiedTx(null), 2000);
   };
 
+  const handleNavScroll = (e: React.MouseEvent<HTMLAnchorElement>, targetId: string) => {
+    e.preventDefault();
+    const element = document.getElementById(targetId);
+    if (element) {
+      const navOffset = 80;
+      const elementPosition = element.getBoundingClientRect().top;
+      const offsetPosition = elementPosition + window.pageYOffset - navOffset;
+
+      window.scrollTo({
+        top: Math.max(0, offsetPosition),
+        behavior: 'smooth'
+      });
+      window.history.pushState(null, '', `#${targetId}`);
+    }
+  };
+
+  const scrollToTop = (e: React.MouseEvent) => {
+    e.preventDefault();
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+    window.history.pushState(null, '', window.location.pathname);
+  };
+
   return (
     <div className="min-h-screen bg-[#0B0F17] text-slate-100 flex flex-col selection:bg-indigo-500/30 selection:text-indigo-200">
       {/* Ambient Gradient Glows */}
@@ -52,7 +74,11 @@ const InstitutionDashboard: React.FC = () => {
       <nav className="sticky top-0 z-40 backdrop-blur-xl bg-[#0B0F17]/85 border-b border-slate-800/80 transition-all duration-300">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-20 flex items-center justify-between">
           {/* Brand Logo */}
-          <Link to="/institution/dashboard" className="flex items-center gap-3 group">
+          <Link
+            to="/institution/dashboard"
+            onClick={scrollToTop}
+            className="flex items-center gap-3 group"
+          >
             <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-amber-500 via-indigo-600 to-violet-500 p-[1.5px] shadow-lg shadow-indigo-500/20 group-hover:shadow-indigo-500/40 transition duration-300">
               <div className="w-full h-full bg-[#0B0F17] rounded-[10px] flex items-center justify-center">
                 <svg className="w-5 h-5 text-amber-400 group-hover:scale-110 transition duration-300" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -75,10 +101,14 @@ const InstitutionDashboard: React.FC = () => {
 
           {/* Navigation Links */}
           <div className="hidden md:flex items-center gap-8 text-sm font-medium">
-            <Link to="/institution/dashboard" className="text-white font-semibold flex items-center gap-2 border-b-2 border-indigo-500 pb-1 pt-1">
+            <a
+              href="#overview"
+              onClick={(e) => handleNavScroll(e, 'overview')}
+              className="text-white font-semibold flex items-center gap-2 border-b-2 border-indigo-500 pb-1 pt-1 cursor-pointer"
+            >
               <span className="w-2 h-2 rounded-full bg-indigo-400"></span>
               Overview
-            </Link>
+            </a>
             <Link to="/artwork/register" className="text-slate-400 hover:text-slate-200 transition">
               Register Artwork
             </Link>
@@ -126,7 +156,7 @@ const InstitutionDashboard: React.FC = () => {
       </nav>
 
       {/* Main Container */}
-      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-12 space-y-10">
+      <main id="overview" className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-12 space-y-10 scroll-mt-24">
         {/* Welcome Header */}
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 pb-2 border-b border-slate-800/80">
           <div>

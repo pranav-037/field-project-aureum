@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useWallet } from '../contexts/WalletContext';
 import { useArtchainContract } from '../hooks/useArtchainContract';
@@ -37,6 +37,48 @@ const CollectorDashboard: React.FC = () => {
   const [showIncomingModal, setShowIncomingModal] = useState(false);
   const [incomingAccepted, setIncomingAccepted] = useState(false);
   const [copiedTx, setCopiedTx] = useState<string | null>(null);
+
+  // Smooth scroll handler for same-page tabs
+  const handleNavScroll = (e: React.MouseEvent<HTMLAnchorElement>, targetId: string) => {
+    e.preventDefault();
+    const element = document.getElementById(targetId);
+    if (element) {
+      const navOffset = 80;
+      const elementPosition = element.getBoundingClientRect().top;
+      const offsetPosition = elementPosition + window.pageYOffset - navOffset;
+
+      window.scrollTo({
+        top: Math.max(0, offsetPosition),
+        behavior: 'smooth'
+      });
+      window.history.pushState(null, '', `#${targetId}`);
+    }
+  };
+
+  const scrollToTop = (e: React.MouseEvent) => {
+    e.preventDefault();
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+    window.history.pushState(null, '', window.location.pathname);
+  };
+
+  // Handle direct navigation with hash e.g. /collector/dashboard#collection
+  useEffect(() => {
+    if (window.location.hash) {
+      const id = window.location.hash.replace('#', '');
+      const element = document.getElementById(id);
+      if (element) {
+        setTimeout(() => {
+          const navOffset = 80;
+          const elementPosition = element.getBoundingClientRect().top;
+          const offsetPosition = elementPosition + window.pageYOffset - navOffset;
+          window.scrollTo({
+            top: Math.max(0, offsetPosition),
+            behavior: 'smooth'
+          });
+        }, 150);
+      }
+    }
+  }, []);
 
   // Mock Owned Artworks
   const artworks: Artwork[] = [
@@ -197,7 +239,11 @@ const CollectorDashboard: React.FC = () => {
       <nav className="sticky top-0 z-40 backdrop-blur-xl bg-[#0B0F17]/85 border-b border-slate-800/80 transition-all duration-300">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-20 flex items-center justify-between">
           {/* Brand Logo */}
-          <Link to="/collector/dashboard" className="flex items-center gap-3 group">
+          <Link
+            to="/collector/dashboard"
+            onClick={scrollToTop}
+            className="flex items-center gap-3 group"
+          >
             <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-amber-500 via-indigo-600 to-violet-500 p-[1.5px] shadow-lg shadow-indigo-500/20 group-hover:shadow-indigo-500/40 transition duration-300">
               <div className="w-full h-full bg-[#0B0F17] rounded-[10px] flex items-center justify-center">
                 <svg className="w-5 h-5 text-amber-400 group-hover:scale-110 transition duration-300" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -218,16 +264,28 @@ const CollectorDashboard: React.FC = () => {
             </div>
           </Link>
 
-          {/* Center Navigation Links */}
+          {/* Center Navigation Links with Smooth Scrolling */}
           <div className="hidden md:flex items-center gap-8 text-sm font-medium">
-            <Link to="/collector/dashboard" className="text-white font-semibold flex items-center gap-2 border-b-2 border-indigo-500 pb-1 pt-1">
+            <a
+              href="#overview"
+              onClick={(e) => handleNavScroll(e, 'overview')}
+              className="text-white font-semibold flex items-center gap-2 border-b-2 border-indigo-500 pb-1 pt-1 cursor-pointer"
+            >
               <span className="w-2 h-2 rounded-full bg-indigo-400"></span>
               Overview
-            </Link>
-            <a href="#collection" className="text-slate-400 hover:text-slate-200 transition">
+            </a>
+            <a
+              href="#collection"
+              onClick={(e) => handleNavScroll(e, 'collection')}
+              className="text-slate-400 hover:text-slate-200 transition cursor-pointer"
+            >
               My Collection
             </a>
-            <a href="#transfers" className="text-slate-400 hover:text-slate-200 transition flex items-center gap-1.5">
+            <a
+              href="#transfers"
+              onClick={(e) => handleNavScroll(e, 'transfers')}
+              className="text-slate-400 hover:text-slate-200 transition flex items-center gap-1.5 cursor-pointer"
+            >
               Transfers
               {!incomingAccepted && (
                 <span className="px-1.5 py-0.2 text-[10px] font-bold rounded-full bg-indigo-500/30 text-indigo-300 border border-indigo-500/40">
@@ -269,7 +327,7 @@ const CollectorDashboard: React.FC = () => {
       </nav>
 
       {/* 2. Main Content Workspace */}
-      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-12 space-y-10">
+      <main id="overview" className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-12 space-y-10 scroll-mt-24">
         
         {/* Welcome Header */}
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 pb-2 border-b border-slate-800/80">
@@ -452,7 +510,7 @@ const CollectorDashboard: React.FC = () => {
         )}
 
         {/* 5. My Collection Section */}
-        <section id="collection" className="space-y-6">
+        <section id="collection" className="space-y-6 scroll-mt-24">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
             <div>
               <h2 className="text-xl sm:text-2xl font-bold text-white tracking-tight flex items-center gap-2.5">
@@ -578,7 +636,7 @@ const CollectorDashboard: React.FC = () => {
         </section>
 
         {/* 6. Recent Transactions & Activity */}
-        <section id="transfers" className="space-y-4">
+        <section id="transfers" className="space-y-4 scroll-mt-24">
           <div className="flex items-center justify-between">
             <div>
               <h2 className="text-xl sm:text-2xl font-bold text-white tracking-tight">
