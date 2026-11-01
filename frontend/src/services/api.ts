@@ -1,6 +1,6 @@
 import axios from 'axios';
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000/api';
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api';
 
 const api = axios.create({
   baseURL: API_BASE_URL,
@@ -128,7 +128,7 @@ export const blockchainApi = {
 
 // Health check
 export const healthApi = {
-  check: () => axios.get('http://localhost:3000/health'),
+  check: () => axios.get('/health'),
 };
 
 // Helper to extract exact reason from errors
@@ -162,7 +162,7 @@ export function formatAuthError(err: any, fallbackMessage: string): string {
 
   // Network & connection errors
   if (err?.code === 'ERR_NETWORK' || err?.message === 'Network Error') {
-    return `Cannot connect to server at ${API_BASE_URL}. Please check if the backend is running.`;
+    return 'Cannot connect to authentication server. Please check your internet connection or verify the service is running.';
   }
   if (err?.code === 'ECONNABORTED' || err?.name === 'TimeoutError') {
     return 'Connection to server timed out. Please try again.';
