@@ -4,6 +4,20 @@ import { Link } from 'react-router-dom';
 const LandingPage: React.FC = () => {
   const [walletConnected, setWalletConnected] = useState(false);
   const [walletAddress, setWalletAddress] = useState('');
+  const [currentUser, setCurrentUser] = useState<{ email?: string; role?: string; name?: string } | null>(() => {
+    try {
+      const token = localStorage.getItem('aureum_token');
+      const userRaw = localStorage.getItem('aureum_user');
+      if (!token || !userRaw) return null;
+      return JSON.parse(userRaw);
+    } catch {
+      return null;
+    }
+  });
+
+  const dashboardUrl = currentUser?.role === 'ADMIN' || currentUser?.role === 'AUTHENTICATOR'
+    ? '/institution/dashboard'
+    : '/collector/dashboard';
 
   const handleConnectWallet = () => {
     if (!walletConnected) {
@@ -15,13 +29,19 @@ const LandingPage: React.FC = () => {
     }
   };
 
+  const handleSignOut = () => {
+    localStorage.removeItem('aureum_token');
+    localStorage.removeItem('aureum_user');
+    setCurrentUser(null);
+  };
+
   return (
     <div className="min-h-screen bg-[#0B0F17] text-slate-100 flex flex-col selection:bg-indigo-500/30 selection:text-indigo-200">
       {/* 1. Professional Navigation Bar */}
       <nav className="sticky top-0 z-50 backdrop-blur-xl bg-[#0B0F17]/80 border-b border-slate-800/80 transition-all duration-300">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-20 flex items-center justify-between">
           {/* Brand Logo */}
-          <Link to="/" className="flex items-center gap-3 group">
+          <Link to={currentUser ? dashboardUrl : "/"} className="flex items-center gap-3 group">
             <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-amber-500 via-indigo-600 to-violet-500 p-[1.5px] shadow-lg shadow-indigo-500/20 group-hover:shadow-indigo-500/40 transition duration-300">
               <div className="w-full h-full bg-[#0B0F17] rounded-[10px] flex items-center justify-center">
                 <svg className="w-5 h-5 text-amber-400 group-hover:scale-110 transition duration-300" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -61,12 +81,34 @@ const LandingPage: React.FC = () => {
 
           {/* Action Buttons */}
           <div className="flex items-center gap-3">
-            <Link
-              to="/login"
-              className="text-sm font-medium px-4 py-2 text-slate-300 hover:text-white hover:bg-slate-800/60 rounded-lg transition duration-200"
-            >
-              Sign In
-            </Link>
+            {currentUser ? (
+              <div className="flex items-center gap-3">
+                <Link
+                  to={dashboardUrl}
+                  className="text-xs sm:text-sm font-semibold px-3.5 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white shadow-md shadow-indigo-600/30 transition flex items-center gap-2"
+                >
+                  <span>Dashboard</span>
+                  <span className="text-[10px] px-1.5 py-0.5 rounded bg-indigo-950 text-indigo-300 border border-indigo-500/40 uppercase font-bold">
+                    {currentUser.role === 'AUTHENTICATOR' || currentUser.role === 'ADMIN' ? 'Institution' : 'Collector'}
+                  </span>
+                </Link>
+                <button
+                  type="button"
+                  onClick={handleSignOut}
+                  className="text-xs text-slate-400 hover:text-rose-400 px-2 py-1.5 rounded transition cursor-pointer"
+                  title="Sign Out"
+                >
+                  Sign Out
+                </button>
+              </div>
+            ) : (
+              <Link
+                to="/login"
+                className="text-sm font-medium px-4 py-2 text-slate-300 hover:text-white hover:bg-slate-800/60 rounded-lg transition duration-200"
+              >
+                Sign In
+              </Link>
+            )}
             <button
               onClick={handleConnectWallet}
               className="text-sm font-semibold px-4 py-2.5 rounded-lg bg-gradient-to-r from-indigo-600 via-indigo-500 to-violet-600 hover:from-indigo-500 hover:to-violet-500 text-white shadow-lg shadow-indigo-600/30 hover:shadow-indigo-600/50 hover:-translate-y-0.5 transition duration-200 flex items-center gap-2 cursor-pointer"
@@ -116,10 +158,10 @@ const LandingPage: React.FC = () => {
               {/* Distinct Well-Spaced Hero Action Buttons */}
               <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-4 pt-2">
                 <Link
-                  to="/register"
+                  to={currentUser ? dashboardUrl : "/register"}
                   className="px-6 py-3.5 rounded-xl bg-gradient-to-r from-indigo-600 via-indigo-500 to-violet-600 hover:from-indigo-500 hover:to-violet-500 text-white font-semibold text-center shadow-lg shadow-indigo-600/30 hover:shadow-indigo-600/50 hover:-translate-y-0.5 transition duration-200 flex items-center justify-center gap-2"
                 >
-                  <span>Get Started Free</span>
+                  <span>{currentUser ? 'Go to Dashboard' : 'Get Started Free'}</span>
                   <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M14 5l7 7m0 0l-7 7m7-7H3" />
                   </svg>

@@ -18,7 +18,8 @@ export const userApi = {
 
 // Auth API
 export const authApi = {
-  login: (data: { email: string; password: string }) => api.post('/login', data),
+  login: (data: { email: string; password: string }) => api.post('/auth/login', data),
+  googleLogin: (data: { idToken: string; role?: string }) => api.post('/auth/google', data),
 };
 
 // Artwork API

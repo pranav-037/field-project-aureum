@@ -54,6 +54,20 @@ app.post(['/api/login', '/api/auth/login'], async (req: Request, res: Response) 
   }
 });
 
+// Google OAuth sign-in / sign-up
+app.post('/api/auth/google', async (req: Request, res: Response) => {
+  try {
+    const { idToken, role } = req.body;
+    if (!idToken) {
+      return res.status(400).json({ error: 'Google ID token is required' });
+    }
+    const result = await AuthService.loginWithGoogle(idToken, role || 'VIEWER');
+    res.json(result);
+  } catch (error) {
+    res.status(401).json({ error: (error as Error).message || 'Google authentication failed' });
+  }
+});
+
 // Health check
 app.get('/health', async (req: Request, res: Response) => {
   try {

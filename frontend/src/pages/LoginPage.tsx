@@ -1,16 +1,54 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { authApi } from '../services/api';
+import { useGoogleAuth } from '../hooks/useGoogleAuth';
+
+/** Returns the dashboard path for the stored user, or null if not logged in */
+function getLoggedInDashboard(): string | null {
+  try {
+    const token = localStorage.getItem('aureum_token');
+    const userRaw = localStorage.getItem('aureum_user');
+    if (!token || !userRaw) return null;
+    const user = JSON.parse(userRaw) as { role?: string };
+    const role = user?.role || '';
+    if (role === 'ADMIN' || role === 'AUTHENTICATOR') return '/institution/dashboard';
+    return '/collector/dashboard';
+  } catch {
+    return null;
+  }
+}
 
 const LoginPage: React.FC = () => {
   const navigate = useNavigate();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [totp, setTotp] = useState('');
   const [isInstitution, setIsInstitution] = useState(true);
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const googleBtnRef = useRef<HTMLDivElement>(null);
+
+  const currentRole = isInstitution ? 'AUTHENTICATOR' : 'COLLECTOR';
+
+  const { isConfigured, renderButton } = useGoogleAuth({
+    role: currentRole,
+    onSuccess: (data) => {
+      const role = (data.user as { role?: string })?.role || '';
+      if (role === 'AUTHENTICATOR' || role === 'ADMIN') {
+        navigate('/institution/dashboard');
+      } else {
+        navigate('/collector/dashboard');
+      }
+    },
+    onError: (msg) => setError(msg),
+  });
+
+  // Re-render the Google button whenever role changes or ref mounts
+  useEffect(() => {
+    if (isConfigured && googleBtnRef.current) {
+      renderButton(googleBtnRef.current);
+    }
+  }, [isConfigured, renderButton, isInstitution]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -51,7 +89,7 @@ const LoginPage: React.FC = () => {
       {/* Top Minimal Navigation */}
       <header className="w-full border-b border-slate-800/80 bg-[#0B0F17]/80 backdrop-blur-md">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
-          <Link to="/" className="flex items-center gap-2.5 group">
+          <Link to={getLoggedInDashboard() ?? '/'} className="flex items-center gap-2.5 group">
             <div className="w-8 h-8 rounded-lg bg-gradient-to-tr from-amber-500 via-indigo-600 to-violet-500 p-[1.5px] shadow-md shadow-indigo-500/20 group-hover:shadow-indigo-500/40 transition">
               <div className="w-full h-full bg-[#0B0F17] rounded-[6px] flex items-center justify-center">
                 <svg className="w-4 h-4 text-amber-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -205,8 +243,20 @@ const LoginPage: React.FC = () => {
                 </div>
               )}
 
+              {/* Google Sign-In */}
+              {isConfigured && (
+                <div className="mb-4">
+                  <div ref={googleBtnRef} className="w-full flex justify-center" />
+                  <div className="flex items-center gap-3 mt-5 mb-5">
+                    <div className="flex-1 h-px bg-slate-800" />
+                    <span className="text-xs text-slate-500 font-medium">or continue with email</span>
+                    <div className="flex-1 h-px bg-slate-800" />
+                  </div>
+                </div>
+              )}
+
               {/* Login Form */}
-              <form onSubmit={handleSubmit} className="space-y-4 text-left">
+              <form onSubmit={handleSubmit} autoComplete="off" className="space-y-4 text-left">
                 {/* Email Field */}
                 <div>
                   <label htmlFor="email" className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1.5">
@@ -217,6 +267,7 @@ const LoginPage: React.FC = () => {
                       id="email"
                       type="email"
                       required
+                      autoComplete="off"
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
                       disabled={loading}
@@ -244,6 +295,7 @@ const LoginPage: React.FC = () => {
                       id="password"
                       type={showPassword ? 'text' : 'password'}
                       required
+                      autoComplete="new-password"
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
                       disabled={loading}
@@ -270,43 +322,26 @@ const LoginPage: React.FC = () => {
                   </div>
                 </div>
 
-                {/* Two-Factor Authentication Code (TOTP) */}
-                {isInstitution ? (
+                {/* Two-Factor Authentication Code — institutions only */}
+                {isInstitution && (
                   <div>
                     <label htmlFor="totp" className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1.5 flex items-center justify-between">
                       <span>Two-Factor Authentication Code</span>
-                      <span className="text-[10px] font-normal text-amber-300/80">Required for Institutions</span>
+                      <span className="text-[10px] font-normal text-amber-300/80">Institutions only</span>
                     </label>
                     <input
                       id="totp"
                       type="text"
+                      inputMode="numeric"
                       maxLength={6}
-                      value={totp}
-                      onChange={(e) => setTotp(e.target.value)}
-                      disabled={loading}
+                      autoComplete="one-time-code"
                       placeholder="e.g. 481920"
+                      disabled={loading}
                       className="w-full px-3.5 py-2.5 rounded-xl bg-slate-950/70 border border-slate-700/80 text-white font-mono placeholder-slate-500 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition duration-150"
                     />
                     <p className="text-[11px] text-slate-400 mt-1">
-                      Enter the 6-digit verification code from your hardware authenticator app.
+                      Enter the 6-digit code from your authenticator app.
                     </p>
-                  </div>
-                ) : (
-                  <div>
-                    <label htmlFor="totp-optional" className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1.5 flex items-center justify-between">
-                      <span>Two-Factor Code</span>
-                      <span className="text-[10px] font-normal text-slate-500">Optional</span>
-                    </label>
-                    <input
-                      id="totp-optional"
-                      type="text"
-                      maxLength={6}
-                      value={totp}
-                      onChange={(e) => setTotp(e.target.value)}
-                      disabled={loading}
-                      placeholder="Enter code if 2FA enabled"
-                      className="w-full px-3.5 py-2.5 rounded-xl bg-slate-950/70 border border-slate-800 text-white font-mono placeholder-slate-600 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 transition duration-150"
-                    />
                   </div>
                 )}
 

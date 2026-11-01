@@ -1,5 +1,21 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+import { useGoogleAuth } from '../hooks/useGoogleAuth';
+
+/** Returns the dashboard path for the stored user, or null if not logged in */
+function getLoggedInDashboard(): string | null {
+  try {
+    const token = localStorage.getItem('aureum_token');
+    const userRaw = localStorage.getItem('aureum_user');
+    if (!token || !userRaw) return null;
+    const user = JSON.parse(userRaw) as { role?: string };
+    const role = user?.role || '';
+    if (role === 'ADMIN' || role === 'AUTHENTICATOR') return '/institution/dashboard';
+    return '/collector/dashboard';
+  } catch {
+    return null;
+  }
+}
 
 const RegisterPage: React.FC = () => {
   const navigate = useNavigate();
@@ -17,6 +33,28 @@ const RegisterPage: React.FC = () => {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const googleBtnRef = useRef<HTMLDivElement>(null);
+
+  const currentRole = formData.userType === 'institution' ? 'AUTHENTICATOR' : 'COLLECTOR';
+
+  const { isConfigured, renderButton } = useGoogleAuth({
+    role: currentRole,
+    onSuccess: (data) => {
+      const role = (data.user as { role?: string })?.role || '';
+      if (role === 'AUTHENTICATOR' || role === 'ADMIN') {
+        navigate('/institution/dashboard');
+      } else {
+        navigate('/collector/dashboard');
+      }
+    },
+    onError: (msg) => setError(msg),
+  });
+
+  useEffect(() => {
+    if (isConfigured && googleBtnRef.current) {
+      renderButton(googleBtnRef.current);
+    }
+  }, [isConfigured, renderButton, formData.userType]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     const { name, id, value, type } = e.target;
@@ -91,7 +129,7 @@ const RegisterPage: React.FC = () => {
       {/* Top Minimal Navigation */}
       <header className="w-full border-b border-slate-800/80 bg-[#0B0F17]/80 backdrop-blur-md">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
-          <Link to="/" className="flex items-center gap-2.5 group">
+          <Link to={getLoggedInDashboard() ?? '/'} className="flex items-center gap-2.5 group">
             <div className="w-8 h-8 rounded-lg bg-gradient-to-tr from-amber-500 via-indigo-600 to-violet-500 p-[1.5px] shadow-md shadow-indigo-500/20 group-hover:shadow-indigo-500/40 transition">
               <div className="w-full h-full bg-[#0B0F17] rounded-[6px] flex items-center justify-center">
                 <svg className="w-4 h-4 text-amber-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -212,8 +250,20 @@ const RegisterPage: React.FC = () => {
                 </div>
               )}
 
+              {/* Google Sign-Up */}
+              {isConfigured && (
+                <div className="mb-4">
+                  <div ref={googleBtnRef} className="w-full flex justify-center" />
+                  <div className="flex items-center gap-3 mt-5 mb-5">
+                    <div className="flex-1 h-px bg-slate-800" />
+                    <span className="text-xs text-slate-500 font-medium">or register with email</span>
+                    <div className="flex-1 h-px bg-slate-800" />
+                  </div>
+                </div>
+              )}
+
               {/* Registration Form */}
-              <form onSubmit={handleSubmit} className="space-y-4 text-left">
+              <form onSubmit={handleSubmit} autoComplete="off" className="space-y-4 text-left">
                 {/* Full Name Field */}
                 <div>
                   <label htmlFor="fullName" className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1.5">
@@ -225,6 +275,7 @@ const RegisterPage: React.FC = () => {
                       name="fullName"
                       type="text"
                       required
+                      autoComplete="name"
                       value={formData.fullName}
                       onChange={handleChange}
                       disabled={loading}
@@ -245,6 +296,7 @@ const RegisterPage: React.FC = () => {
                       name="email"
                       type="email"
                       required
+                      autoComplete="off"
                       value={formData.email}
                       onChange={handleChange}
                       disabled={loading}
@@ -267,6 +319,7 @@ const RegisterPage: React.FC = () => {
                       name="password"
                       type={showPassword ? 'text' : 'password'}
                       required
+                      autoComplete="new-password"
                       value={formData.password}
                       onChange={handleChange}
                       disabled={loading}
@@ -306,6 +359,7 @@ const RegisterPage: React.FC = () => {
                       name="confirmPassword"
                       type={showConfirmPassword ? 'text' : 'password'}
                       required
+                      autoComplete="new-password"
                       value={formData.confirmPassword}
                       onChange={handleChange}
                       disabled={loading}

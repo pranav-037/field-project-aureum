@@ -4,6 +4,20 @@ import { artworkApi } from '../services/api';
 import WalletButton from '../components/WalletButton';
 import { useArtchainContract } from '../hooks/useArtchainContract';
 
+function getLoggedInDashboard(): string | null {
+  try {
+    const token = localStorage.getItem('aureum_token');
+    const userRaw = localStorage.getItem('aureum_user');
+    if (!token || !userRaw) return null;
+    const user = JSON.parse(userRaw) as { role?: string };
+    const role = user?.role || '';
+    if (role === 'ADMIN' || role === 'AUTHENTICATOR') return '/institution/dashboard';
+    return '/collector/dashboard';
+  } catch {
+    return null;
+  }
+}
+
 interface TransferRecord {
   id: string;
   date: string;
@@ -211,7 +225,7 @@ const ProvenanceVerification: React.FC = () => {
       {/* 1. Consistent Navigation Bar */}
       <nav className="sticky top-0 z-50 backdrop-blur-xl bg-[#0B0F17]/85 border-b border-slate-800/80">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-18 flex items-center justify-between">
-          <Link to="/" className="flex items-center gap-2.5 group">
+          <Link to={getLoggedInDashboard() ?? '/'} className="flex items-center gap-2.5 group">
             <div className="w-8 h-8 rounded-lg bg-gradient-to-tr from-amber-500 via-indigo-600 to-violet-500 p-[1.5px] shadow-md shadow-indigo-500/20 group-hover:shadow-indigo-500/40 transition">
               <div className="w-full h-full bg-[#0B0F17] rounded-[6px] flex items-center justify-center">
                 <svg className="w-4 h-4 text-amber-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -237,16 +251,27 @@ const ProvenanceVerification: React.FC = () => {
               Verify
               <span className="w-1.5 h-1.5 rounded-full bg-amber-400"></span>
             </Link>
-            <Link to="/login" className="text-slate-400 hover:text-slate-200 transition">
-              Sign In
-            </Link>
+            {getLoggedInDashboard() ? (
+              <Link
+                to={getLoggedInDashboard()!}
+                className="text-xs font-semibold px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white shadow-md transition"
+              >
+                Dashboard
+              </Link>
+            ) : (
+              <>
+                <Link to="/login" className="text-slate-400 hover:text-slate-200 transition">
+                  Sign In
+                </Link>
+                <Link
+                  to="/register"
+                  className="hidden sm:inline-flex px-3.5 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold shadow-md transition"
+                >
+                  Get Started
+                </Link>
+              </>
+            )}
             <WalletButton />
-            <Link
-              to="/register"
-              className="hidden sm:inline-flex px-3.5 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold shadow-md transition"
-            >
-              Get Started
-            </Link>
           </div>
         </div>
       </nav>
