@@ -47,9 +47,17 @@ function verifyGoogleToken(idToken: string): Promise<GoogleTokenPayload> {
 export class AuthService {
   // In a real app, we would hash passwords. For this basic app, we'll store them plainly
   // but this is ONLY for demonstration - NEVER do this in production!
-  static async register(email: string, password: string, name: string, role: string = 'VIEWER'): Promise<LoginResponse> {
+  static async register(
+    email: string,
+    password: string,
+    name: string,
+    role: string = 'VIEWER',
+    walletAddress?: string
+  ): Promise<LoginResponse> {
+    const normalizedEmail = email.trim().toLowerCase();
+
     // Check if user already exists
-    const existingUser = await prisma.user.findUnique({ where: { email } });
+    const existingUser = await prisma.user.findUnique({ where: { email: normalizedEmail } });
     if (existingUser) {
       throw new Error('User with this email already exists');
     }
@@ -57,12 +65,47 @@ export class AuthService {
     // Create user
     const user = await prisma.user.create({
       data: {
-        email,
-        name,
+        email: normalizedEmail,
+        name: name.trim(),
         role,
         password: password || '',
+        walletAddress: walletAddress?.trim() || null,
       },
     });
+
+    // If an institution with a wallet address registers, ensure institution record
+    if (role === 'AUTHENTICATOR' && walletAddress) {
+      try {
+        await prisma.institution.upsert({
+          where: { walletAddress: walletAddress.trim() },
+          update: { name: name.trim() },
+          create: {
+            name: name.trim(),
+            walletAddress: walletAddress.trim(),
+            status: 'APPROVED',
+            approvedAt: new Date(),
+          },
+        });
+      } catch (instErr) {
+        console.warn('Failed to upsert institution record:', instErr);
+      }
+    }
+
+    // Record activity in database
+    try {
+      await prisma.activity.create({
+        data: {
+          userId: user.id,
+          userEmail: user.email,
+          type: 'REGISTER',
+          title: 'Account Registered',
+          detail: `${user.name} (${user.email}) registered as ${user.role}`,
+          badge: 'ACCOUNT',
+        },
+      });
+    } catch (actErr) {
+      console.warn('Failed to log register activity:', actErr);
+    }
 
     // Generate JWT token
     const token = sign(
@@ -72,18 +115,40 @@ export class AuthService {
     );
 
     // Return user without password
-    const { id, email: userEmail, name: userName, role: userRole, walletAddress, googleId, avatarUrl, createdAt, updatedAt } = user;
+    const { id, email: userEmail, name: userName, role: userRole, walletAddress: userWallet, googleId, avatarUrl, createdAt, updatedAt } = user;
     return {
       token,
-      user: { id, email: userEmail, name: userName, role: userRole, walletAddress: walletAddress || null, googleId: googleId || null, avatarUrl: avatarUrl || null, createdAt, updatedAt }
+      user: { id, email: userEmail, name: userName, role: userRole, walletAddress: userWallet || null, googleId: googleId || null, avatarUrl: avatarUrl || null, createdAt, updatedAt }
     };
   }
 
   static async login(email: string, password: string): Promise<LoginResponse> {
+    const normalizedEmail = email.trim().toLowerCase();
+
     // Find user by email
-    const user = await prisma.user.findUnique({ where: { email } });
+    const user = await prisma.user.findUnique({ where: { email: normalizedEmail } });
     if (!user) {
+      throw new Error('No account found with this email. Please register first.');
+    }
+
+    if (user.password && user.password !== password) {
       throw new Error('Invalid email or password');
+    }
+
+    // Record login activity in database
+    try {
+      await prisma.activity.create({
+        data: {
+          userId: user.id,
+          userEmail: user.email,
+          type: 'LOGIN',
+          title: 'User Signed In',
+          detail: `${user.name} logged in (${user.role})`,
+          badge: 'SESSION',
+        },
+      });
+    } catch (actErr) {
+      console.warn('Failed to log login activity:', actErr);
     }
 
     // Generate JWT token
@@ -103,16 +168,12 @@ export class AuthService {
 
   /**
    * Verify a Google ID token, then upsert the user in the DB.
-   * On first sign-in the user is created with `defaultRole`.
-   * On subsequent sign-ins the existing record is returned.
-   * If an email/password account already exists with the same email it gets linked.
    */
   static async loginWithGoogle(idToken: string, defaultRole: string = 'VIEWER'): Promise<LoginResponse> {
     const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID;
 
     const payload = await verifyGoogleToken(idToken);
 
-    // Optionally enforce that the token was issued for our client ID
     if (GOOGLE_CLIENT_ID && payload.aud !== GOOGLE_CLIENT_ID) {
       throw new Error('Google ID token audience mismatch');
     }
@@ -125,7 +186,7 @@ export class AuthService {
     let user = await prisma.user.findUnique({ where: { googleId: payload.sub } });
 
     if (!user) {
-      user = await prisma.user.findUnique({ where: { email: payload.email } });
+      user = await prisma.user.findUnique({ where: { email: payload.email.toLowerCase() } });
       if (user) {
         // Link this Google identity to the existing account
         user = await prisma.user.update({
@@ -139,7 +200,7 @@ export class AuthService {
         // Brand-new user via Google
         user = await prisma.user.create({
           data: {
-            email: payload.email,
+            email: payload.email.toLowerCase(),
             name: payload.name || payload.email.split('@')[0],
             role: defaultRole,
             password: '',
@@ -149,11 +210,26 @@ export class AuthService {
         });
       }
     } else if (payload.picture && payload.picture !== user.avatarUrl) {
-      // Keep avatar in sync
       user = await prisma.user.update({
         where: { id: user.id },
         data: { avatarUrl: payload.picture },
       });
+    }
+
+    // Record login activity in database
+    try {
+      await prisma.activity.create({
+        data: {
+          userId: user.id,
+          userEmail: user.email,
+          type: 'LOGIN',
+          title: 'Google Sign-In',
+          detail: `${user.name} signed in with Google (${user.role})`,
+          badge: 'GOOGLE-AUTH',
+        },
+      });
+    } catch (actErr) {
+      console.warn('Failed to log google login activity:', actErr);
     }
 
     const token = sign(

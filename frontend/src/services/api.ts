@@ -1,12 +1,21 @@
 import axios from 'axios';
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api';
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000/api';
 
 const api = axios.create({
   baseURL: API_BASE_URL,
   headers: {
     'Content-Type': 'application/json',
   },
+});
+
+// Attach JWT token to requests if present in localStorage
+api.interceptors.request.use((config) => {
+  const token = localStorage.getItem('aureum_token');
+  if (token && config.headers) {
+    config.headers.Authorization = `Bearer ${token}`;
+  }
+  return config;
 });
 
 // User API
@@ -19,7 +28,31 @@ export const userApi = {
 // Auth API
 export const authApi = {
   login: (data: { email: string; password: string }) => api.post('/auth/login', data),
+  register: (data: {
+    email: string;
+    password?: string;
+    name?: string;
+    fullName?: string;
+    role?: string;
+    userType?: string;
+    walletAddress?: string;
+  }) => api.post('/auth/register', data),
+  getMe: () => api.get('/auth/me'),
   googleLogin: (data: { idToken: string; role?: string }) => api.post('/auth/google', data),
+};
+
+// Activity History API
+export const activityApi = {
+  getAll: (params?: { userId?: string; limit?: number }) => api.get('/activities', { params }),
+  create: (data: {
+    userId?: string;
+    userEmail?: string;
+    type: string;
+    title: string;
+    detail?: string;
+    badge?: string;
+    txHash?: string;
+  }) => api.post('/activities', data),
 };
 
 // Artwork API
@@ -95,7 +128,7 @@ export const blockchainApi = {
 
 // Health check
 export const healthApi = {
-  check: () => axios.get('/health'),
+  check: () => axios.get('http://localhost:3000/health'),
 };
 
 export default api;

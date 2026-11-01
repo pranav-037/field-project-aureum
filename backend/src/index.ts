@@ -41,6 +41,21 @@ app.get('/api', (req: Request, res: Response) => {
 });
 
 // Authentication routes
+app.post(['/api/register', '/api/auth/register'], async (req: Request, res: Response) => {
+  try {
+    const { email, password, name, fullName, role, userType, walletAddress } = req.body;
+    const resolvedName = name || fullName;
+    if (!email || !resolvedName) {
+      return res.status(400).json({ error: 'Email and name are required' });
+    }
+    const resolvedRole = role || (userType === 'institution' ? 'AUTHENTICATOR' : 'COLLECTOR');
+    const result = await AuthService.register(email, password, resolvedName, resolvedRole, walletAddress);
+    res.status(201).json(result);
+  } catch (error) {
+    res.status(400).json({ error: (error as Error).message || 'Registration failed' });
+  }
+});
+
 app.post(['/api/login', '/api/auth/login'], async (req: Request, res: Response) => {
   try {
     const { email, password } = req.body;
@@ -65,6 +80,78 @@ app.post('/api/auth/google', async (req: Request, res: Response) => {
     res.json(result);
   } catch (error) {
     res.status(401).json({ error: (error as Error).message || 'Google authentication failed' });
+  }
+});
+
+// Get current user profile
+app.get('/api/auth/me', async (req: Request, res: Response) => {
+  try {
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return res.status(401).json({ error: 'Missing authorization header' });
+    }
+    const token = authHeader.split(' ')[1];
+    const decoded = AuthService.verifyToken(token);
+    if (!decoded) {
+      return res.status(401).json({ error: 'Invalid or expired token' });
+    }
+    const user = await prisma.user.findUnique({
+      where: { id: decoded.userId },
+      select: {
+        id: true,
+        email: true,
+        name: true,
+        role: true,
+        walletAddress: true,
+        googleId: true,
+        avatarUrl: true,
+        createdAt: true,
+      },
+    });
+    if (!user) return res.status(404).json({ error: 'User not found' });
+    res.json(user);
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to verify session' });
+  }
+});
+
+// Activities history
+app.get('/api/activities', async (req: Request, res: Response) => {
+  try {
+    const { userId, limit } = req.query;
+    const where = userId ? { userId: String(userId) } : {};
+    const take = limit ? Math.min(Number(limit), 100) : 50;
+    const activities = await prisma.activity.findMany({
+      where,
+      orderBy: { createdAt: 'desc' },
+      take,
+    });
+    res.json(activities);
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to fetch activities' });
+  }
+});
+
+app.post('/api/activities', async (req: Request, res: Response) => {
+  try {
+    const { userId, userEmail, type, title, detail, badge, txHash } = req.body;
+    if (!title || !type) {
+      return res.status(400).json({ error: 'title and type are required' });
+    }
+    const activity = await prisma.activity.create({
+      data: {
+        userId: userId || null,
+        userEmail: userEmail || null,
+        type,
+        title,
+        detail: detail || null,
+        badge: badge || null,
+        txHash: txHash || null,
+      },
+    });
+    res.status(201).json(activity);
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to record activity' });
   }
 });
 
@@ -382,6 +469,22 @@ app.post('/api/artworks', async (req: Request, res: Response) => {
       },
     });
 
+    // Record Genesis activity
+    try {
+      await prisma.activity.create({
+        data: {
+          userId: ownerId,
+          type: 'GENESIS',
+          title: 'Genesis Record Created',
+          detail: `"${artwork.title}" by ${artwork.artist}`,
+          badge: 'NFC-BOUND',
+          txHash: artwork.txHash,
+        },
+      });
+    } catch (actErr) {
+      console.warn('Failed to log artwork activity:', actErr);
+    }
+
     res.status(201).json({
       ...artwork,
       metadataGatewayUrl: IPFSService.getGatewayUrl(finalMetadataCid),
@@ -464,6 +567,22 @@ app.post('/api/transfers', async (req: Request, res: Response) => {
       },
     });
 
+    // Record Transfer Initiated activity
+    try {
+      await prisma.activity.create({
+        data: {
+          userId: sellerId,
+          type: 'TRANSFER',
+          title: 'Custody Transfer Initiated',
+          detail: `Transfer initiated for "${artwork.title}"`,
+          badge: 'MULTISIG ESCROW',
+          txHash: transfer.txHash,
+        },
+      });
+    } catch (actErr) {
+      console.warn('Failed to log transfer activity:', actErr);
+    }
+
     res.status(201).json({
       ...transfer,
       onChainSynced: Boolean(onChainTransferId),
@@ -510,6 +629,22 @@ app.post('/api/transfers/:id/accept', async (req: Request, res: Response) => {
         where: { id: transfer.artworkId },
         data: { ownerId: transfer.buyerId },
       });
+    }
+
+    // Record Transfer Finalized activity
+    try {
+      await prisma.activity.create({
+        data: {
+          userId: transfer.buyerId || transfer.sellerId,
+          type: 'TRANSFER',
+          title: 'Custody Transfer Finalized',
+          detail: `Transfer finalized on-chain`,
+          badge: 'FINALIZED',
+          txHash: finalTxHash,
+        },
+      });
+    } catch (actErr) {
+      console.warn('Failed to log transfer finalize activity:', actErr);
     }
 
     res.json(updated);

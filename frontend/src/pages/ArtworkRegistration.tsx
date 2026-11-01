@@ -82,6 +82,15 @@ const ArtworkRegistration: React.FC = () => {
         }
       }
 
+      let currentOwnerId = account || 'current-institution-id';
+      try {
+        const rawUser = localStorage.getItem('aureum_user');
+        if (rawUser) {
+          const parsed = JSON.parse(rawUser);
+          currentOwnerId = parsed.id || parsed.email || currentOwnerId;
+        }
+      } catch {}
+
       const artworkData = {
         title: formData.title,
         artist: formData.artist,
@@ -93,7 +102,7 @@ const ArtworkRegistration: React.FC = () => {
         bindingReference: formData.bindingReference || `NFC-UUID-${Date.now()}`,
         imageCids: uploadedImageCids,
         documentCids: uploadedDocCids,
-        ownerId: 'current-institution-id',
+        ownerId: currentOwnerId,
         ownerAddress: account || undefined,
       };
 

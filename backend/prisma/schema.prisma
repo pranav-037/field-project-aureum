@@ -98,3 +98,27 @@ model SyncState {
   lastBlockIndexed Int      @default(0)
   updatedAt        DateTime @updatedAt
 }
+
+model Activity {
+  id        String   @id @default(cuid())
+  userId    String?
+  userEmail String?
+  type      String   // LOGIN, REGISTER, GENESIS, TRANSFER, VERIFICATION, AMENDMENT, FLAG
+  title     String
+  detail    String?
+  badge     String?
+  txHash    String?
+  createdAt DateTime @default(now())
+}
+
+model Activity {
+  id        String   @id @default(cuid())
+  userId    String?
+  userEmail String?
+  type      String   // LOGIN, REGISTER, GENESIS, TRANSFER, VERIFICATION, AMENDMENT, FLAG
+  title     String
+  detail    String?
+  badge     String?
+  txHash    String?
+  createdAt DateTime @default(now())
+}

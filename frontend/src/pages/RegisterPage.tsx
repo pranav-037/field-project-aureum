@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useGoogleAuth } from '../hooks/useGoogleAuth';
+import { authApi } from '../services/api';
 
 /** Returns the dashboard path for the stored user, or null if not logged in */
 function getLoggedInDashboard(): string | null {
@@ -109,16 +110,28 @@ const RegisterPage: React.FC = () => {
       return;
     }
 
-    // TODO: Implement actual registration logic
-    // This would call the backend API
-
     try {
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1500));
-      // On success, redirect to login
-      navigate('/login');
-    } catch (err) {
-      setError('Registration failed. Please try again.');
+      const res = await authApi.register({
+        fullName: formData.fullName.trim(),
+        email: formData.email.trim(),
+        password: formData.password,
+        userType: formData.userType,
+        role: formData.userType === 'institution' ? 'AUTHENTICATOR' : 'COLLECTOR',
+      });
+
+      if (res.data?.token) {
+        localStorage.setItem('aureum_token', res.data.token);
+        localStorage.setItem('aureum_user', JSON.stringify(res.data.user));
+        if (formData.userType === 'institution') {
+          navigate('/institution/dashboard');
+        } else {
+          navigate('/collector/dashboard');
+        }
+      } else {
+        navigate('/login');
+      }
+    } catch (err: any) {
+      setError(err?.response?.data?.error || 'Registration failed. Please try again.');
     } finally {
       setLoading(false);
     }

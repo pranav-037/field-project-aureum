@@ -1,40 +1,109 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import WalletButton from '../components/WalletButton';
+import { activityApi, artworkApi, transferApi } from '../services/api';
+
+const defaultActivities = [
+  {
+    id: 'act-1',
+    type: 'GENESIS',
+    title: 'Genesis Record Created',
+    detail: '"Starry Night" by Vincent van Gogh',
+    time: '2 hours ago',
+    badge: 'NFC-BOUND',
+    txHash: '0x742d35Cc6634C0532925a3b8D4C0532950532950',
+  },
+  {
+    id: 'act-2',
+    type: 'TRANSFER',
+    title: 'Custody Transfer Initiated',
+    detail: 'Artwork #AUR-7890 to Guggenheim Escrow',
+    time: '5 hours ago',
+    badge: 'MULTISIG ESCROW',
+    txHash: '0x8f2d35Cc6634C0532925a3b8D4C05329505329b1',
+  },
+  {
+    id: 'act-3',
+    type: 'VERIFICATION',
+    title: 'Physical Authentication Verified',
+    detail: 'Spectrometry & Pigment Analysis Verified',
+    time: '1 day ago',
+    badge: 'ZKP PROOF',
+    txHash: '0x3c7e91Da9931B0532925a3b8D4C05329505329a4',
+  },
+];
+
+function formatTimeAgo(dateStr?: string): string {
+  if (!dateStr) return 'Recently';
+  try {
+    const diff = Date.now() - new Date(dateStr).getTime();
+    if (isNaN(diff)) return dateStr;
+    const minutes = Math.floor(diff / 60000);
+    if (minutes < 1) return 'Just now';
+    if (minutes < 60) return `${minutes}m ago`;
+    const hours = Math.floor(minutes / 60);
+    if (hours < 24) return `${hours}h ago`;
+    const days = Math.floor(hours / 24);
+    return `${days}d ago`;
+  } catch {
+    return dateStr;
+  }
+}
 
 const InstitutionDashboard: React.FC = () => {
   const navigate = useNavigate();
   const [copiedTx, setCopiedTx] = useState<string | null>(null);
+  const [currentUser, setCurrentUser] = useState<any>(null);
+  const [activities, setActivities] = useState<any[]>([]);
+  const [artworkCount, setArtworkCount] = useState<number>(0);
+  const [pendingCount, setPendingCount] = useState<number>(0);
+  const [completedCount, setCompletedCount] = useState<number>(0);
 
-  const activities = [
-    {
-      id: 'act-1',
-      type: 'GENESIS',
-      title: 'Genesis Record Created',
-      detail: '"Starry Night" by Vincent van Gogh',
-      time: '2 hours ago',
-      badge: 'NFC-BOUND',
-      txHash: '0x742d35Cc6634C0532925a3b8D4C0532950532950',
-    },
-    {
-      id: 'act-2',
-      type: 'TRANSFER',
-      title: 'Custody Transfer Initiated',
-      detail: 'Artwork #AUR-7890 to Guggenheim Escrow',
-      time: '5 hours ago',
-      badge: 'MULTISIG ESCROW',
-      txHash: '0x8f2d35Cc6634C0532925a3b8D4C05329505329b1',
-    },
-    {
-      id: 'act-3',
-      type: 'VERIFICATION',
-      title: 'Physical Authentication Verified',
-      detail: 'Spectrometry & Pigment Analysis Verified',
-      time: '1 day ago',
-      badge: 'ZKP PROOF',
-      txHash: '0x3c7e91Da9931B0532925a3b8D4C05329505329a4',
-    },
-  ];
+  useEffect(() => {
+    try {
+      const stored = localStorage.getItem('aureum_user');
+      if (stored) setCurrentUser(JSON.parse(stored));
+    } catch {}
+
+    const fetchData = async () => {
+      try {
+        const [actRes, artRes, transRes] = await Promise.allSettled([
+          activityApi.getAll({ limit: 15 }),
+          artworkApi.getAll(),
+          transferApi.getAll(),
+        ]);
+
+        if (actRes.status === 'fulfilled' && Array.isArray(actRes.value.data) && actRes.value.data.length > 0) {
+          setActivities(actRes.value.data.map(a => ({
+            id: a.id,
+            type: a.type,
+            title: a.title,
+            detail: a.detail || `${a.type} operation`,
+            badge: a.badge || a.type,
+            time: formatTimeAgo(a.createdAt),
+            txHash: a.txHash || '0x' + '0'.repeat(40),
+          })));
+        } else {
+          setActivities(defaultActivities);
+        }
+
+        if (artRes.status === 'fulfilled' && Array.isArray(artRes.value.data)) {
+          setArtworkCount(artRes.value.data.length);
+        }
+
+        if (transRes.status === 'fulfilled' && Array.isArray(transRes.value.data)) {
+          const transfers = transRes.value.data;
+          setPendingCount(transfers.filter((t: any) => t.status === 'PENDING').length);
+          setCompletedCount(transfers.filter((t: any) => t.status === 'FINALIZED').length);
+        }
+      } catch (err) {
+        console.warn('Could not load institution stats:', err);
+        setActivities(defaultActivities);
+      }
+    };
+
+    fetchData();
+  }, []);
 
   const handleCopy = (tx: string) => {
     navigator.clipboard?.writeText(tx);
@@ -170,7 +239,7 @@ const InstitutionDashboard: React.FC = () => {
               Institution Dashboard
             </h1>
             <p className="text-sm text-slate-400 mt-1">
-              Welcome back, <span className="text-white font-medium">Metropolitan Museum of Art Guild</span>. Oversee Genesis provenance registrations and authorized custody handoffs.
+              Welcome back, <span className="text-white font-medium">{currentUser?.name || 'Metropolitan Museum of Art Guild'}</span>. Oversee Genesis provenance registrations and authorized custody handoffs.
             </p>
           </div>
 
@@ -199,10 +268,10 @@ const InstitutionDashboard: React.FC = () => {
               </div>
             </div>
             <div className="mt-4 flex items-baseline gap-2">
-              <span className="text-3xl sm:text-4xl font-extrabold text-white tracking-tight">12</span>
-              <span className="text-xs font-semibold text-emerald-400">+2 this month</span>
+              <span className="text-3xl sm:text-4xl font-extrabold text-white tracking-tight">{artworkCount}</span>
+              <span className="text-xs font-semibold text-emerald-400">Recorded</span>
             </div>
-            <p className="text-xs text-slate-500 mt-2">Genesis physical records verified</p>
+            <p className="text-xs text-slate-500 mt-2">Genesis physical records in database</p>
           </div>
 
           <div className="p-6 rounded-2xl bg-slate-900/70 border border-slate-800 hover:border-indigo-500/40 shadow-xl backdrop-blur-xl transition duration-300">
@@ -215,7 +284,7 @@ const InstitutionDashboard: React.FC = () => {
               </div>
             </div>
             <div className="mt-4 flex items-baseline gap-2">
-              <span className="text-3xl sm:text-4xl font-extrabold text-white tracking-tight">3</span>
+              <span className="text-3xl sm:text-4xl font-extrabold text-white tracking-tight">{pendingCount}</span>
               <span className="text-xs font-semibold text-indigo-300 bg-indigo-500/10 px-2 py-0.5 rounded-full border border-indigo-500/20">
                 In Escrow
               </span>
@@ -233,8 +302,8 @@ const InstitutionDashboard: React.FC = () => {
               </div>
             </div>
             <div className="mt-4 flex items-baseline gap-2">
-              <span className="text-3xl sm:text-4xl font-extrabold text-white tracking-tight">45</span>
-              <span className="text-xs font-semibold text-emerald-400">100% Settled</span>
+              <span className="text-3xl sm:text-4xl font-extrabold text-white tracking-tight">{completedCount}</span>
+              <span className="text-xs font-semibold text-emerald-400">Settled</span>
             </div>
             <p className="text-xs text-slate-500 mt-2">Historical handoffs recorded on ledger</p>
           </div>

@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { useWallet } from '../contexts/WalletContext';
 import { useArtchainContract } from '../hooks/useArtchainContract';
 import WalletButton from '../components/WalletButton';
+import { artworkApi, transferApi } from '../services/api';
 
 interface Artwork {
   id: string;
@@ -80,8 +81,10 @@ const CollectorDashboard: React.FC = () => {
     }
   }, []);
 
-  // Mock Owned Artworks
-  const artworks: Artwork[] = [
+  const [currentUser, setCurrentUser] = useState<any>(null);
+
+  // Default Fallback Owned Artworks
+  const defaultArtworks: Artwork[] = [
     {
       id: 'AUR-1503-ML',
       title: 'Mona Lisa',
@@ -144,6 +147,8 @@ const CollectorDashboard: React.FC = () => {
     },
   ];
 
+  const [artworks, setArtworks] = useState<Artwork[]>(defaultArtworks);
+
   // Recent Transactions
   const [transactions, setTransactions] = useState<TransferItem[]>([
     {
@@ -177,6 +182,64 @@ const CollectorDashboard: React.FC = () => {
       txHash: '0x992d35Cc6634C0532925a3b8D4C05329505329b2',
     },
   ]);
+
+  useEffect(() => {
+    try {
+      const stored = localStorage.getItem('aureum_user');
+      if (stored) setCurrentUser(JSON.parse(stored));
+    } catch {}
+
+    const loadArtworks = async () => {
+      try {
+        const res = await artworkApi.getAll();
+        if (res.data && Array.isArray(res.data) && res.data.length > 0) {
+          const gradients = [
+            'from-amber-700/60 via-amber-900/40 to-slate-900',
+            'from-indigo-900/60 via-violet-900/40 to-slate-900',
+            'from-blue-900/60 via-cyan-900/40 to-slate-900',
+            'from-blue-800/60 via-amber-700/40 to-slate-900',
+            'from-amber-600/60 via-yellow-700/40 to-slate-900'
+          ];
+          const mapped: Artwork[] = res.data.map((a: any, idx: number) => ({
+            id: a.blockchainArtworkId ? `AUR-${a.blockchainArtworkId}` : (a.id || `AUR-${idx}`),
+            title: a.title,
+            artist: a.artist,
+            year: a.year || 'Modern',
+            medium: a.medium || 'Fine Art',
+            dimensions: a.dimensions || 'Variable',
+            status: a.status === 'VERIFIED' ? 'VERIFIED' : (a.status === 'IN_ESCROW' ? 'IN_ESCROW' : 'PENDING'),
+            thumbnailGradient: gradients[idx % gradients.length],
+            nfcTag: a.bindingReference || `NFC-BOUND-${idx}`,
+            authenticator: 'Aureum Authentication Guild',
+          }));
+          setArtworks(mapped);
+        }
+      } catch (err) {
+        console.warn('Could not fetch artworks:', err);
+      }
+
+      try {
+        const transRes = await transferApi.getAll();
+        if (transRes.data && Array.isArray(transRes.data) && transRes.data.length > 0) {
+          const mappedTrans: TransferItem[] = transRes.data.map((t: any) => ({
+            id: t.id,
+            type: 'INCOMING',
+            title: `Artwork #${t.artworkId}`,
+            artist: 'Provenance Verified',
+            counterparty: t.sellerId?.slice(0, 10) + '...',
+            date: new Date(t.transferDate || t.createdAt).toLocaleDateString(),
+            status: t.status === 'FINALIZED' ? 'COMPLETED' : 'PENDING_ACCEPTANCE',
+            txHash: t.txHash || '0x' + '0'.repeat(40),
+          }));
+          setTransactions(mappedTrans);
+        }
+      } catch (transErr) {
+        console.warn('Could not fetch transfers:', transErr);
+      }
+    };
+
+    loadArtworks();
+  }, []);
 
   const filteredArtworks = artworks.filter(item => {
     if (filter === 'VERIFIED') return item.status === 'VERIFIED';
@@ -342,7 +405,7 @@ const CollectorDashboard: React.FC = () => {
               Collector Dashboard
             </h1>
             <p className="text-sm text-slate-400 mt-1">
-              Welcome back, <span className="text-white font-medium">collector</span>. Manage your authenticated artworks, track physical custody, and sign transfers.
+              Welcome back, <span className="text-white font-medium">{currentUser?.name || 'Collector'}</span>. Manage your authenticated artworks, track physical custody, and sign transfers.
             </p>
           </div>
 

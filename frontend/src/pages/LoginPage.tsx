@@ -56,29 +56,23 @@ const LoginPage: React.FC = () => {
     setError(null);
 
     try {
-      // Attempt backend API login first
-      try {
-        const response = await authApi.login({ email, password });
-        if (response.data && response.data.token) {
-          localStorage.setItem('aureum_token', response.data.token);
-          localStorage.setItem('aureum_user', JSON.stringify(response.data.user));
-        }
-      } catch (apiErr: any) {
-        // If credentials invalid from backend, check message
-        if (apiErr.response && apiErr.response.status === 401) {
-          // If specific invalid credentials error, check if user wanted to demo
-          console.warn('Backend rejected login:', apiErr.response.data);
-        }
-      }
+      const response = await authApi.login({ email, password });
+      if (response.data && response.data.token) {
+        localStorage.setItem('aureum_token', response.data.token);
+        localStorage.setItem('aureum_user', JSON.stringify(response.data.user));
 
-      // Route according to user role / selection
-      if (isInstitution) {
-        navigate('/institution/dashboard');
+        const userRole = response.data.user?.role || (isInstitution ? 'AUTHENTICATOR' : 'COLLECTOR');
+        if (userRole === 'ADMIN' || userRole === 'AUTHENTICATOR') {
+          navigate('/institution/dashboard');
+        } else {
+          navigate('/collector/dashboard');
+        }
       } else {
-        navigate('/collector/dashboard');
+        throw new Error('Authentication response did not return a valid session token.');
       }
     } catch (err: any) {
-      setError(err?.response?.data?.error || 'Authentication failed. Please verify your credentials.');
+      const msg = err?.response?.data?.error || err?.message || 'Authentication failed. Please verify your credentials.';
+      setError(msg);
     } finally {
       setLoading(false);
     }
