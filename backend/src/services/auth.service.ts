@@ -54,24 +54,48 @@ export class AuthService {
     role: string = 'VIEWER',
     walletAddress?: string
   ): Promise<LoginResponse> {
+    if (!email || !email.trim()) {
+      throw new Error('Email address is required.');
+    }
+
     const normalizedEmail = email.trim().toLowerCase();
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(normalizedEmail)) {
+      throw new Error('Please provide a valid email address (e.g. name@domain.com).');
+    }
+
+    if (!name || name.trim().length < 2) {
+      throw new Error('Full name is required and must be at least 2 characters long.');
+    }
+
+    if (!password || password.length < 6) {
+      throw new Error('Password must be at least 6 characters long.');
+    }
 
     // Check if user already exists
     const existingUser = await prisma.user.findUnique({ where: { email: normalizedEmail } });
     if (existingUser) {
-      throw new Error('User with this email already exists');
+      throw new Error(`An account with the email "${normalizedEmail}" already exists. Please sign in instead.`);
     }
 
     // Create user
-    const user = await prisma.user.create({
-      data: {
-        email: normalizedEmail,
-        name: name.trim(),
-        role,
-        password: password || '',
-        walletAddress: walletAddress?.trim() || null,
-      },
-    });
+    let user;
+    try {
+      user = await prisma.user.create({
+        data: {
+          email: normalizedEmail,
+          name: name.trim(),
+          role,
+          password: password || '',
+          walletAddress: walletAddress?.trim() || null,
+        },
+      });
+    } catch (dbErr: any) {
+      if (dbErr?.code === 'P2002') {
+        throw new Error(`An account with the email "${normalizedEmail}" already exists. Please sign in instead.`);
+      }
+      throw new Error(`Database error saving user account: ${dbErr?.message || 'Unknown database error'}`);
+    }
 
     // If an institution with a wallet address registers, ensure institution record
     if (role === 'AUTHENTICATOR' && walletAddress) {
@@ -123,16 +147,28 @@ export class AuthService {
   }
 
   static async login(email: string, password: string): Promise<LoginResponse> {
+    if (!email || !email.trim()) {
+      throw new Error('Please enter your email address.');
+    }
+    if (!password) {
+      throw new Error('Please enter your password.');
+    }
+
     const normalizedEmail = email.trim().toLowerCase();
 
     // Find user by email
     const user = await prisma.user.findUnique({ where: { email: normalizedEmail } });
     if (!user) {
-      throw new Error('No account found with this email. Please register first.');
+      throw new Error(`No account found for "${normalizedEmail}". Please check your email or click "Create one" to register.`);
     }
 
-    if (user.password && user.password !== password) {
-      throw new Error('Invalid email or password');
+    // If user has no local password and registered through Google OAuth
+    if (!user.password && user.googleId) {
+      throw new Error('This account was registered using Google Sign-In. Please sign in using the Google button.');
+    }
+
+    if (user.password !== password) {
+      throw new Error('Incorrect password entered. Please double-check your password and try again.');
     }
 
     // Record login activity in database

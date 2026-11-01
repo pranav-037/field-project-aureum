@@ -44,28 +44,40 @@ app.get('/api', (req: Request, res: Response) => {
 app.post(['/api/register', '/api/auth/register'], async (req: Request, res: Response) => {
   try {
     const { email, password, name, fullName, role, userType, walletAddress } = req.body;
-    const resolvedName = name || fullName;
-    if (!email || !resolvedName) {
-      return res.status(400).json({ error: 'Email and name are required' });
+    const resolvedName = (name || fullName || '').trim();
+    if (!email || !email.trim()) {
+      return res.status(400).json({ error: 'Email address is required.' });
+    }
+    if (!resolvedName) {
+      return res.status(400).json({ error: 'Full name is required.' });
+    }
+    if (!password) {
+      return res.status(400).json({ error: 'Password is required.' });
     }
     const resolvedRole = role || (userType === 'institution' ? 'AUTHENTICATOR' : 'COLLECTOR');
     const result = await AuthService.register(email, password, resolvedName, resolvedRole, walletAddress);
     res.status(201).json(result);
   } catch (error) {
-    res.status(400).json({ error: (error as Error).message || 'Registration failed' });
+    const message = (error as Error).message || 'Registration failed.';
+    const statusCode = message.includes('already exists') ? 409 : 400;
+    res.status(statusCode).json({ error: message });
   }
 });
 
 app.post(['/api/login', '/api/auth/login'], async (req: Request, res: Response) => {
   try {
     const { email, password } = req.body;
-    if (!email || !password) {
-      return res.status(400).json({ error: 'Email and password are required' });
+    if (!email || !email.trim()) {
+      return res.status(400).json({ error: 'Please enter your email address.' });
+    }
+    if (!password) {
+      return res.status(400).json({ error: 'Please enter your password.' });
     }
     const result = await AuthService.login(email, password);
     res.json(result);
   } catch (error) {
-    res.status(401).json({ error: (error as Error).message || 'Invalid credentials' });
+    const message = (error as Error).message || 'Authentication failed.';
+    res.status(401).json({ error: message });
   }
 });
 

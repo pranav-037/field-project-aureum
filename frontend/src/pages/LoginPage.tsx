@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { authApi } from '../services/api';
+import { authApi, formatAuthError } from '../services/api';
 import { useGoogleAuth } from '../hooks/useGoogleAuth';
 
 /** Returns the dashboard path for the stored user, or null if not logged in */
@@ -55,8 +55,21 @@ const LoginPage: React.FC = () => {
     setLoading(true);
     setError(null);
 
+    const trimmedEmail = email.trim();
+    if (!trimmedEmail) {
+      setError('Please enter your email address.');
+      setLoading(false);
+      return;
+    }
+
+    if (!password) {
+      setError('Please enter your password.');
+      setLoading(false);
+      return;
+    }
+
     try {
-      const response = await authApi.login({ email, password });
+      const response = await authApi.login({ email: trimmedEmail, password });
       if (response.data && response.data.token) {
         localStorage.setItem('aureum_token', response.data.token);
         localStorage.setItem('aureum_user', JSON.stringify(response.data.user));
@@ -71,8 +84,8 @@ const LoginPage: React.FC = () => {
         throw new Error('Authentication response did not return a valid session token.');
       }
     } catch (err: any) {
-      const msg = err?.response?.data?.error || err?.message || 'Authentication failed. Please verify your credentials.';
-      setError(msg);
+      const exactMsg = formatAuthError(err, 'Unable to sign in. Please verify your credentials.');
+      setError(exactMsg);
     } finally {
       setLoading(false);
     }

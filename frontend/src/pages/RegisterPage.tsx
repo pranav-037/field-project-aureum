@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useGoogleAuth } from '../hooks/useGoogleAuth';
-import { authApi } from '../services/api';
+import { authApi, formatAuthError } from '../services/api';
 
 /** Returns the dashboard path for the stored user, or null if not logged in */
 function getLoggedInDashboard(): string | null {
@@ -79,41 +79,63 @@ const RegisterPage: React.FC = () => {
     setError(null);
     setLoading(true);
 
-    // Basic validation
-    if (!formData.fullName.trim()) {
-      setError('Full name is required');
+    // Precise client-side validation
+    const trimmedName = formData.fullName.trim();
+    const trimmedEmail = formData.email.trim();
+
+    if (!trimmedName) {
+      setError('Please enter your full name.');
       setLoading(false);
       return;
     }
 
-    if (!formData.email.trim()) {
-      setError('Email address is required');
+    if (trimmedName.length < 2) {
+      setError('Full name must be at least 2 characters long.');
+      setLoading(false);
+      return;
+    }
+
+    if (!trimmedEmail) {
+      setError('Please enter your email address.');
+      setLoading(false);
+      return;
+    }
+
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(trimmedEmail)) {
+      setError('Please enter a valid email address (e.g. name@example.com).');
       setLoading(false);
       return;
     }
 
     if (!formData.password) {
-      setError('Password is required');
+      setError('Please enter a password.');
+      setLoading(false);
+      return;
+    }
+
+    if (formData.password.length < 6) {
+      setError('Password must be at least 6 characters long.');
       setLoading(false);
       return;
     }
 
     if (formData.password !== formData.confirmPassword) {
-      setError('Passwords do not match');
+      setError('Passwords do not match. Please verify your confirm password.');
       setLoading(false);
       return;
     }
 
     if (formData.userType === 'institution' && !formData.institutionName.trim()) {
-      setError('Institution name is required for institution accounts');
+      setError('Institution name is required for institution accounts.');
       setLoading(false);
       return;
     }
 
     try {
       const res = await authApi.register({
-        fullName: formData.fullName.trim(),
-        email: formData.email.trim(),
+        fullName: trimmedName,
+        email: trimmedEmail,
         password: formData.password,
         userType: formData.userType,
         role: formData.userType === 'institution' ? 'AUTHENTICATOR' : 'COLLECTOR',
@@ -131,7 +153,8 @@ const RegisterPage: React.FC = () => {
         navigate('/login');
       }
     } catch (err: any) {
-      setError(err?.response?.data?.error || 'Registration failed. Please try again.');
+      const exactMsg = formatAuthError(err, 'Registration could not be completed.');
+      setError(exactMsg);
     } finally {
       setLoading(false);
     }

@@ -131,4 +131,48 @@ export const healthApi = {
   check: () => axios.get('http://localhost:3000/health'),
 };
 
+// Helper to extract exact reason from errors
+export function formatAuthError(err: any, fallbackMessage: string): string {
+  if (err?.response?.data?.error && typeof err.response.data.error === 'string') {
+    return err.response.data.error;
+  }
+  if (err?.response?.data?.message && typeof err.response.data.message === 'string') {
+    return err.response.data.message;
+  }
+  if (typeof err?.response?.data === 'string' && err.response.data.trim().length > 0) {
+    return err.response.data;
+  }
+
+  // HTTP status specific errors
+  if (err?.response?.status === 400) {
+    return 'Invalid details provided. Please review the form fields.';
+  }
+  if (err?.response?.status === 401) {
+    return 'Authentication failed. Please verify your email and password.';
+  }
+  if (err?.response?.status === 404) {
+    return 'Authentication endpoint not found (404). Please verify that the backend is running.';
+  }
+  if (err?.response?.status === 409) {
+    return 'An account with this email address already exists. Please sign in instead.';
+  }
+  if (err?.response?.status === 500) {
+    return 'Server error (500). Please check backend logs or try again shortly.';
+  }
+
+  // Network & connection errors
+  if (err?.code === 'ERR_NETWORK' || err?.message === 'Network Error') {
+    return `Cannot connect to server at ${API_BASE_URL}. Please check if the backend is running.`;
+  }
+  if (err?.code === 'ECONNABORTED' || err?.name === 'TimeoutError') {
+    return 'Connection to server timed out. Please try again.';
+  }
+
+  if (err?.message && typeof err.message === 'string') {
+    return err.message;
+  }
+
+  return fallbackMessage;
+}
+
 export default api;
