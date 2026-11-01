@@ -160,47 +160,9 @@ const RegisterPage: React.FC = () => {
       </header>
 
       {/* Main Container */}
-      <main className="flex-1 flex items-center justify-center p-4 sm:p-6 lg:p-8">
-        <div className="w-full max-w-5xl grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12 items-center">
-
-          {/* Left Column: Product Branding & Context */}
-          <div className="hidden lg:flex lg:col-span-6 flex-col justify-between space-y-8 pr-4">
-            <div className="space-y-4">
-              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-slate-900 border border-slate-800 text-xs text-slate-300">
-                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
-                <span>Decentralized Custody Network</span>
-              </div>
-              <h1 className="text-3xl sm:text-4xl font-extrabold text-white tracking-tight leading-tight">
-                Secure Chain of Custody for the World's{' '}
-                <span className="bg-gradient-to-r from-amber-200 via-indigo-300 to-violet-400 bg-clip-text text-transparent">
-                  Fine Art Masterpieces
-                </span>
-              </h1>
-              <p className="text-slate-400 text-base leading-relaxed">
-                Connect trusted gallery authenticators, institutions, and collectors through immutable provenance ledgers and cryptographic NFC seals.
-              </p>
-            </div>
-
-            {/* Trust Badges */}
-            <div className="flex items-center gap-6 text-xs text-slate-500 font-medium">
-              <span className="flex items-center gap-1.5">
-                <svg className="w-4 h-4 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7"/></svg>
-                Zero-Knowledge Privacy
-              </span>
-              <span className="flex items-center gap-1.5">
-                <svg className="w-4 h-4 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7"/></svg>
-                IPFS Immutability
-              </span>
-              <span className="flex items-center gap-1.5">
-                <svg className="w-4 h-4 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 3v1m0 16v1m6-9h-1m4 0h-1m1-5h-2m1 4h-2m1 3h-2m1-4h-2m1-3zm-9 4h-2m1 3h-2m1-4h-2m1 5h-2m1-4h-2"/></svg>
-                Decentralized Custody Network
-              </span>
-            </div>
-          </div>
-
-          {/* Right Column: Refined Registration Card */}
-          <div className="w-full lg:col-span-6 max-w-md mx-auto">
-            <div className="rounded-2xl bg-slate-900/70 border border-slate-800 shadow-xl backdrop-blur-xl p-6 sm:p-8">
+      <main className="flex-1 flex items-center justify-center p-4 sm:p-6 lg:p-8 py-10">
+        <div className="w-full max-w-md mx-auto">
+          <div className="rounded-2xl bg-slate-900/70 border border-slate-800 shadow-xl backdrop-blur-xl p-6 sm:p-8">
 
               {/* Card Header */}
               <div className="mb-6 text-center">
@@ -484,7 +446,6 @@ const RegisterPage: React.FC = () => {
               </form>
             </div>
           </div>
-        </div>
       </main>
 
       {/* Footer */}

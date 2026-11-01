@@ -121,79 +121,8 @@ const LoginPage: React.FC = () => {
 
       {/* Main Container */}
       <main className="flex-1 flex items-center justify-center p-4 sm:p-6 lg:p-8">
-        <div className="w-full max-w-5xl grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12 items-center">
-          
-          {/* Left Column: Product Branding & Abstract Verification Graphic */}
-          <div className="hidden lg:flex lg:col-span-6 flex-col justify-between space-y-8 pr-4">
-            <div className="space-y-4">
-              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-slate-900 border border-slate-800 text-xs text-slate-300">
-                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
-                <span>Decentralized Custody Network</span>
-              </div>
-              <h1 className="text-3xl sm:text-4xl font-extrabold text-white tracking-tight leading-tight">
-                Secure Chain of Custody for the World's{' '}
-                <span className="bg-gradient-to-r from-amber-200 via-indigo-300 to-violet-400 bg-clip-text text-transparent">
-                  Fine Art Masterpieces
-                </span>
-              </h1>
-              <p className="text-slate-400 text-base leading-relaxed">
-                Connect trusted gallery authenticators, institutions, and collectors through immutable provenance ledgers and cryptographic NFC seals.
-              </p>
-            </div>
-
-            {/* Subtle Abstract Visual Card */}
-            <div className="relative rounded-2xl bg-gradient-to-b from-slate-800/60 to-slate-900/60 p-[1px] border border-slate-800">
-              <div className="rounded-[15px] bg-[#0E131F]/90 backdrop-blur-md p-5 space-y-4">
-                <div className="flex items-center justify-between pb-3 border-b border-slate-800 text-xs">
-                  <div className="flex items-center gap-2">
-                    <span className="w-2 h-2 rounded-full bg-amber-400"></span>
-                    <span className="font-mono text-slate-300 font-medium">CERTIFICATE VERIFICATION</span>
-                  </div>
-                  <span className="font-mono text-[10px] text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20">
-                    CHAIN VALIDATED
-                  </span>
-                </div>
-
-                <div className="space-y-2 text-xs">
-                  <div className="flex justify-between py-1 border-b border-slate-800/50">
-                    <span className="text-slate-400">Cryptographic Seal</span>
-                    <span className="font-mono text-slate-200">0x8a92...e41c</span>
-                  </div>
-                  <div className="flex justify-between py-1 border-b border-slate-800/50">
-                    <span className="text-slate-400">Physical NFC Tag</span>
-                    <span className="font-mono text-amber-300">NFC-AUREUM-8921</span>
-                  </div>
-                  <div className="flex justify-between py-1">
-                    <span className="text-slate-400">Custodial Status</span>
-                    <span className="text-slate-200 font-medium">Institution Guild Escrow</span>
-                  </div>
-                </div>
-
-                <div className="pt-2 flex items-center gap-2 text-[11px] text-slate-400">
-                  <svg className="w-3.5 h-3.5 text-indigo-400 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
-                  </svg>
-                  <span>Protected by dual-key multi-signature consensus</span>
-                </div>
-              </div>
-            </div>
-
-            {/* Trust Badges */}
-            <div className="flex items-center gap-6 text-xs text-slate-500 font-medium">
-              <span className="flex items-center gap-1.5">
-                <svg className="w-4 h-4 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7"/></svg>
-                Zero-Knowledge Privacy
-              </span>
-              <span className="flex items-center gap-1.5">
-                <svg className="w-4 h-4 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7"/></svg>
-                IPFS Immutability
-              </span>
-            </div>
-          </div>
-
-          {/* Right Column: Refined Authentication Card */}
-          <div className="w-full lg:col-span-6 max-w-md mx-auto">
-            <div className="rounded-2xl bg-slate-900/70 border border-slate-800 shadow-xl backdrop-blur-xl p-6 sm:p-8">
+        <div className="w-full max-w-md mx-auto">
+          <div className="rounded-2xl bg-slate-900/70 border border-slate-800 shadow-xl backdrop-blur-xl p-6 sm:p-8">
               
               {/* Card Header */}
               <div className="mb-6 text-left">
@@ -378,7 +307,6 @@ const LoginPage: React.FC = () => {
               </form>
             </div>
           </div>
-        </div>
       </main>
 
       {/* Footer */}
