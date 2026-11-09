@@ -1,10 +1,38 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import WalletButton from '../components/WalletButton';
+import { institutionApi, artworkApi } from '../services/api';
 
 const AdminConsole: React.FC = () => {
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState<'institutions' | 'users' | 'flags' | 'audit' | 'settings'>('institutions');
+  const [institutions, setInstitutions] = useState<any[]>([]);
+  const [artworksCount, setArtworksCount] = useState<number>(0);
+
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        const [instRes, artRes] = await Promise.allSettled([
+          institutionApi.getAll(),
+          artworkApi.getAll(),
+        ]);
+
+        if (instRes.status === 'fulfilled' && Array.isArray(instRes.value.data)) {
+          setInstitutions(instRes.value.data);
+        }
+        if (artRes.status === 'fulfilled' && Array.isArray(artRes.value.data)) {
+          setArtworksCount(artRes.value.data.length);
+        }
+      } catch (err) {
+        console.warn('Failed to load admin metrics:', err);
+      }
+    };
+
+    fetchData();
+  }, []);
+
+  const pendingInstitutions = institutions.filter(i => i.status === 'PENDING');
+  const activeInstitutions = institutions.filter(i => i.status === 'APPROVED');
 
   return (
     <div className="min-h-screen bg-[#0B0F17] text-slate-100 flex flex-col selection:bg-indigo-500/30 selection:text-indigo-200">
@@ -97,17 +125,17 @@ const AdminConsole: React.FC = () => {
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
           <div className="p-6 rounded-2xl bg-slate-900/70 border border-slate-800 shadow-xl backdrop-blur-xl">
             <span className="text-xs font-semibold uppercase tracking-wider text-slate-400">Pending Applications</span>
-            <div className="mt-3 text-3xl font-extrabold text-amber-400">3</div>
+            <div className="mt-3 text-3xl font-extrabold text-amber-400">{pendingInstitutions.length}</div>
             <p className="text-xs text-slate-500 mt-1">Institutions waiting review</p>
           </div>
           <div className="p-6 rounded-2xl bg-slate-900/70 border border-slate-800 shadow-xl backdrop-blur-xl">
             <span className="text-xs font-semibold uppercase tracking-wider text-slate-400">Active Institutions</span>
-            <div className="mt-3 text-3xl font-extrabold text-white">12</div>
+            <div className="mt-3 text-3xl font-extrabold text-white">{activeInstitutions.length}</div>
             <p className="text-xs text-slate-500 mt-1">Approved authenticators</p>
           </div>
           <div className="p-6 rounded-2xl bg-slate-900/70 border border-slate-800 shadow-xl backdrop-blur-xl">
             <span className="text-xs font-semibold uppercase tracking-wider text-slate-400">Total Artworks</span>
-            <div className="mt-3 text-3xl font-extrabold text-emerald-400">456</div>
+            <div className="mt-3 text-3xl font-extrabold text-emerald-400">{artworksCount}</div>
             <p className="text-xs text-slate-500 mt-1">Genesis tokens anchored</p>
           </div>
           <div className="p-6 rounded-2xl bg-slate-900/70 border border-slate-800 shadow-xl backdrop-blur-xl">
@@ -125,26 +153,28 @@ const AdminConsole: React.FC = () => {
           </div>
 
           <div className="divide-y divide-slate-800/80">
-            {[
-              { name: "Sotheby's Zurich Vault", jur: 'Switzerland', date: 'Yesterday', id: 'APP-902' },
-              { name: 'Tokyo Art Authentication Bureau', jur: 'Japan', date: '2 days ago', id: 'APP-901' },
-              { name: 'Galleria Borghese Archive', jur: 'Italy', date: '3 days ago', id: 'APP-899' },
-            ].map(app => (
-              <div key={app.id} className="py-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                <div>
-                  <h3 className="text-sm font-semibold text-white">{app.name}</h3>
-                  <p className="text-xs text-slate-400">Jurisdiction: {app.jur} • Submitted {app.date}</p>
-                </div>
-                <div className="flex items-center gap-2">
-                  <button className="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold shadow-sm transition cursor-pointer">
-                    Approve
-                  </button>
-                  <button className="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold transition cursor-pointer">
-                    Review Docs
-                  </button>
-                </div>
+            {pendingInstitutions.length === 0 ? (
+              <div className="py-8 text-center text-slate-400 text-xs">
+                No pending institution registrations at this time.
               </div>
-            ))}
+            ) : (
+              pendingInstitutions.map(app => (
+                <div key={app.id} className="py-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  <div>
+                    <h3 className="text-sm font-semibold text-white">{app.name}</h3>
+                    <p className="text-xs text-slate-400">Wallet: {app.walletAddress} • Status: {app.status}</p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button className="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold shadow-sm transition cursor-pointer">
+                      Approve
+                    </button>
+                    <button className="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold transition cursor-pointer">
+                      Review Docs
+                    </button>
+                  </div>
+                </div>
+              ))
+            )}
           </div>
         </div>
       </main>

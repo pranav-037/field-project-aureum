@@ -3,36 +3,6 @@ import { Link, useNavigate } from 'react-router-dom';
 import WalletButton from '../components/WalletButton';
 import { activityApi, artworkApi, transferApi } from '../services/api';
 
-const defaultActivities = [
-  {
-    id: 'act-1',
-    type: 'GENESIS',
-    title: 'Genesis Record Created',
-    detail: '"Starry Night" by Vincent van Gogh',
-    time: '2 hours ago',
-    badge: 'NFC-BOUND',
-    txHash: '0x742d35Cc6634C0532925a3b8D4C0532950532950',
-  },
-  {
-    id: 'act-2',
-    type: 'TRANSFER',
-    title: 'Custody Transfer Initiated',
-    detail: 'Artwork #AUR-7890 to Guggenheim Escrow',
-    time: '5 hours ago',
-    badge: 'MULTISIG ESCROW',
-    txHash: '0x8f2d35Cc6634C0532925a3b8D4C05329505329b1',
-  },
-  {
-    id: 'act-3',
-    type: 'VERIFICATION',
-    title: 'Physical Authentication Verified',
-    detail: 'Spectrometry & Pigment Analysis Verified',
-    time: '1 day ago',
-    badge: 'ZKP PROOF',
-    txHash: '0x3c7e91Da9931B0532925a3b8D4C05329505329a4',
-  },
-];
-
 function formatTimeAgo(dateStr?: string): string {
   if (!dateStr) return 'Recently';
   try {
@@ -84,7 +54,7 @@ const InstitutionDashboard: React.FC = () => {
             txHash: a.txHash || '0x' + '0'.repeat(40),
           })));
         } else {
-          setActivities(defaultActivities);
+          setActivities([]);
         }
 
         if (artRes.status === 'fulfilled' && Array.isArray(artRes.value.data)) {
@@ -98,7 +68,7 @@ const InstitutionDashboard: React.FC = () => {
         }
       } catch (err) {
         console.warn('Could not load institution stats:', err);
-        setActivities(defaultActivities);
+        setActivities([]);
       }
     };
 
@@ -336,40 +306,47 @@ const InstitutionDashboard: React.FC = () => {
           </div>
 
           <div className="rounded-2xl bg-slate-900/70 border border-slate-800 shadow-xl backdrop-blur-xl divide-y divide-slate-800/80">
-            {activities.map(act => (
-              <div key={act.id} className="p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4 hover:bg-slate-800/20 transition">
-                <div className="flex items-center gap-4">
-                  <div className="w-10 h-10 rounded-xl bg-slate-800 border border-slate-700 flex items-center justify-center text-lg flex-shrink-0">
-                    {act.type === 'GENESIS' ? '🎨' : act.type === 'TRANSFER' ? '🔄' : '🛡️'}
-                  </div>
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <h3 className="text-sm font-bold text-white">{act.title}</h3>
-                      <span className="px-2 py-0.5 rounded-full bg-slate-800 text-[10px] font-semibold text-slate-300 border border-slate-700">
-                        {act.badge}
-                      </span>
-                    </div>
-                    <p className="text-xs text-slate-400 mt-0.5">{act.detail}</p>
-                  </div>
-                </div>
-
-                <div className="flex items-center gap-4 sm:flex-shrink-0 justify-between sm:justify-end">
-                  <div className="text-right">
-                    <button
-                      onClick={() => handleCopy(act.txHash)}
-                      className="font-mono text-xs text-indigo-400 hover:text-indigo-300 cursor-pointer block"
-                      title="Copy hash"
-                    >
-                      {act.txHash.slice(0, 10)}...{act.txHash.slice(-6)}
-                    </button>
-                    {copiedTx === act.txHash && (
-                      <span className="text-[10px] text-emerald-400">Copied!</span>
-                    )}
-                  </div>
-                  <span className="text-xs text-slate-500">{act.time}</span>
-                </div>
+            {activities.length === 0 ? (
+              <div className="p-10 text-center text-slate-400 text-xs">
+                <span className="block text-2xl mb-2">📋</span>
+                No institutional activity recorded yet. Genesis artwork registrations and verified custody transfers will appear here.
               </div>
-            ))}
+            ) : (
+              activities.map(act => (
+                <div key={act.id} className="p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4 hover:bg-slate-800/20 transition">
+                  <div className="flex items-center gap-4">
+                    <div className="w-10 h-10 rounded-xl bg-slate-800 border border-slate-700 flex items-center justify-center text-lg flex-shrink-0">
+                      {act.type === 'GENESIS' ? '🎨' : act.type === 'TRANSFER' ? '🔄' : '🛡️'}
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <h3 className="text-sm font-bold text-white">{act.title}</h3>
+                        <span className="px-2 py-0.5 rounded-full bg-slate-800 text-[10px] font-semibold text-slate-300 border border-slate-700">
+                          {act.badge}
+                        </span>
+                      </div>
+                      <p className="text-xs text-slate-400 mt-0.5">{act.detail}</p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-4 sm:flex-shrink-0 justify-between sm:justify-end">
+                    <div className="text-right">
+                      <button
+                        onClick={() => handleCopy(act.txHash)}
+                        className="font-mono text-xs text-indigo-400 hover:text-indigo-300 cursor-pointer block"
+                        title="Copy hash"
+                      >
+                        {act.txHash.slice(0, 10)}...{act.txHash.slice(-6)}
+                      </button>
+                      {copiedTx === act.txHash && (
+                        <span className="text-[10px] text-emerald-400">Copied!</span>
+                      )}
+                    </div>
+                    <span className="text-xs text-slate-500">{act.time}</span>
+                  </div>
+                </div>
+              ))
+            )}
           </div>
         </section>
 

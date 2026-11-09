@@ -240,6 +240,20 @@ app.get('/api/blockchain/status', async (req: Request, res: Response) => {
   }
 });
 
+// List institutions
+app.get('/api/institutions', async (req: Request, res: Response) => {
+  try {
+    const { data, error } = await supabase.from('Institution').select('*');
+    if (!error && data) {
+      return res.json(data);
+    }
+    const institutions = await prisma.institution.findMany();
+    res.json(institutions);
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to fetch institutions' });
+  }
+});
+
 // Approve institution on-chain
 app.post('/api/institutions/approve', async (req: Request, res: Response) => {
   try {

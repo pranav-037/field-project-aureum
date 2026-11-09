@@ -83,105 +83,8 @@ const CollectorDashboard: React.FC = () => {
 
   const [currentUser, setCurrentUser] = useState<any>(null);
 
-  // Default Fallback Owned Artworks
-  const defaultArtworks: Artwork[] = [
-    {
-      id: 'AUR-1503-ML',
-      title: 'Mona Lisa',
-      artist: 'Leonardo da Vinci',
-      year: '1503–1506',
-      medium: 'Oil on poplar panel',
-      dimensions: '77 cm × 53 cm',
-      status: 'VERIFIED',
-      thumbnailGradient: 'from-amber-700/60 via-amber-900/40 to-slate-900',
-      nfcTag: 'NFC-SECURE-9024',
-      authenticator: 'Musée du Louvre Authentication Guild',
-    },
-    {
-      id: 'AUR-1931-DAL',
-      title: 'The Persistence of Memory',
-      artist: 'Salvador Dalí',
-      year: '1931',
-      medium: 'Oil on canvas',
-      dimensions: '24 cm × 33 cm',
-      status: 'VERIFIED',
-      thumbnailGradient: 'from-indigo-900/60 via-violet-900/40 to-slate-900',
-      nfcTag: 'NFC-SECURE-8142',
-      authenticator: 'Fundació Gala-Salvador Dalí Heritage',
-    },
-    {
-      id: 'AUR-1665-JVE',
-      title: 'Girl with a Pearl Earring',
-      artist: 'Johannes Vermeer',
-      year: '1665',
-      medium: 'Oil on canvas',
-      dimensions: '44.5 cm × 39 cm',
-      status: 'VERIFIED',
-      thumbnailGradient: 'from-blue-900/60 via-cyan-900/40 to-slate-900',
-      nfcTag: 'NFC-SECURE-7319',
-      authenticator: 'Mauritshuis Research Board',
-    },
-    {
-      id: 'AUR-1889-SVG',
-      title: 'The Starry Night',
-      artist: 'Vincent van Gogh',
-      year: '1889',
-      medium: 'Oil on canvas',
-      dimensions: '73.7 cm × 92.1 cm',
-      status: 'VERIFIED',
-      thumbnailGradient: 'from-blue-800/60 via-amber-700/40 to-slate-900',
-      nfcTag: 'NFC-SECURE-6012',
-      authenticator: 'Metropolitan Museum of Art Guild',
-    },
-    {
-      id: 'AUR-1907-GKL',
-      title: 'The Kiss',
-      artist: 'Gustav Klimt',
-      year: '1907–1908',
-      medium: 'Oil and gold leaf on canvas',
-      dimensions: '180 cm × 180 cm',
-      status: 'VERIFIED',
-      thumbnailGradient: 'from-amber-600/60 via-yellow-700/40 to-slate-900',
-      nfcTag: 'NFC-SECURE-5511',
-      authenticator: 'Österreichische Galerie Belvedere',
-    },
-  ];
-
-  const [artworks, setArtworks] = useState<Artwork[]>(defaultArtworks);
-
-  // Recent Transactions
-  const [transactions, setTransactions] = useState<TransferItem[]>([
-    {
-      id: 'tx-101',
-      type: 'INCOMING',
-      title: 'Water Lilies (Nymphéas)',
-      artist: 'Claude Monet',
-      counterparty: 'Sotheby’s Contemporary Custody Escrow',
-      date: '1 day ago',
-      status: 'PENDING_ACCEPTANCE',
-      txHash: '0x8f2d35Cc6634C0532925a3b8D4C05329505329b1',
-    },
-    {
-      id: 'tx-102',
-      type: 'VERIFICATION',
-      title: 'The Persistence of Memory',
-      artist: 'Salvador Dalí',
-      counterparty: 'Fundació Gala-Salvador Dalí',
-      date: '3 weeks ago',
-      status: 'COMPLETED',
-      txHash: '0x3c7e91Da9931B0532925a3b8D4C05329505329a4',
-    },
-    {
-      id: 'tx-103',
-      type: 'INCOMING',
-      title: 'Girl with a Pearl Earring',
-      artist: 'Johannes Vermeer',
-      counterparty: 'The Sovereign Heritage Trust',
-      date: '2 months ago',
-      status: 'COMPLETED',
-      txHash: '0x992d35Cc6634C0532925a3b8D4C05329505329b2',
-    },
-  ]);
+  const [artworks, setArtworks] = useState<Artwork[]>([]);
+  const [transactions, setTransactions] = useState<TransferItem[]>([]);
 
   useEffect(() => {
     try {
@@ -247,6 +150,11 @@ const CollectorDashboard: React.FC = () => {
     return true;
   });
 
+  const pendingIncoming = transactions.filter(t => t.type === 'INCOMING' && t.status === 'PENDING_ACCEPTANCE');
+  const incomingTransfer = pendingIncoming[0];
+  const outgoingCount = transactions.filter(t => t.type === 'OUTGOING').length;
+  const verifiedCount = artworks.filter(item => item.status === 'VERIFIED').length;
+
   const handleCopyTx = (tx: string) => {
     navigator.clipboard?.writeText(tx);
     setCopiedTx(tx);
@@ -268,11 +176,13 @@ const CollectorDashboard: React.FC = () => {
         const receipt = await acceptTransferOnChain(1);
         setConfirmedTx(receipt.txHash);
         setIncomingAccepted(true);
-        setTransactions(prev =>
-          prev.map(t =>
-            t.id === 'tx-101' ? { ...t, status: 'COMPLETED' as const, txHash: receipt.txHash } : t
-          )
-        );
+        if (incomingTransfer) {
+          setTransactions(prev =>
+            prev.map(t =>
+              t.id === incomingTransfer.id ? { ...t, status: 'COMPLETED' as const, txHash: receipt.txHash } : t
+            )
+          );
+        }
         setTimeout(() => setShowIncomingModal(false), 2000);
       } catch (err: any) {
         console.warn('On-chain signature error:', err);
@@ -281,13 +191,14 @@ const CollectorDashboard: React.FC = () => {
         setIsSigningTx(false);
       }
     } else {
-      // Offline / demo state
       setIncomingAccepted(true);
-      setTransactions(prev =>
-        prev.map(t =>
-          t.id === 'tx-101' ? { ...t, status: 'COMPLETED' as const } : t
-        )
-      );
+      if (incomingTransfer) {
+        setTransactions(prev =>
+          prev.map(t =>
+            t.id === incomingTransfer.id ? { ...t, status: 'COMPLETED' as const } : t
+          )
+        );
+      }
       setShowIncomingModal(false);
     }
   };
@@ -350,9 +261,9 @@ const CollectorDashboard: React.FC = () => {
               className="text-slate-400 hover:text-slate-200 transition flex items-center gap-1.5 cursor-pointer"
             >
               Transfers
-              {!incomingAccepted && (
+              {!incomingAccepted && pendingIncoming.length > 0 && (
                 <span className="px-1.5 py-0.2 text-[10px] font-bold rounded-full bg-indigo-500/30 text-indigo-300 border border-indigo-500/40">
-                  1
+                  {pendingIncoming.length}
                 </span>
               )}
             </a>
@@ -422,6 +333,10 @@ const CollectorDashboard: React.FC = () => {
             </Link>
             <button
               onClick={() => {
+                if (artworks.length === 0) {
+                  alert('You do not have any artworks in your vault to transfer.');
+                  return;
+                }
                 setTransferArtwork(artworks[0]);
                 setShowTransferModal(true);
               }}
@@ -450,14 +365,16 @@ const CollectorDashboard: React.FC = () => {
               </div>
             </div>
             <div className="mt-4 flex items-baseline gap-2">
-              <span className="text-3xl sm:text-4xl font-extrabold text-white tracking-tight">5</span>
-              <span className="text-xs font-semibold text-emerald-400 flex items-center">
-                +1 this quarter
-              </span>
+              <span className="text-3xl sm:text-4xl font-extrabold text-white tracking-tight">{artworks.length}</span>
+              {artworks.length > 0 && (
+                <span className="text-xs font-semibold text-emerald-400 flex items-center">
+                  Active
+                </span>
+              )}
             </div>
             <p className="text-xs text-slate-500 mt-2 flex items-center gap-1.5">
               <span className="w-1.5 h-1.5 rounded-full bg-amber-400"></span>
-              All registered on Artchain Ledger
+              {artworks.length > 0 ? 'All registered on Artchain Ledger' : 'No artworks registered yet'}
             </p>
           </div>
 
@@ -475,9 +392,9 @@ const CollectorDashboard: React.FC = () => {
             </div>
             <div className="mt-4 flex items-baseline gap-2">
               <span className="text-3xl sm:text-4xl font-extrabold text-white tracking-tight">
-                {incomingAccepted ? '0' : '1'}
+                {pendingIncoming.length}
               </span>
-              {!incomingAccepted && (
+              {pendingIncoming.length > 0 && (
                 <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-300 border border-amber-500/20">
                   Awaiting sign-off
                 </span>
@@ -485,7 +402,7 @@ const CollectorDashboard: React.FC = () => {
             </div>
             <p className="text-xs text-slate-500 mt-2 flex items-center gap-1.5">
               <span className="w-1.5 h-1.5 rounded-full bg-indigo-400"></span>
-              {incomingAccepted ? 'No pending requests' : '1 artwork ready for acceptance'}
+              {pendingIncoming.length > 0 ? `${pendingIncoming.length} transfer ready for acceptance` : 'No pending requests'}
             </p>
           </div>
 
@@ -502,7 +419,7 @@ const CollectorDashboard: React.FC = () => {
               </div>
             </div>
             <div className="mt-4 flex items-baseline gap-2">
-              <span className="text-3xl sm:text-4xl font-extrabold text-white tracking-tight">0</span>
+              <span className="text-3xl sm:text-4xl font-extrabold text-white tracking-tight">{outgoingCount}</span>
               <span className="text-xs font-semibold text-slate-400">Active</span>
             </div>
             <p className="text-xs text-slate-500 mt-2 flex items-center gap-1.5">
@@ -524,9 +441,9 @@ const CollectorDashboard: React.FC = () => {
               </div>
             </div>
             <div className="mt-4 flex items-baseline gap-2">
-              <span className="text-3xl sm:text-4xl font-extrabold text-emerald-400 tracking-tight">5</span>
+              <span className="text-3xl sm:text-4xl font-extrabold text-emerald-400 tracking-tight">{verifiedCount}</span>
               <span className="text-xs font-semibold text-emerald-300 bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/20">
-                100% Rate
+                {artworks.length > 0 ? `${Math.round((verifiedCount / artworks.length) * 100)}% Rate` : '0%'}
               </span>
             </div>
             <p className="text-xs text-slate-500 mt-2 flex items-center gap-1.5">
@@ -537,7 +454,7 @@ const CollectorDashboard: React.FC = () => {
         </div>
 
         {/* 4. Action Banner for Pending Incoming Transfer (if not accepted) */}
-        {!incomingAccepted && (
+        {!incomingAccepted && incomingTransfer && (
           <div className="p-5 rounded-2xl bg-gradient-to-r from-indigo-950/70 via-slate-900/80 to-slate-900/70 border border-indigo-500/40 shadow-xl backdrop-blur-xl flex flex-col md:flex-row md:items-center justify-between gap-4">
             <div className="flex items-start gap-4">
               <div className="w-12 h-12 rounded-xl bg-indigo-500/20 border border-indigo-500/30 flex items-center justify-center text-indigo-300 flex-shrink-0 text-xl">
@@ -548,13 +465,13 @@ const CollectorDashboard: React.FC = () => {
                   <span className="px-2 py-0.5 rounded-full bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 text-[10px] font-bold uppercase tracking-wider">
                     Action Required
                   </span>
-                  <span className="text-xs text-slate-400">1 day ago</span>
+                  <span className="text-xs text-slate-400">{incomingTransfer.date}</span>
                 </div>
                 <h2 className="text-base font-bold text-white mt-1">
-                  Incoming Transfer Pending: "Water Lilies (Nymphéas)" by Claude Monet
+                  Incoming Transfer Pending: "{incomingTransfer.title}" by {incomingTransfer.artist}
                 </h2>
                 <p className="text-xs text-slate-400 mt-0.5">
-                  Origin: Sotheby’s Contemporary Custody Escrow. Requires your cryptographic acceptance signature to complete custody transfer.
+                  Origin: {incomingTransfer.counterparty}. Requires your cryptographic acceptance signature to complete custody transfer.
                 </p>
               </div>
             </div>
@@ -607,13 +524,24 @@ const CollectorDashboard: React.FC = () => {
                     : 'text-slate-400 hover:text-slate-200'
                 }`}
               >
-                Verified Provenance (5)
+                Verified Provenance ({verifiedCount})
               </button>
             </div>
           </div>
 
           {/* Artworks Grid */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {filteredArtworks.length === 0 ? (
+            <div className="py-16 px-6 text-center rounded-2xl bg-slate-900/40 border border-dashed border-slate-800">
+              <div className="w-12 h-12 mx-auto rounded-full bg-slate-800/80 flex items-center justify-center text-slate-400 text-xl mb-3">
+                🖼️
+              </div>
+              <h3 className="text-base font-bold text-white">No Artworks in Vault</h3>
+              <p className="text-xs text-slate-400 max-w-sm mx-auto mt-1">
+                Your vault is currently empty. Artworks you acquire or register on the Artchain ledger will be displayed here with their cryptographic certificates.
+              </p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {filteredArtworks.map(artwork => (
               <div
                 key={artwork.id}
@@ -696,6 +624,7 @@ const CollectorDashboard: React.FC = () => {
               </div>
             ))}
           </div>
+          )}
         </section>
 
         {/* 6. Recent Transactions & Activity */}
@@ -725,7 +654,15 @@ const CollectorDashboard: React.FC = () => {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-800/80">
-                  {transactions.map(tx => (
+                  {transactions.length === 0 ? (
+                    <tr>
+                      <td colSpan={6} className="px-5 py-12 text-center text-slate-400 text-xs">
+                        <span className="block text-2xl mb-1.5">📜</span>
+                        No custody transfers or transactions recorded yet.
+                      </td>
+                    </tr>
+                  ) : (
+                    transactions.map(tx => (
                     <tr key={tx.id} className="hover:bg-slate-800/30 transition">
                       <td className="px-5 py-4">
                         <div className="flex items-center gap-3">
@@ -794,7 +731,7 @@ const CollectorDashboard: React.FC = () => {
                         )}
                       </td>
                     </tr>
-                  ))}
+                  )))}
                 </tbody>
               </table>
             </div>
@@ -837,6 +774,10 @@ const CollectorDashboard: React.FC = () => {
             {/* Action 2: Initiate Transfer */}
             <button
               onClick={() => {
+                if (artworks.length === 0) {
+                  alert('You do not have any artworks in your vault to transfer.');
+                  return;
+                }
                 setTransferArtwork(artworks[0]);
                 setShowTransferModal(true);
               }}

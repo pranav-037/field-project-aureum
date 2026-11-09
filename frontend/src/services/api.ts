@@ -25,6 +25,12 @@ export const userApi = {
     api.post('/users', data),
 };
 
+// Institution API
+export const institutionApi = {
+  getAll: () => api.get('/institutions'),
+  approve: (walletAddress: string) => api.post('/institutions/approve', { walletAddress }),
+};
+
 // Auth API
 export const authApi = {
   login: (data: { email: string; password: string }) => api.post('/auth/login', data),

@@ -47,43 +47,6 @@ interface ArtworkData {
   transfers: TransferRecord[];
 }
 
-const mockDemoArtwork: ArtworkData = {
-  id: 'AUR-1234',
-  title: 'The Starry Night',
-  artist: 'Vincent van Gogh',
-  year: '1889',
-  medium: 'Oil on canvas',
-  dimensions: '73.7 cm × 92.1 cm',
-  authenticator: 'Metropolitan Museum of Art Guild',
-  genesisTimestamp: '2023-05-15T10:30:00Z',
-  genesisTxHash: '0x742d35Cc6634C0532925a3b8D4C0532950532950',
-  status: 'VERIFIED',
-  integrityStatus: 'VERIFIED',
-  metadataCid: 'QmZtmD2qt8fQgdfmkW4m6JqWcstVkAbD9ldWgjXF2',
-  bindingReference: 'NFC-SECURE-9024',
-  onChainVerified: true,
-  transfers: [
-    {
-      id: 'txf-001',
-      date: '2023-06-01',
-      from: 'Metropolitan Museum of Art',
-      to: 'Guggenheim Foundation Escrow',
-      priceVisibility: 'PARTIES_AND_AUTHORISED',
-      txHash: '0x8f2d35Cc6634C0532925a3b8D4C05329505329b1',
-      blockNumber: 18452104,
-    },
-    {
-      id: 'txf-002',
-      date: '2024-01-15',
-      from: 'Guggenheim Foundation Escrow',
-      to: 'The Sovereign Heritage Trust',
-      priceVisibility: 'PUBLIC',
-      txHash: '0x992d35Cc6634C0532925a3b8D4C05329505329b2',
-      blockNumber: 19842109,
-    },
-  ],
-};
-
 const ProvenanceVerification: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [searchBy, setSearchBy] = useState<'artworkId' | 'wallet' | 'qr'>('artworkId');
@@ -161,17 +124,14 @@ const ProvenanceVerification: React.FC = () => {
             };
           }
         } catch (apiErr) {
-          // If not in database, fallback to verified mock records for demo
+          // Artwork not found via API
         }
       }
 
-      // 2. Fallback to mock data for demonstration
       if (!foundData) {
-        await new Promise((resolve) => setTimeout(resolve, 600));
-        foundData = {
-          ...mockDemoArtwork,
-          id: searchQuery.trim().toUpperCase().startsWith('AUR-') ? searchQuery.trim().toUpperCase() : `AUR-${searchQuery.trim().slice(0, 6).toUpperCase()}`,
-        };
+        setError(`No verified artwork record found for "${searchQuery.trim()}".`);
+        setArtworkData(null);
+        return;
       }
 
       setArtworkData(foundData);
@@ -183,10 +143,7 @@ const ProvenanceVerification: React.FC = () => {
   };
 
   const handleQRScan = () => {
-    setSearchQuery('AUR-1234');
-    setSearchBy('artworkId');
-    // Auto-trigger search demonstration
-    setArtworkData(mockDemoArtwork);
+    setError('Optical / QR scanner is unavailable. Please enter the Artwork ID or NFC Tag directly in the search input.');
   };
 
   const copyToClipboard = (text: string) => {
