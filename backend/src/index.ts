@@ -13,6 +13,8 @@ import { AuthService } from './services/auth.service';
 import { BlockchainService } from './services/blockchain.service';
 import { IPFSService } from './services/ipfs.service';
 import { IndexerService } from './services/indexer.service';
+import { requireAuth, requireRole } from './middleware/auth';
+import { supabase } from './db/supabase';
 import multer from 'multer';
 
 const app = express();
@@ -95,33 +97,40 @@ app.post('/api/auth/google', async (req: Request, res: Response) => {
   }
 });
 
-// Get current user profile
-app.get('/api/auth/me', async (req: Request, res: Response) => {
+// Password reset request
+app.post(['/api/reset-password', '/api/auth/reset-password'], async (req: Request, res: Response) => {
   try {
-    const authHeader = req.headers.authorization;
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      return res.status(401).json({ error: 'Missing authorization header' });
+    const { email, redirectTo } = req.body;
+    if (!email || !email.trim()) {
+      return res.status(400).json({ error: 'Email address is required.' });
     }
-    const token = authHeader.split(' ')[1];
-    const decoded = AuthService.verifyToken(token);
-    if (!decoded) {
-      return res.status(401).json({ error: 'Invalid or expired token' });
+    const result = await AuthService.resetPassword(email, redirectTo);
+    res.json(result);
+  } catch (error) {
+    res.status(400).json({ error: (error as Error).message });
+  }
+});
+
+// Get current user profile
+app.get('/api/auth/me', requireAuth, async (req: Request, res: Response) => {
+  try {
+    if (!req.user) {
+      return res.status(401).json({ error: 'User not authenticated' });
     }
-    const user = await prisma.user.findUnique({
-      where: { id: decoded.userId },
-      select: {
-        id: true,
-        email: true,
-        name: true,
-        role: true,
-        walletAddress: true,
-        googleId: true,
-        avatarUrl: true,
-        createdAt: true,
-      },
-    });
-    if (!user) return res.status(404).json({ error: 'User not found' });
-    res.json(user);
+
+    // Try fetching freshest profile from Supabase "User" table
+    const { data: dbUser } = await supabase
+      .from('User')
+      .select('id, email, name, role, walletAddress, googleId, avatarUrl, createdAt')
+      .eq('id', req.user.id)
+      .single();
+
+    if (dbUser) {
+      return res.json(dbUser);
+    }
+
+    // Fallback to verified user payload
+    res.json(req.user);
   } catch (error) {
     res.status(500).json({ error: 'Failed to verify session' });
   }
@@ -181,7 +190,13 @@ app.get('/health', async (req: Request, res: Response) => {
 // Get all users (for testing)
 app.get('/api/users', async (req: Request, res: Response) => {
   try {
-    const users = await prisma.user.findMany({
+    const { data: users, error } = await supabase
+      .from('User')
+      .select('id, email, name, role, createdAt');
+    if (!error && users) {
+      return res.json(users);
+    }
+    const legacyUsers = await prisma.user.findMany({
       select: {
         id: true,
         email: true,
@@ -190,7 +205,7 @@ app.get('/api/users', async (req: Request, res: Response) => {
         createdAt: true,
       },
     });
-    res.json(users);
+    res.json(legacyUsers);
   } catch (error) {
     res.status(500).json({ error: 'Failed to fetch users' });
   }
@@ -203,19 +218,10 @@ app.post('/api/users', async (req: Request, res: Response) => {
     if (!email || !name) {
       return res.status(400).json({ error: 'Email and name are required' });
     }
-    const user = await prisma.user.create({
-      data: {
-        email,
-        name,
-        role: role || 'VIEWER',
-        password: password || '',
-      },
-    });
-    // Remove sensitive fields before sending response
-    const { id, email: userEmail, name: userName, role: userRole, createdAt, updatedAt } = user;
-    res.status(201).json({ id, email: userEmail, name: userName, role: userRole, createdAt, updatedAt });
+    const result = await AuthService.register(email, password || 'P@ssword123', name, role || 'COLLECTOR');
+    res.status(201).json(result.user);
   } catch (error) {
-    res.status(500).json({ error: 'Failed to create user' });
+    res.status(500).json({ error: 'Failed to create user: ' + (error as Error).message });
   }
 });
 

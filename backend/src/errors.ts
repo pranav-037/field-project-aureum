@@ -1,27 +1,42 @@
 /**
- * Custom application error classes.
- * Centralised here so all modules can import from one place.
+ * Custom application error classes
  */
 
-/** Thrown when an authenticated user attempts an action they are not permitted to perform. */
 export class AuthorizationError extends Error {
+  public readonly statusCode = 403;
+
   constructor(message: string) {
     super(message);
     this.name = 'AuthorizationError';
-    // Maintains proper stack trace in V8-based environments
+    Object.setPrototypeOf(this, AuthorizationError.prototype);
     if (Error.captureStackTrace) {
       Error.captureStackTrace(this, AuthorizationError);
     }
   }
 }
 
-/** Thrown when a request cannot be authenticated (missing / invalid token). */
 export class AuthenticationError extends Error {
+  public readonly statusCode = 401;
+
   constructor(message = 'Unauthorized') {
     super(message);
     this.name = 'AuthenticationError';
+    Object.setPrototypeOf(this, AuthenticationError.prototype);
     if (Error.captureStackTrace) {
       Error.captureStackTrace(this, AuthenticationError);
+    }
+  }
+}
+
+export class ConflictError extends Error {
+  public readonly statusCode = 409;
+
+  constructor(message: string) {
+    super(message);
+    this.name = 'ConflictError';
+    Object.setPrototypeOf(this, ConflictError.prototype);
+    if (Error.captureStackTrace) {
+      Error.captureStackTrace(this, ConflictError);
     }
   }
 }
