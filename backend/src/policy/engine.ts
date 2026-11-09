@@ -27,7 +27,7 @@ export async function loadRules() {
 /** Simple sandboxed evaluation of a condition string */
 function evalCondition(
   condition: string | undefined,
-  ctx: { user: DecodedUser; resource: Resource },
+  ctx: { user: DecodedUser; resource?: Resource },
 ): boolean {
   if (!condition) return true;
   // eslint-disable-next-line no-new-func
@@ -50,7 +50,8 @@ export async function authorize(
   if (!matching) {
     throw new AuthorizationError(`Action "${action}" not permitted for role ${user.role}`);
   }
-  const allowed = evalCondition(matching.condition, { user, resource: resource ?? {} });
+  // resource is intentionally optional – conditions that reference it must guard accordingly
+  const allowed = evalCondition(matching.condition, { user, resource });
   if (!allowed) {
     throw new AuthorizationError(`Condition failed for action "${action}"`);
   }
@@ -73,4 +74,3 @@ export async function filterResources<T extends Resource>(
   }
   return result;
 }
-
