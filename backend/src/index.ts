@@ -5,7 +5,6 @@ import express, { Request, Response } from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import morgan from 'morgan';
-import { PrismaClient } from '@prisma/client';
 import path from 'path';
 import fs from 'fs';
 
@@ -14,12 +13,11 @@ import { BlockchainService } from './services/blockchain.service';
 import { IPFSService } from './services/ipfs.service';
 import { IndexerService } from './services/indexer.service';
 import { requireAuth, requireRole } from './middleware/auth';
-import { supabase } from './db/supabase';
+import { supabase, db } from './db/supabase';
 import multer from 'multer';
 
 const app = express();
 const PORT = process.env.PORT || 3000;
-export const prisma = new PrismaClient();
 
 // Configure Multer for file uploads (max 50MB per file)
 const upload = multer({
@@ -39,7 +37,7 @@ app.use(express.json());
 
 // Basic API route
 app.get('/api', (req: Request, res: Response) => {
-  res.json({ message: 'Aureum API is running!' });
+  res.json({ message: 'Aureum API is running with Supabase backend!' });
 });
 
 // Authentication routes
@@ -90,7 +88,7 @@ app.post('/api/auth/google', async (req: Request, res: Response) => {
     if (!idToken) {
       return res.status(400).json({ error: 'Google ID token is required' });
     }
-    const result = await AuthService.loginWithGoogle(idToken, role || 'VIEWER');
+    const result = await AuthService.loginWithGoogle(idToken, role || 'COLLECTOR');
     res.json(result);
   } catch (error) {
     res.status(401).json({ error: (error as Error).message || 'Google authentication failed' });
@@ -107,26 +105,34 @@ app.post(['/api/reset-password', '/api/auth/reset-password'], async (req: Reques
     const result = await AuthService.resetPassword(email, redirectTo);
     res.json(result);
   } catch (error) {
-    res.status(400).json({ error: (error as Error).message });
+    res.status(400).json({ error: (error as Error).message || 'Password reset request failed' });
   }
 });
 
-// Get current user profile
+// Get current user profile (protected by requireAuth)
 app.get('/api/auth/me', requireAuth, async (req: Request, res: Response) => {
   try {
     if (!req.user) {
       return res.status(401).json({ error: 'User not authenticated' });
     }
 
-    // Try fetching freshest profile from Supabase "User" table
-    const { data: dbUser } = await supabase
-      .from('User')
-      .select('id, email, name, role, walletAddress, googleId, avatarUrl, createdAt')
-      .eq('id', req.user.id)
-      .single();
-
-    if (dbUser) {
-      return res.json(dbUser);
+    // Try fetching fresh user record from Supabase
+    try {
+      const user = await db.users.findUnique(req.user.id);
+      if (user) {
+        return res.json({
+          id: user.id,
+          email: user.email,
+          name: user.name,
+          role: user.role,
+          walletAddress: user.walletAddress,
+          googleId: user.googleId,
+          avatarUrl: user.avatarUrl,
+          createdAt: user.createdAt,
+        });
+      }
+    } catch {
+      // Continue to fallback
     }
 
     // Fallback to verified user payload
@@ -140,13 +146,8 @@ app.get('/api/auth/me', requireAuth, async (req: Request, res: Response) => {
 app.get('/api/activities', async (req: Request, res: Response) => {
   try {
     const { userId, limit } = req.query;
-    const where = userId ? { userId: String(userId) } : {};
     const take = limit ? Math.min(Number(limit), 100) : 50;
-    const activities = await prisma.activity.findMany({
-      where,
-      orderBy: { createdAt: 'desc' },
-      take,
-    });
+    const activities = await db.activities.findMany(userId ? String(userId) : undefined, take);
     res.json(activities);
   } catch (error) {
     res.status(500).json({ error: 'Failed to fetch activities' });
@@ -159,16 +160,14 @@ app.post('/api/activities', async (req: Request, res: Response) => {
     if (!title || !type) {
       return res.status(400).json({ error: 'title and type are required' });
     }
-    const activity = await prisma.activity.create({
-      data: {
-        userId: userId || null,
-        userEmail: userEmail || null,
-        type,
-        title,
-        detail: detail || null,
-        badge: badge || null,
-        txHash: txHash || null,
-      },
+    const activity = await db.activities.create({
+      userId: userId || null,
+      userEmail: userEmail || null,
+      type,
+      title,
+      detail: detail || null,
+      badge: badge || null,
+      txHash: txHash || null,
     });
     res.status(201).json(activity);
   } catch (error) {
@@ -179,33 +178,27 @@ app.post('/api/activities', async (req: Request, res: Response) => {
 // Health check
 app.get('/health', async (req: Request, res: Response) => {
   try {
-    // Check database connection
-    await prisma.user.count();
-    res.status(200).json({ status: 'OK', timestamp: new Date().toISOString(), database: 'connected' });
+    // Check Supabase connection
+    await db.users.count();
+    res.status(200).json({
+      status: 'OK',
+      timestamp: new Date().toISOString(),
+      database: 'supabase-connected',
+    });
   } catch (error) {
-    res.status(500).json({ status: 'ERROR', message: 'Database connection failed', error: (error as Error).message });
+    res.status(500).json({
+      status: 'ERROR',
+      message: 'Supabase connection failed',
+      error: (error as Error).message,
+    });
   }
 });
 
 // Get all users (for testing)
 app.get('/api/users', async (req: Request, res: Response) => {
   try {
-    const { data: users, error } = await supabase
-      .from('User')
-      .select('id, email, name, role, createdAt');
-    if (!error && users) {
-      return res.json(users);
-    }
-    const legacyUsers = await prisma.user.findMany({
-      select: {
-        id: true,
-        email: true,
-        name: true,
-        role: true,
-        createdAt: true,
-      },
-    });
-    res.json(legacyUsers);
+    const users = await db.users.findMany('id, email, name, role, createdAt');
+    res.json(users);
   } catch (error) {
     res.status(500).json({ error: 'Failed to fetch users' });
   }
@@ -243,11 +236,7 @@ app.get('/api/blockchain/status', async (req: Request, res: Response) => {
 // List institutions
 app.get('/api/institutions', async (req: Request, res: Response) => {
   try {
-    const { data, error } = await supabase.from('Institution').select('*');
-    if (!error && data) {
-      return res.json(data);
-    }
-    const institutions = await prisma.institution.findMany();
+    const institutions = await db.institutions.findMany();
     res.json(institutions);
   } catch (error) {
     res.status(500).json({ error: 'Failed to fetch institutions' });
@@ -265,125 +254,100 @@ app.post('/api/institutions/approve', async (req: Request, res: Response) => {
     const isChainAvailable = await BlockchainService.isAvailable();
     if (isChainAvailable) {
       const result = await BlockchainService.approveInstitution(walletAddress);
+      await db.institutions.updateStatus(walletAddress, 'APPROVED');
       return res.json({ success: true, ...result });
     }
 
+    await db.institutions.updateStatus(walletAddress, 'APPROVED');
     res.json({ success: true, message: 'Institution approved (blockchain offline)' });
   } catch (error) {
     res.status(500).json({ error: (error as Error).message || 'Failed to approve institution' });
   }
 });
 
-// IPFS Status check
+// IPFS Service status
 app.get('/api/ipfs/status', (req: Request, res: Response) => {
   res.json({
-    pinataConfigured: IPFSService.isPinataConfigured(),
-    gatewayUrl: IPFSService.getGatewayUrl(''),
+    configured: IPFSService.isPinataConfigured(),
+    gateway: process.env.IPFS_GATEWAY || 'https://gateway.pinata.cloud/ipfs/',
+    localStorage: true,
   });
 });
 
-// Single file IPFS upload (image or certificate PDF)
+// Upload a single file to IPFS
 app.post('/api/ipfs/upload', upload.single('file'), async (req: Request, res: Response) => {
   try {
     if (!req.file) {
-      return res.status(400).json({ error: 'No file provided in form-data field "file"' });
+      return res.status(400).json({ error: 'No file uploaded' });
     }
 
-    const result = await IPFSService.pinFile(
+    const pinResult = await IPFSService.pinFile(
       req.file.buffer,
       req.file.originalname,
       req.file.mimetype
     );
 
-    res.status(201).json({
-      success: true,
-      originalFilename: req.file.originalname,
-      mimetype: req.file.mimetype,
-      ...result,
-    });
+    res.status(201).json(pinResult);
   } catch (error) {
     res.status(500).json({ error: (error as Error).message || 'Failed to pin file to IPFS' });
   }
 });
 
-// Multiple files IPFS upload
+// Upload multiple files to IPFS
 app.post('/api/ipfs/upload-multiple', upload.array('files', 10), async (req: Request, res: Response) => {
   try {
     const files = req.files as Express.Multer.File[];
     if (!files || files.length === 0) {
-      return res.status(400).json({ error: 'No files provided in form-data field "files"' });
+      return res.status(400).json({ error: 'No files uploaded' });
     }
 
-    const pinnedResults = await Promise.all(
-      files.map(async (file) => {
-        const pin = await IPFSService.pinFile(file.buffer, file.originalname, file.mimetype);
-        return {
-          originalFilename: file.originalname,
-          mimetype: file.mimetype,
-          ...pin,
-        };
-      })
+    const uploadPromises = files.map((file) =>
+      IPFSService.pinFile(file.buffer, file.originalname, file.mimetype)
     );
 
-    res.status(201).json({
-      success: true,
-      count: pinnedResults.length,
-      files: pinnedResults,
-    });
+    const results = await Promise.all(uploadPromises);
+    res.status(201).json({ files: results });
   } catch (error) {
-    res.status(500).json({ error: (error as Error).message || 'Failed to pin files to IPFS' });
+    res.status(500).json({ error: (error as Error).message || 'Failed to pin multiple files to IPFS' });
   }
 });
 
-// Pin JSON Metadata to IPFS
+// Pin raw JSON metadata to IPFS
 app.post('/api/ipfs/pin-json', async (req: Request, res: Response) => {
   try {
     const { metadata, name } = req.body;
-    if (!metadata) {
-      return res.status(400).json({ error: 'JSON metadata object is required' });
+    if (!metadata || typeof metadata !== 'object') {
+      return res.status(400).json({ error: 'Valid JSON metadata is required' });
     }
 
-    const result = await IPFSService.pinJSON(metadata, name);
-    res.status(201).json({
-      success: true,
-      ...result,
-    });
+    const pinResult = await IPFSService.pinJSON(metadata, name);
+    res.status(201).json(pinResult);
   } catch (error) {
     res.status(500).json({ error: (error as Error).message || 'Failed to pin JSON to IPFS' });
   }
 });
 
-// Retrieve IPFS content by CID
+// Retrieve IPFS file metadata / redirect to gateway
 app.get('/api/ipfs/:cid', async (req: Request, res: Response) => {
   try {
     const { cid } = req.params;
-    const content = await IPFSService.retrieve(cid);
-
-    if (!content) {
-      return res.status(404).json({ error: `CID ${cid} could not be resolved from local cache or IPFS gateway` });
-    }
-
-    res.setHeader('Content-Type', content.contentType);
-    res.send(content.data);
+    const gatewayUrl = IPFSService.getGatewayUrl(cid);
+    res.json({
+      cid,
+      gatewayUrl,
+      publicUrl: gatewayUrl,
+    });
   } catch (error) {
-    res.status(500).json({ error: (error as Error).message || 'Failed to retrieve IPFS content' });
+    res.status(500).json({ error: (error as Error).message });
   }
 });
 
 // Get all artworks
 app.get('/api/artworks', async (req: Request, res: Response) => {
   try {
-    const artworks = await prisma.artwork.findMany({
-      select: {
-        id: true,
-        blockchainArtworkId: true,
-        txHash: true,
-        title: true,
-        artist: true,
-        status: true,
-        createdAt: true,
-      },
-    });
+    const artworks = await db.artworks.findMany(
+      'id, blockchainArtworkId, txHash, title, artist, status, createdAt'
+    );
     res.json(artworks);
   } catch (error) {
     res.status(500).json({ error: 'Failed to fetch artworks' });
@@ -482,36 +446,32 @@ app.post('/api/artworks', async (req: Request, res: Response) => {
       }
     }
 
-    const artwork = await prisma.artwork.create({
-      data: {
-        title,
-        artist,
-        year: year || undefined,
-        medium: medium || '',
-        dimensions: dimensions || '',
-        metadataCid: finalMetadataCid,
-        imageCids: JSON.stringify(parsedImageCids),
-        documentCids: JSON.stringify(parsedDocCids),
-        bindingReference: bindingReference || '',
-        status: 'VERIFIED',
-        ownerId,
-        blockchainArtworkId: onChainArtworkId,
-        txHash: txHash || '0x' + '0'.repeat(64),
-        blockNumber: blockNumber || 0,
-      },
+    const artwork = await db.artworks.create({
+      title,
+      artist,
+      year: year || null,
+      medium: medium || '',
+      dimensions: dimensions || '',
+      metadataCid: finalMetadataCid,
+      imageCids: JSON.stringify(parsedImageCids),
+      documentCids: JSON.stringify(parsedDocCids),
+      bindingReference: bindingReference || '',
+      status: 'VERIFIED',
+      ownerId,
+      blockchainArtworkId: onChainArtworkId,
+      txHash: txHash || '0x' + '0'.repeat(64),
+      blockNumber: blockNumber || 0,
     });
 
     // Record Genesis activity
     try {
-      await prisma.activity.create({
-        data: {
-          userId: ownerId,
-          type: 'GENESIS',
-          title: 'Genesis Record Created',
-          detail: `"${artwork.title}" by ${artwork.artist}`,
-          badge: 'NFC-BOUND',
-          txHash: artwork.txHash,
-        },
+      await db.activities.create({
+        userId: ownerId,
+        type: 'GENESIS',
+        title: 'Genesis Record Created',
+        detail: `"${artwork.title}" by ${artwork.artist}`,
+        badge: 'NFC-BOUND',
+        txHash: artwork.txHash,
       });
     } catch (actErr) {
       console.warn('Failed to log artwork activity:', actErr);
@@ -530,20 +490,9 @@ app.post('/api/artworks', async (req: Request, res: Response) => {
 // Get all transfers
 app.get('/api/transfers', async (req: Request, res: Response) => {
   try {
-    const transfers = await prisma.transfer.findMany({
-      select: {
-        id: true,
-        blockchainTransferId: true,
-        artworkId: true,
-        sellerId: true,
-        buyerId: true,
-        transferDate: true,
-        priceVisibility: true,
-        status: true,
-        txHash: true,
-        createdAt: true,
-      },
-    });
+    const transfers = await db.transfers.findMany(
+      'id, blockchainTransferId, artworkId, sellerId, buyerId, transferDate, priceVisibility, status, txHash, createdAt'
+    );
     res.json(transfers);
   } catch (error) {
     res.status(500).json({ error: 'Failed to fetch transfers' });
@@ -558,7 +507,7 @@ app.post('/api/transfers', async (req: Request, res: Response) => {
       return res.status(400).json({ error: 'Artwork ID and seller ID are required' });
     }
 
-    const artwork = await prisma.artwork.findUnique({ where: { id: artworkId } });
+    const artwork = await db.artworks.findUnique(artworkId);
     if (!artwork) {
       return res.status(404).json({ error: 'Artwork not found' });
     }
@@ -585,31 +534,27 @@ app.post('/api/transfers', async (req: Request, res: Response) => {
       }
     }
 
-    const transfer = await prisma.transfer.create({
-      data: {
-        artworkId,
-        sellerId,
-        buyerId: buyerId || null,
-        transferDate: transferDate ? new Date(transferDate) : new Date(),
-        priceVisibility: priceVisibility || 'PARTIES_AND_AUTHORISED',
-        txHash,
-        blockNumber,
-        status: 'PENDING',
-        blockchainTransferId: onChainTransferId,
-      },
+    const transfer = await db.transfers.create({
+      artworkId,
+      sellerId,
+      buyerId: buyerId || null,
+      transferDate: transferDate ? new Date(transferDate).toISOString() : new Date().toISOString(),
+      priceVisibility: priceVisibility || 'PARTIES_AND_AUTHORISED',
+      txHash,
+      blockNumber,
+      status: 'PENDING',
+      blockchainTransferId: onChainTransferId,
     });
 
     // Record Transfer Initiated activity
     try {
-      await prisma.activity.create({
-        data: {
-          userId: sellerId,
-          type: 'TRANSFER',
-          title: 'Custody Transfer Initiated',
-          detail: `Transfer initiated for "${artwork.title}"`,
-          badge: 'MULTISIG ESCROW',
-          txHash: transfer.txHash,
-        },
+      await db.activities.create({
+        userId: sellerId,
+        type: 'TRANSFER',
+        title: 'Custody Transfer Initiated',
+        detail: `Transfer initiated for "${artwork.title}"`,
+        badge: 'MULTISIG ESCROW',
+        txHash: transfer.txHash,
       });
     } catch (actErr) {
       console.warn('Failed to log transfer activity:', actErr);
@@ -628,7 +573,7 @@ app.post('/api/transfers', async (req: Request, res: Response) => {
 app.post('/api/transfers/:id/accept', async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
-    const transfer = await prisma.transfer.findUnique({ where: { id } });
+    const transfer = await db.transfers.findUnique(id);
     if (!transfer) {
       return res.status(404).json({ error: 'Transfer not found' });
     }
@@ -647,33 +592,25 @@ app.post('/api/transfers/:id/accept', async (req: Request, res: Response) => {
       }
     }
 
-    const updated = await prisma.transfer.update({
-      where: { id },
-      data: {
-        status: 'FINALIZED',
-        txHash: finalTxHash,
-        blockNumber: finalBlockNumber,
-      },
+    const updated = await db.transfers.update(id, {
+      status: 'FINALIZED',
+      txHash: finalTxHash,
+      blockNumber: finalBlockNumber,
     });
 
     if (transfer.buyerId) {
-      await prisma.artwork.update({
-        where: { id: transfer.artworkId },
-        data: { ownerId: transfer.buyerId },
-      });
+      await db.artworks.update(transfer.artworkId, { ownerId: transfer.buyerId });
     }
 
     // Record Transfer Finalized activity
     try {
-      await prisma.activity.create({
-        data: {
-          userId: transfer.buyerId || transfer.sellerId,
-          type: 'TRANSFER',
-          title: 'Custody Transfer Finalized',
-          detail: `Transfer finalized on-chain`,
-          badge: 'FINALIZED',
-          txHash: finalTxHash,
-        },
+      await db.activities.create({
+        userId: transfer.buyerId || transfer.sellerId,
+        type: 'TRANSFER',
+        title: 'Custody Transfer Finalized',
+        detail: `Transfer finalized on-chain`,
+        badge: 'FINALIZED',
+        txHash: finalTxHash,
       });
     } catch (actErr) {
       console.warn('Failed to log transfer finalize activity:', actErr);
@@ -690,7 +627,7 @@ app.post('/api/transfers/:id/cancel', async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
     const { reason } = req.body;
-    const transfer = await prisma.transfer.findUnique({ where: { id } });
+    const transfer = await db.transfers.findUnique(id);
     if (!transfer) {
       return res.status(404).json({ error: 'Transfer not found' });
     }
@@ -704,11 +641,7 @@ app.post('/api/transfers/:id/cancel', async (req: Request, res: Response) => {
       }
     }
 
-    const updated = await prisma.transfer.update({
-      where: { id },
-      data: { status: 'CANCELLED' },
-    });
-
+    const updated = await db.transfers.update(id, { status: 'CANCELLED' });
     res.json(updated);
   } catch (error) {
     res.status(500).json({ error: (error as Error).message || 'Failed to cancel transfer' });
@@ -719,28 +652,7 @@ app.post('/api/transfers/:id/cancel', async (req: Request, res: Response) => {
 app.get('/api/artworks/:id', async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
-    const artwork = await prisma.artwork.findUnique({
-      where: { id },
-      select: {
-        id: true,
-        blockchainArtworkId: true,
-        txHash: true,
-        blockNumber: true,
-        title: true,
-        artist: true,
-        year: true,
-        medium: true,
-        dimensions: true,
-        metadataCid: true,
-        imageCids: true,
-        documentCids: true,
-        bindingReference: true,
-        status: true,
-        ownerId: true,
-        createdAt: true,
-        updatedAt: true,
-      },
-    });
+    const artwork = await db.artworks.findUnique(id);
 
     if (!artwork) {
       return res.status(404).json({ error: 'Artwork not found' });
@@ -756,23 +668,7 @@ app.get('/api/artworks/:id', async (req: Request, res: Response) => {
 app.get('/api/artworks/:artworkId/transfers', async (req: Request, res: Response) => {
   try {
     const { artworkId } = req.params;
-    const transfers = await prisma.transfer.findMany({
-      where: { artworkId },
-      select: {
-        id: true,
-        blockchainTransferId: true,
-        artworkId: true,
-        sellerId: true,
-        buyerId: true,
-        transferDate: true,
-        priceVisibility: true,
-        txHash: true,
-        blockNumber: true,
-        status: true,
-        createdAt: true,
-      },
-      orderBy: { transferDate: 'desc' },
-    });
+    const transfers = await db.transfers.findByArtworkId(artworkId);
     res.json(transfers);
   } catch (error) {
     res.status(500).json({ error: 'Failed to fetch transfers for artwork' });
@@ -783,7 +679,7 @@ app.get('/api/artworks/:artworkId/transfers', async (req: Request, res: Response
 app.get('/api/artworks/:id/provenance', async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
-    const artwork = await prisma.artwork.findUnique({ where: { id } });
+    const artwork = await db.artworks.findUnique(id);
     if (!artwork) {
       return res.status(404).json({ error: 'Artwork not found' });
     }
@@ -802,10 +698,7 @@ app.get('/api/artworks/:id/provenance', async (req: Request, res: Response) => {
       }
     }
 
-    const transfers = await prisma.transfer.findMany({
-      where: { artworkId: id },
-      orderBy: { transferDate: 'desc' },
-    });
+    const transfers = await db.transfers.findByArtworkId(id);
 
     res.json({
       source: 'DATABASE_CACHE',
@@ -821,7 +714,7 @@ app.get('/api/artworks/:id/provenance', async (req: Request, res: Response) => {
 app.get('/api/artworks/:id/verify-cid', async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
-    const artwork = await prisma.artwork.findUnique({ where: { id } });
+    const artwork = await db.artworks.findUnique(id);
     if (!artwork) {
       return res.status(404).json({ error: 'Artwork not found' });
     }
@@ -868,7 +761,7 @@ if (fs.existsSync(frontendDistPath)) {
 
 // Start server
 app.listen(PORT, () => {
-  console.log(`Server is running on port ${PORT}`);
+  console.log(`Server is running on port ${PORT} (100% Supabase powered)`);
 });
 
 export default app;

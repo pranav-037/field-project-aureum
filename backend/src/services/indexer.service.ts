@@ -1,8 +1,5 @@
-import { ethers } from 'ethers';
-import { PrismaClient } from '@prisma/client';
 import { BlockchainService } from './blockchain.service';
-
-const prisma = new PrismaClient();
+import { db } from '../db/supabase';
 
 export interface ReconciliationReport {
   onChainArtworksCount: number;
@@ -42,7 +39,7 @@ export class IndexerService {
         'GenesisRecordCreated',
         async (
           artworkId: bigint,
-          authenticator: string,
+          _authenticator: string,
           initialOwner: string,
           metadataCid: string,
           _docCids: string[],
@@ -56,46 +53,34 @@ export class IndexerService {
             console.log(`[Indexer] GenesisRecordCreated event for artwork #${artworkId.toString()}`);
             const blockNumber = event?.log?.blockNumber || 0;
             const txHash = event?.log?.transactionHash || '';
-
             const strId = artworkId.toString();
+
             // Check if existing draft/record exists
-            const existing = await prisma.artwork.findFirst({
-              where: {
-                OR: [
-                  { blockchainArtworkId: strId },
-                  { bindingReference: bindingReference }
-                ]
-              }
-            });
+            const existing = await db.artworks.findByBlockchainIdOrBinding(strId, bindingReference);
 
             if (existing) {
-              await prisma.artwork.update({
-                where: { id: existing.id },
-                data: {
-                  blockchainArtworkId: strId,
-                  txHash: txHash || existing.txHash,
-                  blockNumber: blockNumber || existing.blockNumber,
-                  status: 'VERIFIED',
-                  ownerId: initialOwner,
-                }
+              await db.artworks.update(existing.id, {
+                blockchainArtworkId: strId,
+                txHash: txHash || existing.txHash,
+                blockNumber: blockNumber || existing.blockNumber,
+                status: 'VERIFIED',
+                ownerId: initialOwner,
               });
             } else {
-              await prisma.artwork.create({
-                data: {
-                  blockchainArtworkId: strId,
-                  title: `On-Chain Masterpiece #${strId}`,
-                  artist: 'Certified Artist',
-                  medium: 'Physical Medium',
-                  dimensions: 'Variable',
-                  metadataCid: metadataCid,
-                  imageCids: '[]',
-                  documentCids: '[]',
-                  bindingReference: bindingReference || `AUR-${strId}`,
-                  status: 'VERIFIED',
-                  ownerId: initialOwner,
-                  txHash: txHash,
-                  blockNumber: blockNumber,
-                }
+              await db.artworks.create({
+                blockchainArtworkId: strId,
+                title: `On-Chain Masterpiece #${strId}`,
+                artist: 'Certified Artist',
+                medium: 'Physical Medium',
+                dimensions: 'Variable',
+                metadataCid: metadataCid,
+                imageCids: '[]',
+                documentCids: '[]',
+                bindingReference: bindingReference || `AUR-${strId}`,
+                status: 'VERIFIED',
+                ownerId: initialOwner,
+                txHash: txHash,
+                blockNumber: blockNumber,
               });
             }
             await this.updateLastBlock(blockNumber);
@@ -125,32 +110,25 @@ export class IndexerService {
             const txHash = event?.log?.transactionHash || '';
             const strTid = transferId.toString();
 
-            const existing = await prisma.transfer.findUnique({
-              where: { blockchainTransferId: strTid }
-            });
+            const existing = await db.transfers.findByBlockchainId(strTid);
 
             if (existing) {
-              await prisma.transfer.update({
-                where: { id: existing.id },
-                data: {
-                  status: 'PENDING',
-                  txHash: txHash || existing.txHash,
-                  blockNumber: blockNumber || existing.blockNumber
-                }
+              await db.transfers.update(existing.id, {
+                status: 'PENDING',
+                txHash: txHash || existing.txHash,
+                blockNumber: blockNumber || existing.blockNumber,
               });
             } else {
-              await prisma.transfer.create({
-                data: {
-                  blockchainTransferId: strTid,
-                  artworkId: artworkId.toString(),
-                  sellerId: seller,
-                  buyerId: buyer,
-                  transferDate: new Date(Number(transferDate) * 1000),
-                  priceVisibility: 'PUBLIC',
-                  txHash: txHash,
-                  blockNumber: blockNumber,
-                  status: 'PENDING',
-                }
+              await db.transfers.create({
+                blockchainTransferId: strTid,
+                artworkId: artworkId.toString(),
+                sellerId: seller,
+                buyerId: buyer,
+                transferDate: new Date(Number(transferDate) * 1000).toISOString(),
+                priceVisibility: 'PUBLIC',
+                txHash: txHash,
+                blockNumber: blockNumber,
+                status: 'PENDING',
               });
             }
             await this.updateLastBlock(blockNumber);
@@ -178,21 +156,15 @@ export class IndexerService {
             const strTid = transferId.toString();
             const strAid = artworkId.toString();
 
-            await prisma.transfer.updateMany({
-              where: { blockchainTransferId: strTid },
-              data: {
-                status: 'FINALIZED',
-                txHash: txHash,
-                blockNumber: blockNumber,
-              }
+            await db.transfers.updateByBlockchainId(strTid, {
+              status: 'FINALIZED',
+              txHash: txHash,
+              blockNumber: blockNumber,
             });
 
             // Update ownership of artwork
-            await prisma.artwork.updateMany({
-              where: { blockchainArtworkId: strAid },
-              data: {
-                ownerId: buyer,
-              }
+            await db.artworks.updateByBlockchainId(strAid, {
+              ownerId: buyer,
             });
 
             await this.updateLastBlock(blockNumber);
@@ -209,10 +181,7 @@ export class IndexerService {
           try {
             console.log(`[Indexer] TransferCancelled event for transfer #${transferId.toString()}`);
             const blockNumber = event?.log?.blockNumber || 0;
-            await prisma.transfer.updateMany({
-              where: { blockchainTransferId: transferId.toString() },
-              data: { status: 'CANCELLED' }
-            });
+            await db.transfers.updateByBlockchainId(transferId.toString(), { status: 'CANCELLED' });
             await this.updateLastBlock(blockNumber);
           } catch (err) {
             console.error('[Indexer] Error processing TransferCancelled:', err);
@@ -227,10 +196,7 @@ export class IndexerService {
           try {
             console.log(`[Indexer] TransferExpired event for transfer #${transferId.toString()}`);
             const blockNumber = event?.log?.blockNumber || 0;
-            await prisma.transfer.updateMany({
-              where: { blockchainTransferId: transferId.toString() },
-              data: { status: 'EXPIRED' }
-            });
+            await db.transfers.updateByBlockchainId(transferId.toString(), { status: 'EXPIRED' });
             await this.updateLastBlock(blockNumber);
           } catch (err) {
             console.error('[Indexer] Error processing TransferExpired:', err);
@@ -255,21 +221,17 @@ export class IndexerService {
             const txHash = event?.log?.transactionHash || '';
             const strAmid = amendmentId.toString();
 
-            const existing = await prisma.amendment.findUnique({
-              where: { blockchainAmendmentId: strAmid }
-            });
+            const existing = await db.amendments.findByBlockchainId(strAmid);
 
             if (!existing) {
-              await prisma.amendment.create({
-                data: {
-                  blockchainAmendmentId: strAmid,
-                  blockchainArtworkId: artworkId.toString(),
-                  issuerAddress: issuer,
-                  reason: reason,
-                  txHash: txHash,
-                  blockNumber: blockNumber,
-                  createdAt: new Date(Number(createdAt) * 1000),
-                }
+              await db.amendments.create({
+                blockchainAmendmentId: strAmid,
+                blockchainArtworkId: artworkId.toString(),
+                issuerAddress: issuer,
+                reason: reason,
+                txHash: txHash,
+                blockNumber: blockNumber,
+                createdAt: new Date(Number(createdAt) * 1000).toISOString(),
               });
             }
             await this.updateLastBlock(blockNumber);
@@ -299,32 +261,25 @@ export class IndexerService {
             const strFid = flagId.toString();
             const strAid = artworkId.toString();
 
-            const existing = await prisma.disputeFlag.findUnique({
-              where: { blockchainFlagId: strFid }
-            });
+            const existing = await db.disputeFlags.findByBlockchainId(strFid);
 
             if (!existing) {
-              await prisma.disputeFlag.create({
-                data: {
-                  blockchainFlagId: strFid,
-                  blockchainArtworkId: strAid,
-                  flaggerAddress: flagger,
-                  flagType: Number(flagType),
-                  reason: reason,
-                  evidenceRef: evidenceRef || '',
-                  active: true,
-                  txHash: txHash,
-                  blockNumber: blockNumber,
-                  createdAt: new Date(Number(createdAt) * 1000),
-                }
+              await db.disputeFlags.create({
+                blockchainFlagId: strFid,
+                blockchainArtworkId: strAid,
+                flaggerAddress: flagger,
+                flagType: Number(flagType),
+                reason: reason,
+                evidenceRef: evidenceRef || '',
+                active: true,
+                txHash: txHash,
+                blockNumber: blockNumber,
+                createdAt: new Date(Number(createdAt) * 1000).toISOString(),
               });
             }
 
             // Flag artwork status as DISPUTED
-            await prisma.artwork.updateMany({
-              where: { blockchainArtworkId: strAid },
-              data: { status: 'DISPUTED' }
-            });
+            await db.artworks.updateByBlockchainId(strAid, { status: 'DISPUTED' });
 
             await this.updateLastBlock(blockNumber);
           } catch (err) {
@@ -350,28 +305,17 @@ export class IndexerService {
             const strFid = flagId.toString();
             const strAid = artworkId.toString();
 
-            await prisma.disputeFlag.updateMany({
-              where: { blockchainFlagId: strFid },
-              data: {
-                active: false,
-                resolvedAt: new Date(Number(resolvedAt) * 1000),
-                resolverAddress: resolver,
-              }
-            });
+            await db.disputeFlags.resolveFlag(
+              strFid,
+              resolver,
+              new Date(Number(resolvedAt) * 1000)
+            );
 
             // Check if any active flags remain for this artwork
-            const activeFlags = await prisma.disputeFlag.count({
-              where: {
-                blockchainArtworkId: strAid,
-                active: true,
-              }
-            });
+            const activeFlags = await db.disputeFlags.countActiveForArtwork(strAid);
 
             if (activeFlags === 0) {
-              await prisma.artwork.updateMany({
-                where: { blockchainArtworkId: strAid },
-                data: { status: 'VERIFIED' }
-              });
+              await db.artworks.updateByBlockchainId(strAid, { status: 'VERIFIED' });
             }
 
             await this.updateLastBlock(blockNumber);
@@ -386,18 +330,11 @@ export class IndexerService {
         try {
           console.log(`[Indexer] InstitutionApproved event for ${institution}`);
           const blockNumber = event?.log?.blockNumber || 0;
-          await prisma.institution.upsert({
-            where: { walletAddress: institution },
-            create: {
-              name: `Institution ${institution.slice(0, 6)}...${institution.slice(-4)}`,
-              walletAddress: institution,
-              status: 'APPROVED',
-              approvedAt: new Date(),
-            },
-            update: {
-              status: 'APPROVED',
-              approvedAt: new Date(),
-            }
+          await db.institutions.upsert({
+            name: `Institution ${institution.slice(0, 6)}...${institution.slice(-4)}`,
+            walletAddress: institution,
+            status: 'APPROVED',
+            approvedAt: new Date(),
           });
           await this.updateLastBlock(blockNumber);
         } catch (err) {
@@ -410,10 +347,7 @@ export class IndexerService {
         try {
           console.log(`[Indexer] InstitutionRevoked event for ${institution}`);
           const blockNumber = event?.log?.blockNumber || 0;
-          await prisma.institution.updateMany({
-            where: { walletAddress: institution },
-            data: { status: 'REVOKED' }
-          });
+          await db.institutions.updateStatus(institution, 'REVOKED');
           await this.updateLastBlock(blockNumber);
         } catch (err) {
           console.error('[Indexer] Error processing InstitutionRevoked:', err);
@@ -460,7 +394,7 @@ export class IndexerService {
 
     let targetFromBlock = fromBlock;
     if (targetFromBlock === undefined) {
-      const syncState = await prisma.syncState.findUnique({ where: { id: 'singleton' } });
+      const syncState = await db.syncState.get();
       targetFromBlock = syncState ? syncState.lastBlockIndexed : 0;
     }
 
@@ -484,9 +418,16 @@ export class IndexerService {
           const metadataCid = args[3];
           const bindingRef = args[6];
 
-          await prisma.artwork.upsert({
-            where: { blockchainArtworkId: artworkId },
-            create: {
+          const existing = await db.artworks.findByBlockchainId(artworkId);
+          if (existing) {
+            await db.artworks.update(existing.id, {
+              txHash: log.transactionHash,
+              blockNumber: log.blockNumber,
+              ownerId: initialOwner,
+              status: 'VERIFIED',
+            });
+          } else {
+            await db.artworks.create({
               blockchainArtworkId: artworkId,
               title: `On-Chain Artwork #${artworkId}`,
               artist: 'Certified Authenticator',
@@ -500,14 +441,8 @@ export class IndexerService {
               ownerId: initialOwner,
               txHash: log.transactionHash,
               blockNumber: log.blockNumber,
-            },
-            update: {
-              txHash: log.transactionHash,
-              blockNumber: log.blockNumber,
-              ownerId: initialOwner,
-              status: 'VERIFIED',
-            }
-          });
+            });
+          }
           processedCount++;
         }
       }
@@ -522,15 +457,13 @@ export class IndexerService {
           const artworkId = args[1].toString();
           const buyer = args[2];
 
-          await prisma.transfer.updateMany({
-            where: { blockchainTransferId: transferId },
-            data: { status: 'FINALIZED', txHash: log.transactionHash, blockNumber: log.blockNumber }
+          await db.transfers.updateByBlockchainId(transferId, {
+            status: 'FINALIZED',
+            txHash: log.transactionHash,
+            blockNumber: log.blockNumber,
           });
 
-          await prisma.artwork.updateMany({
-            where: { blockchainArtworkId: artworkId },
-            data: { ownerId: buyer }
-          });
+          await db.artworks.updateByBlockchainId(artworkId, { ownerId: buyer });
           processedCount++;
         }
       }
@@ -551,9 +484,9 @@ export class IndexerService {
     const contract = BlockchainService.getContract();
     const provider = BlockchainService.getProvider();
 
-    const dbArtworks = await prisma.artwork.count();
-    const dbTransfers = await prisma.transfer.count();
-    const syncState = await prisma.syncState.findUnique({ where: { id: 'singleton' } });
+    const dbArtworks = await db.artworks.count();
+    const dbTransfers = await db.transfers.count();
+    const syncState = await db.syncState.get();
     const lastIndexed = syncState?.lastBlockIndexed || 0;
 
     let latestBlockNumber = 0;
@@ -563,8 +496,6 @@ export class IndexerService {
     if (contract && provider) {
       try {
         latestBlockNumber = await provider.getBlockNumber();
-        // Check on-chain artwork existence starting from ID 1 up to reasonable scan or checking total
-        // Attempt to probe up to 10 on-chain artworks
         let id = 1;
         while (id <= 100) {
           try {
@@ -604,11 +535,7 @@ export class IndexerService {
   private static async updateLastBlock(blockNumber: number): Promise<void> {
     if (blockNumber <= 0) return;
     try {
-      await prisma.syncState.upsert({
-        where: { id: 'singleton' },
-        create: { id: 'singleton', lastBlockIndexed: blockNumber },
-        update: { lastBlockIndexed: blockNumber },
-      });
+      await db.syncState.upsert(blockNumber);
     } catch {
       // Non-critical background update failure
     }
