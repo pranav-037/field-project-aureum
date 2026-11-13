@@ -345,24 +345,24 @@ const ProvenanceVerification: React.FC = () => {
                     disabled={loading}
                     placeholder={
                       searchBy === 'artworkId'
-                        ? 'Enter Artwork ID (e.g., AUR-1234 or GUID)'
+                        ? 'Enter Artwork ID (e.g., AUR-1234, AUR-1, or GUID)'
                         : 'Enter Blockchain Wallet Address (0x...)'
                     }
-                    className="w-full pl-10 pr-4 py-3 rounded-xl bg-slate-950/80 border border-slate-700/80 text-white placeholder-slate-500 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition"
+                    className="w-full pl-10 pr-4 py-3 rounded-xl bg-slate-950/80 border border-slate-700/80 text-white placeholder-slate-500 text-sm focus:outline-none focus:ring-2 focus:ring-gold-500/50 focus:border-gold-500/50 transition font-mono"
                   />
                 </div>
                 <button
                   type="submit"
                   disabled={loading}
-                  className="px-6 py-3 rounded-xl bg-gradient-to-r from-indigo-600 via-indigo-500 to-violet-600 hover:from-indigo-500 hover:to-violet-500 text-white font-semibold text-sm shadow-lg shadow-indigo-600/30 hover:shadow-indigo-600/50 transition flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
+                  className="px-6 py-3 rounded-xl bg-gradient-to-r from-gold-500 via-amber-500 to-gold-600 hover:from-gold-400 hover:to-amber-500 text-slate-950 font-bold text-sm shadow-lg shadow-gold-500/20 hover:shadow-gold-500/40 transition flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
                 >
                   {loading ? (
                     <>
-                      <svg className="animate-spin h-4 w-4 text-white" fill="none" viewBox="0 0 24 24">
+                      <svg className="animate-spin h-4 w-4 text-slate-950" fill="none" viewBox="0 0 24 24">
                         <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                         <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                       </svg>
-                      <span>Verifying...</span>
+                      <span>Verifying Ledger...</span>
                     </>
                   ) : (
                     <span>Verify Provenance</span>
@@ -371,6 +371,32 @@ const ProvenanceVerification: React.FC = () => {
               </div>
             )}
           </form>
+
+          {/* Quick Query Sample Badges */}
+          <div className="flex flex-wrap items-center justify-center gap-2 text-xs text-slate-400 pt-1">
+            <span className="text-[11px] uppercase tracking-wider text-slate-500 font-medium">Quick search sample:</span>
+            <button
+              type="button"
+              onClick={() => { setSearchBy('artworkId'); setSearchQuery('AUR-0842'); }}
+              className="px-2.5 py-0.5 rounded-full bg-slate-900 border border-slate-700 hover:border-gold-500/50 text-slate-300 font-mono text-[11px] transition"
+            >
+              AUR-0842
+            </button>
+            <button
+              type="button"
+              onClick={() => { setSearchBy('artworkId'); setSearchQuery('AUR-1'); }}
+              className="px-2.5 py-0.5 rounded-full bg-slate-900 border border-slate-700 hover:border-gold-500/50 text-slate-300 font-mono text-[11px] transition"
+            >
+              AUR-1
+            </button>
+            <button
+              type="button"
+              onClick={() => { setSearchBy('wallet'); setSearchQuery('0x71C...49A2'); }}
+              className="px-2.5 py-0.5 rounded-full bg-slate-900 border border-slate-700 hover:border-gold-500/50 text-slate-300 font-mono text-[11px] transition"
+            >
+              Collector 0x71C...
+            </button>
+          </div>
 
           {/* Error Message */}
           {error && (
@@ -386,61 +412,96 @@ const ProvenanceVerification: React.FC = () => {
         {/* 3. Search Results or Empty State */}
         {artworkData ? (
           <div className="space-y-8 animate-fadeIn text-left">
-            {/* Artwork Details Top Card */}
-            <div className="rounded-2xl bg-slate-900/60 border border-slate-800 p-6 sm:p-8 space-y-6">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-6 border-b border-slate-800">
-                <div>
-                  <div className="flex items-center gap-2.5">
-                    <span className="font-mono text-xs px-2.5 py-0.5 rounded-full bg-slate-800 text-slate-300 border border-slate-700">
-                      {artworkData.id}
-                    </span>
-                    <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 text-xs font-semibold">
-                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
-                      {artworkData.integrityStatus} ON-CHAIN
-                    </span>
+            {/* Archival Certificate of Authenticity */}
+            <div className="relative rounded-3xl p-1 bg-gradient-to-b from-gold-500/40 via-slate-800/60 to-slate-900/90 shadow-2xl shadow-black/80">
+              <div className="rounded-[22px] guilloche-bg p-6 sm:p-10 space-y-8 border border-gold-500/20">
+                {/* Certificate Header Banner */}
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-6 border-b border-gold-500/20">
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-2">
+                      <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 shadow-[0_0_8px_#34d399]"></span>
+                      <span className="text-[10px] uppercase tracking-[0.25em] font-display font-bold text-gold-300">
+                        OFFICIAL CERTIFICATE OF PROVENANCE
+                      </span>
+                    </div>
+                    <p className="text-[11px] font-mono text-slate-400">
+                      ANCHORED VIA ARTCHAIN CONSENSUS PROTOCOL
+                    </p>
                   </div>
-                  <h2 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight mt-2">
-                    {artworkData.title}
-                  </h2>
-                  <p className="text-slate-400 text-sm mt-0.5">by <span className="text-slate-200 font-semibold">{artworkData.artist}</span></p>
+
+                  <div className="flex items-center gap-3">
+                    <button
+                      onClick={() => window.print()}
+                      className="px-4 py-2 rounded-xl border border-gold-500/40 hover:border-gold-400 bg-gold-500/10 hover:bg-gold-500/20 text-xs font-semibold text-gold-300 transition flex items-center gap-2 cursor-pointer"
+                    >
+                      <svg className="w-4 h-4 text-gold-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
+                      </svg>
+                      Print Official Record
+                    </button>
+                    <button
+                      onClick={() => copyToClipboard(artworkData.genesisTxHash)}
+                      className="px-4 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-700 text-xs font-mono text-slate-300 transition cursor-pointer"
+                    >
+                      {copiedHash === artworkData.genesisTxHash ? 'Copied Hash!' : 'Copy Hash'}
+                    </button>
+                  </div>
                 </div>
 
-                <div className="flex items-center gap-3">
-                  <button
-                    onClick={() => alert('Certificate of Provenance downloaded')}
-                    className="px-4 py-2 rounded-xl border border-slate-700 hover:border-slate-500 bg-slate-800/80 text-xs font-semibold text-slate-200 transition flex items-center gap-2"
-                  >
-                    <svg className="w-3.5 h-3.5 text-amber-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                    </svg>
-                    Audit Report
-                  </button>
-                  <button
-                    onClick={() => copyToClipboard(artworkData.genesisTxHash)}
-                    className="px-4 py-2 rounded-xl bg-indigo-600/20 border border-indigo-500/30 hover:bg-indigo-600/30 text-xs font-semibold text-indigo-300 transition"
-                  >
-                    {copiedHash === artworkData.genesisTxHash ? 'Copied Hash!' : 'Copy Tx Hash'}
-                  </button>
-                </div>
-              </div>
+                {/* Masterpiece Title & Credentials */}
+                <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
+                  <div>
+                    <div className="flex items-center gap-2.5">
+                      <span className="font-mono text-xs px-2.5 py-0.5 rounded-full bg-black/60 text-gold-300 border border-gold-500/30">
+                        {artworkData.id}
+                      </span>
+                      <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 text-xs font-semibold">
+                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+                        {artworkData.integrityStatus} ON-CHAIN
+                      </span>
+                    </div>
+                    <h2 className="text-3xl sm:text-4xl lg:text-5xl font-serif font-light text-white tracking-tight mt-3">
+                      {artworkData.title}
+                    </h2>
+                    <p className="text-slate-300 text-base sm:text-lg font-serif italic mt-1">
+                      Attributed to <span className="text-gold-200 font-normal">{artworkData.artist}</span>
+                    </p>
+                  </div>
 
-              {/* Artwork Metadata Grid */}
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-xs">
-                <div className="p-3.5 rounded-xl bg-slate-950/60 border border-slate-800/80">
-                  <p className="text-slate-500 uppercase tracking-wider text-[10px]">Year</p>
-                  <p className="font-semibold text-slate-200 mt-1">{artworkData.year || 'Unknown'}</p>
+                  {/* Archival Seal Stamp */}
+                  <div className="self-start md:self-auto px-4 py-3 rounded-2xl bg-black/60 border border-gold-500/30 flex items-center gap-3.5 backdrop-blur-md">
+                    <div className="w-10 h-10 rounded-xl bg-gold-500/10 border border-gold-500/30 flex items-center justify-center text-gold-400">
+                      <svg className="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                        <polygon points="12 2 2 7 12 12 22 7 12 2" />
+                        <polyline points="2 17 12 22 22 17" />
+                        <polyline points="2 12 12 17 22 12" />
+                      </svg>
+                    </div>
+                    <div>
+                      <p className="text-[10px] font-display uppercase tracking-widest text-gold-400 font-bold">CERTIFIED SOVEREIGN</p>
+                      <p className="text-[11px] font-mono text-slate-400">AUTHENTICATOR GUILD</p>
+                    </div>
+                  </div>
                 </div>
-                <div className="p-3.5 rounded-xl bg-slate-950/60 border border-slate-800/80">
-                  <p className="text-slate-500 uppercase tracking-wider text-[10px]">Medium</p>
-                  <p className="font-semibold text-slate-200 mt-1">{artworkData.medium || 'Not specified'}</p>
-                </div>
-                <div className="p-3.5 rounded-xl bg-slate-950/60 border border-slate-800/80">
-                  <p className="text-slate-500 uppercase tracking-wider text-[10px]">Dimensions</p>
-                  <p className="font-semibold text-slate-200 mt-1">{artworkData.dimensions || 'Custom'}</p>
-                </div>
-                <div className="p-3.5 rounded-xl bg-slate-950/60 border border-slate-800/80">
-                  <p className="text-slate-500 uppercase tracking-wider text-[10px]">Physical Tag</p>
-                  <p className="font-mono font-semibold text-amber-300 mt-1">{artworkData.bindingReference || 'NFC-VERIFIED'}</p>
+
+                {/* Artwork Metadata Grid */}
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-xs pt-2">
+                  <div className="p-4 rounded-xl bg-black/40 border border-slate-800">
+                    <p className="text-slate-500 uppercase tracking-widest text-[10px] font-medium">Creation Year</p>
+                    <p className="font-semibold text-slate-100 mt-1 font-serif text-sm">{artworkData.year || 'Circa Modern'}</p>
+                  </div>
+                  <div className="p-4 rounded-xl bg-black/40 border border-slate-800">
+                    <p className="text-slate-500 uppercase tracking-widest text-[10px] font-medium">Medium & Support</p>
+                    <p className="font-semibold text-slate-100 mt-1 line-clamp-1">{artworkData.medium || 'Oil on Canvas'}</p>
+                  </div>
+                  <div className="p-4 rounded-xl bg-black/40 border border-slate-800">
+                    <p className="text-slate-500 uppercase tracking-widest text-[10px] font-medium">Dimensions</p>
+                    <p className="font-semibold text-slate-100 mt-1">{artworkData.dimensions || 'Archival Custom'}</p>
+                  </div>
+                  <div className="p-4 rounded-xl bg-black/40 border border-slate-800">
+                    <p className="text-slate-500 uppercase tracking-widest text-[10px] font-medium">Physical Cryptoseal</p>
+                    <p className="font-mono font-semibold text-gold-300 mt-1">{artworkData.bindingReference || 'NFC-VERIFIED'}</p>
+                  </div>
                 </div>
               </div>
             </div>

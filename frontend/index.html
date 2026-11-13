@@ -5,10 +5,10 @@
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Aureum — Artchain Provenance Trail</title>
-    <!-- Google Fonts: Plus Jakarta Sans -->
+    <!-- Google Fonts: Plus Jakarta Sans, Cormorant Garamond, Cinzel, JetBrains Mono -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;500;600;700;800&family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400&family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
     <!-- Tailwind CSS CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
@@ -17,15 +17,35 @@
         theme: {
           extend: {
             fontFamily: {
-              sans: ['"Plus Jakarta Sans"', 'sans-serif'],
+              sans: ['"Plus Jakarta Sans"', '-apple-system', 'BlinkMacSystemFont', 'sans-serif'],
+              serif: ['"Cormorant Garamond"', 'Georgia', 'serif'],
+              display: ['"Cinzel"', 'Georgia', 'serif'],
               mono: ['"JetBrains Mono"', 'monospace'],
             },
             colors: {
               gold: {
-                400: '#F5D061',
-                500: '#E5B83B',
-                600: '#C69927',
+                50: '#FAF6E9',
+                100: '#F4ECD0',
+                200: '#EBD9A4',
+                300: '#E1C475',
+                400: '#D7AE47',
+                500: '#C69927',
+                600: '#A0791B',
+                700: '#795913',
+                800: '#523B0D',
+                900: '#2F2107',
+              },
+              obsidian: {
+                950: '#06080E',
+                900: '#0B0F17',
+                850: '#101623',
+                800: '#161D2E',
+                700: '#232D42',
               }
+            },
+            backgroundImage: {
+              'radial-gold': 'radial-gradient(ellipse at top, rgba(212,175,55,0.15) 0%, rgba(11,15,23,0) 70%)',
+              'gold-gradient': 'linear-gradient(135deg, #F5D061 0%, #D4AF37 50%, #AA8520 100%)',
             }
           }
         }

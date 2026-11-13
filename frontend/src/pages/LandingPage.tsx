@@ -100,13 +100,13 @@ const LandingPage: React.FC = () => {
               </div>
             </div>
             <div>
-              <span className="text-xl font-bold tracking-tight text-white flex items-center gap-1.5 font-sans">
+              <span className="text-xl font-bold tracking-tight text-white flex items-center gap-2 font-display">
                 Aureum
-                <span className="text-[10px] uppercase tracking-wider font-semibold px-2 py-0.5 rounded-full bg-gradient-to-r from-amber-500/20 to-indigo-500/20 text-amber-300 border border-amber-500/30">
+                <span className="text-[10px] uppercase tracking-widest font-semibold px-2 py-0.5 rounded-full bg-gold-500/10 text-gold-300 border border-gold-500/30 font-sans">
                   Artchain
                 </span>
               </span>
-              <p className="text-[11px] text-slate-400 -mt-0.5 hidden sm:block">Provenance Trail</p>
+              <p className="text-[10px] text-slate-400 font-mono tracking-wider uppercase -mt-0.5 hidden sm:block">Sovereign Provenance Trail</p>
             </div>
           </Link>
 
@@ -185,53 +185,52 @@ const LandingPage: React.FC = () => {
       {/* 2. Hero Section */}
       <section id="hero" className="relative overflow-hidden pt-12 pb-24 md:pt-20 md:pb-32 scroll-mt-24">
         {/* Ambient Gradient Glows */}
-        <div className="absolute top-1/4 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[650px] h-[350px] bg-gradient-to-tr from-indigo-600/20 via-violet-600/15 to-amber-500/10 blur-[130px] rounded-full pointer-events-none -z-10"></div>
-        <div className="absolute top-10 right-10 w-96 h-96 bg-indigo-500/10 blur-[100px] rounded-full pointer-events-none -z-10"></div>
+        <div className="absolute top-1/4 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[700px] h-[380px] bg-gradient-to-tr from-amber-500/10 via-indigo-600/15 to-gold-500/10 blur-[140px] rounded-full pointer-events-none -z-10"></div>
+        <div className="absolute top-10 right-10 w-96 h-96 bg-gold-500/5 blur-[120px] rounded-full pointer-events-none -z-10"></div>
 
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 lg:gap-8 items-center">
             {/* Left Content Column */}
             <div className="lg:col-span-7 space-y-8 text-left">
               {/* Badge */}
-              <div className="inline-flex items-center gap-2.5 px-3.5 py-1.5 rounded-full bg-slate-900/90 border border-slate-700/80 text-xs font-medium text-slate-300 shadow-sm backdrop-blur-md">
-                <span className="flex h-2 w-2 rounded-full bg-amber-400 shadow-[0_0_8px_#f59e0b]"></span>
-                <span className="text-amber-200/90 font-semibold tracking-wide uppercase text-[10px]">Web3 Physical Provenance</span>
-                <span className="text-slate-500">•</span>
-                <span className="text-slate-400">Tamper-Proof Custody</span>
+              <div className="inline-flex items-center gap-2.5 px-3.5 py-1.5 rounded-full bg-slate-900/90 border border-gold-500/30 text-xs font-medium text-slate-300 shadow-sm backdrop-blur-md">
+                <span className="flex h-2 w-2 rounded-full bg-gold-400 shadow-[0_0_10px_#D4AF37]"></span>
+                <span className="text-gold-300 font-display tracking-widest uppercase text-[10px]">Sovereign Fine Art Registry</span>
+                <span className="text-slate-600">•</span>
+                <span className="text-slate-400 text-[11px]">Decentralized Merkle Custody</span>
               </div>
 
               {/* Main Headline */}
-              <h1 className="text-4xl sm:text-5xl lg:text-6xl font-extrabold tracking-tight text-white leading-[1.12]">
-                Immutable Provenance for the World's{' '}
-                <span className="bg-gradient-to-r from-amber-200 via-indigo-300 to-violet-400 bg-clip-text text-transparent">
-                  Fine Art Masterpieces
+              <h1 className="text-4xl sm:text-6xl lg:text-[4.2rem] font-serif font-light text-white leading-[1.08] tracking-tight">
+                The Sovereign Standard for{' '}
+                <span className="font-serif italic text-gold-gradient font-normal block sm:inline">
+                  Fine Art Provenance
                 </span>
               </h1>
 
               {/* Body Text */}
-              <p className="text-lg text-slate-300/90 leading-relaxed max-w-2xl font-normal">
-                Aureum unifies physical fine art identities with decentralized cryptographic consensus.
-                Trusted authenticators seal physical inspection records into permanent on-chain Genesis blocks,
-                creating an unbroken, verifiable chain of custody.
+              <p className="text-base sm:text-lg text-slate-300/80 leading-relaxed max-w-2xl font-light">
+                Aureum permanently anchors physical museum masterpieces to decentralized cryptographic consensus.
+                Tamper-evident NFC cryptoseals and multi-signature attestations unite physical conservation reports with immutable on-chain custody.
               </p>
 
               {/* Distinct Well-Spaced Hero Action Buttons */}
               <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-4 pt-2">
                 <Link
                   to={currentUser ? dashboardUrl : "/register"}
-                  className="px-6 py-3.5 rounded-xl bg-gradient-to-r from-indigo-600 via-indigo-500 to-violet-600 hover:from-indigo-500 hover:to-violet-500 text-white font-semibold text-center shadow-lg shadow-indigo-600/30 hover:shadow-indigo-600/50 hover:-translate-y-0.5 transition duration-200 flex items-center justify-center gap-2"
+                  className="px-7 py-3.5 rounded-xl bg-gradient-to-r from-gold-500 via-amber-500 to-gold-600 hover:from-gold-400 hover:to-amber-500 text-slate-950 font-bold text-center shadow-lg shadow-gold-500/20 hover:shadow-gold-500/40 hover:-translate-y-0.5 transition duration-200 flex items-center justify-center gap-2"
                 >
-                  <span>{currentUser ? 'Go to Dashboard' : 'Get Started Free'}</span>
-                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M14 5l7 7m0 0l-7 7m7-7H3" />
+                  <span>{currentUser ? 'Go to Dashboard' : 'Enter Sovereign Vault'}</span>
+                  <svg className="w-4 h-4 text-slate-950" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M14 5l7 7m0 0l-7 7m7-7H3" />
                   </svg>
                 </Link>
 
                 <Link
                   to="/verify"
-                  className="px-6 py-3.5 rounded-xl border border-slate-700/90 hover:border-slate-500 bg-slate-900/60 hover:bg-slate-800/80 text-slate-200 font-semibold text-center backdrop-blur-sm transition duration-200 flex items-center justify-center gap-2"
+                  className="px-7 py-3.5 rounded-xl border border-slate-700/90 hover:border-gold-500/50 bg-slate-900/60 hover:bg-slate-800/80 text-slate-200 font-semibold text-center backdrop-blur-sm transition duration-200 flex items-center justify-center gap-2 group"
                 >
-                  <svg className="w-4 h-4 text-indigo-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <svg className="w-4 h-4 text-gold-400 group-hover:scale-110 transition" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
                   </svg>
                   <span>Verify an Artwork</span>
@@ -241,16 +240,16 @@ const LandingPage: React.FC = () => {
               {/* Trust Metrics / Micro Badges */}
               <div className="pt-6 border-t border-slate-800/80 grid grid-cols-3 gap-6 max-w-lg">
                 <div>
-                  <p className="text-2xl font-bold text-white tracking-tight font-sans">100%</p>
-                  <p className="text-xs text-slate-400 mt-0.5">On-Chain Custody</p>
+                  <p className="text-2xl font-display font-bold text-white tracking-tight">100%</p>
+                  <p className="text-[11px] uppercase tracking-wider text-slate-400 mt-1">Dual-Key Custody</p>
                 </div>
                 <div>
-                  <p className="text-2xl font-bold text-amber-300 tracking-tight font-sans">$45M+</p>
-                  <p className="text-xs text-slate-400 mt-0.5">Art Value Anchored</p>
+                  <p className="text-2xl font-display font-bold text-gold-400 tracking-tight">$45M+</p>
+                  <p className="text-[11px] uppercase tracking-wider text-slate-400 mt-1">Fine Art Anchored</p>
                 </div>
                 <div>
-                  <p className="text-2xl font-bold text-indigo-300 tracking-tight font-sans">0 Fraud</p>
-                  <p className="text-xs text-slate-400 mt-0.5">Cryptographic Seals</p>
+                  <p className="text-2xl font-display font-bold text-indigo-300 tracking-tight">0 Fraud</p>
+                  <p className="text-[11px] uppercase tracking-wider text-slate-400 mt-1">Cryptoseal Ledger</p>
                 </div>
               </div>
             </div>
@@ -258,73 +257,83 @@ const LandingPage: React.FC = () => {
             {/* Right Abstract Web3 / Fine Art Graphic Column */}
             <div className="lg:col-span-5 relative">
               {/* Outer Glow & Glass Frame */}
-              <div className="relative mx-auto max-w-md rounded-2xl bg-gradient-to-b from-slate-700/50 via-slate-800/30 to-slate-900/70 p-[1px] shadow-2xl shadow-indigo-950/60">
-                <div className="rounded-[15px] bg-[#0F1422]/95 backdrop-blur-xl p-5 overflow-hidden">
+              <div className="relative mx-auto max-w-md rounded-2xl bg-gradient-to-b from-gold-500/30 via-slate-800/40 to-slate-900/80 p-[1px] shadow-2xl shadow-black/80">
+                <div className="rounded-[15px] bg-[#0A0D15]/95 backdrop-blur-xl p-5 overflow-hidden border border-slate-800/60">
                   {/* Top Bar with Token Header */}
-                  <div className="flex items-center justify-between pb-4 border-b border-slate-800">
+                  <div className="flex items-center justify-between pb-4 border-b border-slate-800/80">
                     <div className="flex items-center gap-2">
-                      <div className="w-3 h-3 rounded-full bg-emerald-400"></div>
-                      <span className="text-xs font-mono font-medium text-slate-300">GENESIS #0842</span>
+                      <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 shadow-[0_0_8px_#34d399]"></span>
+                      <span className="text-xs font-mono font-semibold text-slate-200">GENESIS #0842</span>
                     </div>
-                    <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-amber-400/10 text-amber-300 border border-amber-400/20">
-                      AUTHENTICATED
+                    <span className="text-[10px] font-display uppercase tracking-widest px-2.5 py-0.5 rounded bg-gold-500/10 text-gold-300 border border-gold-500/30 font-semibold">
+                      ARCHIVAL PROVENANCE
                     </span>
                   </div>
 
                   {/* Artwork Showcase Image / Graphic Canvas */}
-                  <div className="relative my-4 rounded-xl overflow-hidden aspect-[4/3] bg-gradient-to-br from-slate-900 via-indigo-950/80 to-[#1e1333] border border-slate-800 group">
-                    {/* Abstract Fine Art Visual Representation */}
-                    <div className="absolute inset-0 flex items-center justify-center opacity-85">
+                  <div className="relative my-4 rounded-xl overflow-hidden aspect-[4/3] bg-gradient-to-br from-slate-950 via-[#121626] to-[#1c1428] border border-slate-800 group">
+                    {/* Archival Fine Art Canvas Effect */}
+                    <div className="absolute inset-0 flex items-center justify-center opacity-90">
                       <div className="relative w-44 h-44">
-                        <div className="absolute inset-0 rounded-full bg-gradient-to-tr from-amber-500/40 via-violet-600/30 to-indigo-500/40 blur-xl animate-pulse"></div>
-                        <div className="absolute inset-4 rounded-2xl rotate-12 border border-amber-400/40 bg-gradient-to-br from-amber-400/10 to-transparent backdrop-blur-sm"></div>
-                        <div className="absolute inset-8 rounded-full -rotate-6 border border-indigo-400/60 bg-gradient-to-tl from-indigo-500/20 to-transparent backdrop-blur-sm"></div>
-                        <div className="absolute inset-14 rounded-xl rotate-45 border border-violet-400/50 bg-violet-600/20 backdrop-blur-md flex items-center justify-center">
-                          <svg className="w-8 h-8 text-amber-300" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-                            <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" />
+                        <div className="absolute inset-0 rounded-full bg-gradient-to-tr from-gold-500/30 via-indigo-600/30 to-violet-500/30 blur-2xl animate-pulse"></div>
+                        <div className="absolute inset-2 rounded-2xl rotate-6 border border-gold-500/40 bg-gradient-to-br from-gold-500/10 to-transparent backdrop-blur-sm"></div>
+                        <div className="absolute inset-6 rounded-full -rotate-6 border border-indigo-400/50 bg-gradient-to-tl from-indigo-500/10 to-transparent backdrop-blur-sm"></div>
+                        <div className="absolute inset-12 rounded-xl rotate-12 border border-gold-400/60 bg-slate-950/70 backdrop-blur-md flex flex-col items-center justify-center shadow-inner">
+                          <svg className="w-8 h-8 text-gold-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                            <polygon points="12 2 2 7 12 12 22 7 12 2" />
+                            <polyline points="2 17 12 22 22 17" />
+                            <polyline points="2 12 12 17 22 12" />
                           </svg>
+                          <span className="text-[9px] font-mono tracking-widest text-gold-300 uppercase mt-1">SEALED</span>
                         </div>
                       </div>
                     </div>
 
                     {/* Artwork Title Overlay */}
-                    <div className="absolute bottom-0 inset-x-0 p-4 bg-gradient-to-t from-slate-950 via-slate-950/80 to-transparent">
-                      <p className="text-xs font-mono text-indigo-300">Oil on Linen • 1889</p>
-                      <h4 className="text-base font-bold text-white tracking-tight">Symphony in Gold & Obsidian</h4>
-                      <p className="text-xs text-slate-400">Provenance Registry ID: <span className="font-mono text-slate-300">0x9F4b...39E1</span></p>
+                    <div className="absolute bottom-0 inset-x-0 p-4 bg-gradient-to-t from-black via-black/85 to-transparent">
+                      <div className="flex items-center justify-between text-[11px] font-mono text-gold-300 mb-0.5">
+                        <span>Oil on Linen • 1889</span>
+                        <span className="text-slate-400">Verifiable</span>
+                      </div>
+                      <h4 className="text-base font-serif font-normal text-white tracking-wide">
+                        Symphony in Gold & Obsidian
+                      </h4>
+                      <p className="text-[11px] text-slate-400 mt-0.5 font-mono">
+                        Registry CID: <span className="text-slate-300">0x9F4b...39E1</span>
+                      </p>
                     </div>
                   </div>
 
                   {/* Verification Status Ledger Cards */}
-                  <div className="space-y-2.5 pt-1">
-                    <div className="flex items-center justify-between p-2.5 rounded-lg bg-slate-900/60 border border-slate-800/80 text-xs">
+                  <div className="space-y-2 pt-1">
+                    <div className="flex items-center justify-between p-2.5 rounded-lg bg-slate-900/80 border border-slate-800 text-xs">
                       <div className="flex items-center gap-2">
                         <svg className="w-4 h-4 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                         </svg>
-                        <span className="text-slate-300">Physical Tag Binding</span>
+                        <span className="text-slate-300 font-medium">Physical Cryptoseal Tag</span>
                       </div>
-                      <span className="font-mono text-slate-400 text-[11px]">NFC-SECURE-902</span>
+                      <span className="font-mono text-gold-300 text-[11px]">NFC-SECURE-902</span>
                     </div>
 
-                    <div className="flex items-center justify-between p-2.5 rounded-lg bg-slate-900/60 border border-slate-800/80 text-xs">
+                    <div className="flex items-center justify-between p-2.5 rounded-lg bg-slate-900/80 border border-slate-800 text-xs">
                       <div className="flex items-center gap-2">
                         <svg className="w-4 h-4 text-indigo-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
                         </svg>
-                        <span className="text-slate-300">Latest Chain Block</span>
+                        <span className="text-slate-300 font-medium">Consensus Block Height</span>
                       </div>
                       <span className="font-mono text-indigo-300 text-[11px]">#19,842,109</span>
                     </div>
 
-                    <div className="flex items-center justify-between p-2.5 rounded-lg bg-slate-900/60 border border-slate-800/80 text-xs">
+                    <div className="flex items-center justify-between p-2.5 rounded-lg bg-slate-900/80 border border-slate-800 text-xs">
                       <div className="flex items-center gap-2">
-                        <svg className="w-4 h-4 text-amber-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <svg className="w-4 h-4 text-gold-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
                         </svg>
-                        <span className="text-slate-300">Custodial Status</span>
+                        <span className="text-slate-300 font-medium">Custodial Protocol</span>
                       </div>
-                      <span className="text-amber-300 font-medium text-[11px]">Institution Escrow</span>
+                      <span className="text-gold-300 font-medium text-[11px]">Metropolitan Museum Guild Escrow</span>
                     </div>
                   </div>
                 </div>
@@ -341,14 +350,17 @@ const LandingPage: React.FC = () => {
 
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
           <div className="max-w-3xl mx-auto text-center space-y-4 mb-16">
-            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-500/10 border border-amber-500/20 text-xs font-semibold text-amber-300 uppercase tracking-wider">
-              Core Capabilities
+            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-gold-500/10 border border-gold-500/20 text-xs font-semibold text-gold-300 uppercase tracking-widest font-display">
+              Core Protocol Capabilities
             </div>
-            <h2 className="text-3xl sm:text-4xl lg:text-5xl font-extrabold text-white tracking-tight">
-              Enterprise Features for Fine Art Custody
+            <h2 className="text-3xl sm:text-4xl lg:text-5xl font-serif font-light text-white tracking-tight">
+              Enterprise Features for{' '}
+              <span className="font-serif italic text-gold-gradient font-normal">
+                Fine Art Custody
+              </span>
             </h2>
-            <p className="text-base sm:text-lg text-slate-400">
-              Built on Ethereum smart contracts, decentralized IPFS storage, and physical NFC cryptographic chips.
+            <p className="text-base sm:text-lg text-slate-300/80 font-light max-w-2xl mx-auto">
+              Built on Ethereum smart contracts, decentralized IPFS storage, and physical NFC tamper-evident cryptoseals.
             </p>
           </div>
 
@@ -454,14 +466,17 @@ const LandingPage: React.FC = () => {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10 text-center">
           {/* Section Heading */}
           <div className="max-w-3xl mx-auto space-y-4 mb-16">
-            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-indigo-500/10 border border-indigo-500/20 text-xs font-semibold text-indigo-300 uppercase tracking-wider">
+            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-indigo-500/10 border border-indigo-500/20 text-xs font-semibold text-indigo-300 uppercase tracking-widest font-display">
               Architecture & Custody
             </div>
-            <h2 className="text-3xl sm:text-4xl lg:text-5xl font-extrabold text-white tracking-tight">
-              How Aureum Secures Artwork Provenance
+            <h2 className="text-3xl sm:text-4xl lg:text-5xl font-serif font-light text-white tracking-tight">
+              How Aureum Secures{' '}
+              <span className="font-serif italic text-gold-gradient font-normal">
+                Artwork Provenance
+              </span>
             </h2>
-            <p className="text-base sm:text-lg text-slate-400">
-              A physical-to-digital chain of custody engineered for international galleries, authenticators, and collectors.
+            <p className="text-base sm:text-lg text-slate-300/80 font-light max-w-2xl mx-auto">
+              A physical-to-digital chain of custody engineered for international galleries, authenticators, and private sovereign collectors.
             </p>
           </div>
 
@@ -558,11 +573,14 @@ const LandingPage: React.FC = () => {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 items-center">
             <div className="lg:col-span-6 space-y-6">
-              <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-violet-500/10 border border-violet-500/20 text-xs font-semibold text-violet-300 uppercase tracking-wider">
+              <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-violet-500/10 border border-violet-500/20 text-xs font-semibold text-violet-300 uppercase tracking-widest font-display">
                 About The Protocol
               </div>
-              <h2 className="text-3xl sm:text-4xl font-extrabold text-white tracking-tight">
-                Restoring Trust & Authenticity to Global Fine Art
+              <h2 className="text-3xl sm:text-4xl font-serif font-light text-white tracking-tight">
+                Restoring Trust & Authenticity to{' '}
+                <span className="font-serif italic text-gold-gradient font-normal">
+                  Global Fine Art
+                </span>
               </h2>
               <p className="text-base text-slate-300 leading-relaxed">
                 For centuries, the international fine art market has suffered from forged paper certificates, opaque provenance trails, and unverified custodial transfers. Aureum Artchain bridges this divide by bonding physical masterworks with cryptographic certainty.
@@ -610,11 +628,14 @@ const LandingPage: React.FC = () => {
       <section className="py-20 relative overflow-hidden bg-gradient-to-b from-[#0B0F17] via-slate-900/60 to-[#0B0F17] border-t border-slate-800/60">
         <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 text-center relative z-10">
           <div className="rounded-3xl p-10 sm:p-14 bg-gradient-to-tr from-slate-900/90 via-indigo-950/40 to-slate-900/90 border border-slate-700/60 shadow-2xl shadow-indigo-950/40 backdrop-blur-xl space-y-6">
-            <span className="inline-block text-xs font-semibold uppercase tracking-widest text-amber-300 px-3 py-1 rounded-full bg-amber-500/10 border border-amber-500/20">
-              Transform Your Art Gallery
+            <span className="inline-block text-xs font-semibold uppercase tracking-widest text-gold-300 px-3.5 py-1 rounded-full bg-gold-500/10 border border-gold-500/20 font-display">
+              Transform Your Gallery
             </span>
-            <h2 className="text-3xl sm:text-4xl font-extrabold text-white tracking-tight">
-              Ready to Safeguard Artwork Legacies?
+            <h2 className="text-3xl sm:text-4xl lg:text-5xl font-serif font-light text-white tracking-tight">
+              Ready to Safeguard{' '}
+              <span className="font-serif italic text-gold-gradient font-normal">
+                Artwork Legacies?
+              </span>
             </h2>
             <p className="text-base text-slate-300 max-w-2xl mx-auto leading-relaxed">
               Join leading museums, international galleries, and certified appraisers on the standard decentralized provenance protocol.

@@ -106,20 +106,20 @@ const LoginPage: React.FC = () => {
                 </svg>
               </div>
             </div>
-            <span className="text-lg font-bold tracking-tight text-white font-sans">
+            <span className="text-lg font-bold tracking-tight text-white font-display flex items-center gap-2">
               Aureum
-              <span className="text-[10px] ml-1.5 font-semibold px-1.5 py-0.5 rounded bg-amber-400/10 text-amber-300 border border-amber-400/20 uppercase tracking-wide">
+              <span className="text-[10px] font-sans font-semibold px-2 py-0.5 rounded-full bg-gold-500/10 text-gold-300 border border-gold-500/30 uppercase tracking-widest">
                 Artchain
               </span>
             </span>
           </Link>
 
           <div className="flex items-center gap-4 text-sm">
-            <Link to="/verify" className="text-slate-400 hover:text-slate-200 transition text-xs sm:text-sm">
+            <Link to="/verify" className="text-slate-400 hover:text-gold-300 transition text-xs sm:text-sm">
               Public Ledger
             </Link>
             <span className="text-slate-700">|</span>
-            <Link to="/register" className="text-indigo-400 hover:text-indigo-300 font-medium text-xs sm:text-sm">
+            <Link to="/register" className="text-gold-400 hover:text-gold-300 font-medium text-xs sm:text-sm">
               Create Account
             </Link>
           </div>
@@ -129,13 +129,18 @@ const LoginPage: React.FC = () => {
       {/* Main Container */}
       <main className="flex-1 flex items-center justify-center p-4 sm:p-6 lg:p-8">
         <div className="w-full max-w-md mx-auto">
-          <div className="rounded-2xl bg-slate-900/70 border border-slate-800 shadow-xl backdrop-blur-xl p-6 sm:p-8">
+          <div className="rounded-3xl bg-slate-900/80 border border-slate-800 hover:border-gold-500/30 shadow-2xl backdrop-blur-2xl p-6 sm:p-9 transition">
               
               {/* Card Header */}
               <div className="mb-6 text-left">
-                <h2 className="text-2xl font-bold text-white tracking-tight">Welcome back</h2>
-                <p className="text-sm text-slate-400 mt-1">
-                  Sign in to manage artwork provenance.
+                <span className="text-[10px] uppercase tracking-[0.2em] font-display font-semibold text-gold-400">
+                  SECURE VAULT ACCESS
+                </span>
+                <h2 className="text-2xl sm:text-3xl font-serif font-light text-white tracking-tight mt-1">
+                  Welcome to Aureum
+                </h2>
+                <p className="text-xs sm:text-sm text-slate-400 mt-1">
+                  Authenticate your identity to manage verified artworks and custodial signatures.
                 </p>
               </div>
 
@@ -286,18 +291,18 @@ const LoginPage: React.FC = () => {
                   <button
                     type="submit"
                     disabled={loading}
-                    className="w-full py-3 px-4 rounded-xl bg-gradient-to-r from-indigo-600 via-indigo-500 to-violet-600 hover:from-indigo-500 hover:to-violet-500 text-white font-semibold text-sm shadow-lg shadow-indigo-600/30 hover:shadow-indigo-600/50 hover:-translate-y-0.5 active:translate-y-0 transition duration-150 disabled:opacity-50 disabled:pointer-events-none flex items-center justify-center gap-2 cursor-pointer"
+                    className="w-full py-3 px-4 rounded-xl bg-gradient-to-r from-gold-500 via-amber-500 to-gold-600 hover:from-gold-400 hover:to-amber-500 text-slate-950 font-bold text-sm shadow-lg shadow-gold-500/20 hover:shadow-gold-500/40 hover:-translate-y-0.5 active:translate-y-0 transition duration-150 disabled:opacity-50 disabled:pointer-events-none flex items-center justify-center gap-2 cursor-pointer"
                   >
                     {loading ? (
                       <>
-                        <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" fill="none" viewBox="0 0 24 24">
+                        <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-slate-950" fill="none" viewBox="0 0 24 24">
                           <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                           <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                         </svg>
-                        <span>Authenticating...</span>
+                        <span>Authenticating Credentials...</span>
                       </>
                     ) : (
-                      <span>Sign in to Aureum</span>
+                      <span>Enter Sovereign Vault</span>
                     )}
                   </button>
                 </div>

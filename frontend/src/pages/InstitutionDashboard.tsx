@@ -228,13 +228,15 @@ const InstitutionDashboard: React.FC = () => {
 
         {/* 4 Core Stat Cards */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
-          <div className="p-6 rounded-2xl bg-slate-900/70 border border-slate-800 hover:border-amber-500/40 shadow-xl backdrop-blur-xl transition duration-300">
+          <div className="p-6 rounded-2xl bg-slate-900/70 border border-slate-800 hover:border-gold-500/40 shadow-xl backdrop-blur-xl transition duration-300">
             <div className="flex items-center justify-between">
               <span className="text-xs font-semibold uppercase tracking-wider text-slate-400">
                 Authenticated Artworks
               </span>
-              <div className="w-10 h-10 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-400">
-                🎨
+              <div className="w-10 h-10 rounded-xl bg-gold-500/10 border border-gold-500/20 flex items-center justify-center text-gold-400">
+                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                </svg>
               </div>
             </div>
             <div className="mt-4 flex items-baseline gap-2">
@@ -250,7 +252,9 @@ const InstitutionDashboard: React.FC = () => {
                 Pending Transfers
               </span>
               <div className="w-10 h-10 rounded-xl bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center text-indigo-400">
-                🔄
+                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
+                </svg>
               </div>
             </div>
             <div className="mt-4 flex items-baseline gap-2">
@@ -268,7 +272,9 @@ const InstitutionDashboard: React.FC = () => {
                 Completed Transfers
               </span>
               <div className="w-10 h-10 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400">
-                ✅
+                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
               </div>
             </div>
             <div className="mt-4 flex items-baseline gap-2">
@@ -284,7 +290,9 @@ const InstitutionDashboard: React.FC = () => {
                 Active Flags & Disputes
               </span>
               <div className="w-10 h-10 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400">
-                🛡️
+                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+                </svg>
               </div>
             </div>
             <div className="mt-4 flex items-baseline gap-2">
@@ -300,23 +308,42 @@ const InstitutionDashboard: React.FC = () => {
         {/* Recent Activity List */}
         <section className="space-y-4">
           <div className="flex items-center justify-between">
-            <h2 className="text-xl sm:text-2xl font-bold text-white tracking-tight">
+            <h2 className="text-xl sm:text-2xl font-bold text-white tracking-tight font-serif">
               Recent Institutional Activity
             </h2>
           </div>
 
           <div className="rounded-2xl bg-slate-900/70 border border-slate-800 shadow-xl backdrop-blur-xl divide-y divide-slate-800/80">
             {activities.length === 0 ? (
-              <div className="p-10 text-center text-slate-400 text-xs">
-                <span className="block text-2xl mb-2">📋</span>
-                No institutional activity recorded yet. Genesis artwork registrations and verified custody transfers will appear here.
+              <div className="p-12 text-center text-slate-400 text-xs">
+                <div className="w-12 h-12 mx-auto rounded-xl bg-slate-800/80 border border-slate-700/80 flex items-center justify-center text-gold-400 mb-2">
+                  <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                  </svg>
+                </div>
+                <span className="block font-medium text-slate-300">No Institutional Activity Recorded Yet</span>
+                <span className="text-[11px] text-slate-500">Genesis artwork registrations and verified custody transfers will appear here.</span>
               </div>
             ) : (
               activities.map(act => (
                 <div key={act.id} className="p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4 hover:bg-slate-800/20 transition">
                   <div className="flex items-center gap-4">
-                    <div className="w-10 h-10 rounded-xl bg-slate-800 border border-slate-700 flex items-center justify-center text-lg flex-shrink-0">
-                      {act.type === 'GENESIS' ? '🎨' : act.type === 'TRANSFER' ? '🔄' : '🛡️'}
+                    <div className="w-10 h-10 rounded-xl bg-slate-800 border border-slate-700 flex items-center justify-center flex-shrink-0 text-slate-300">
+                      {act.type === 'GENESIS' ? (
+                        <svg className="w-5 h-5 text-gold-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <polygon points="12 2 2 7 12 12 22 7 12 2" strokeWidth="1.5" />
+                          <polyline points="2 17 12 22 22 17" strokeWidth="1.5" />
+                          <polyline points="2 12 12 17 22 12" strokeWidth="1.5" />
+                        </svg>
+                      ) : act.type === 'TRANSFER' ? (
+                        <svg className="w-5 h-5 text-indigo-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
+                        </svg>
+                      ) : (
+                        <svg className="w-5 h-5 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+                        </svg>
+                      )}
                     </div>
                     <div>
                       <div className="flex items-center gap-2">
@@ -352,25 +379,35 @@ const InstitutionDashboard: React.FC = () => {
 
         {/* Quick Actions Grid */}
         <section className="space-y-4">
-          <h2 className="text-xl sm:text-2xl font-bold text-white tracking-tight">
+          <h2 className="text-xl sm:text-2xl font-bold text-white tracking-tight font-serif">
             Institutional Operations
           </h2>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             <Link
               to="/artwork/register"
-              className="p-5 rounded-2xl bg-slate-900/70 border border-slate-800 hover:border-indigo-500/50 shadow-xl backdrop-blur-xl group transition hover:-translate-y-1 block"
+              className="p-5 rounded-2xl bg-slate-900/70 border border-slate-800 hover:border-gold-500/50 shadow-xl backdrop-blur-xl group transition hover:-translate-y-1 block"
             >
-              <div className="text-2xl mb-3">🎨</div>
-              <h3 className="text-sm font-bold text-white group-hover:text-indigo-300 transition">Register Artwork</h3>
-              <p className="text-xs text-slate-400 mt-1">Bind new physical masterpiece with NFC security tag</p>
+              <div className="w-10 h-10 rounded-xl bg-gold-500/10 border border-gold-500/30 flex items-center justify-center text-gold-400 mb-3 group-hover:scale-110 transition">
+                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <polygon points="12 2 2 7 12 12 22 7 12 2" strokeWidth="1.5" />
+                  <polyline points="2 17 12 22 22 17" strokeWidth="1.5" />
+                  <polyline points="2 12 12 17 22 12" strokeWidth="1.5" />
+                </svg>
+              </div>
+              <h3 className="text-sm font-bold text-white group-hover:text-gold-300 transition">Register Masterpiece</h3>
+              <p className="text-xs text-slate-400 mt-1">Bind new physical artwork with cryptographic NFC seal</p>
             </Link>
 
             <Link
               to="/collector/dashboard"
-              className="p-5 rounded-2xl bg-slate-900/70 border border-slate-800 hover:border-amber-500/50 shadow-xl backdrop-blur-xl group transition hover:-translate-y-1 block"
+              className="p-5 rounded-2xl bg-slate-900/70 border border-slate-800 hover:border-indigo-500/50 shadow-xl backdrop-blur-xl group transition hover:-translate-y-1 block"
             >
-              <div className="text-2xl mb-3">🔄</div>
-              <h3 className="text-sm font-bold text-white group-hover:text-amber-300 transition">Initiate Transfer</h3>
+              <div className="w-10 h-10 rounded-xl bg-indigo-500/10 border border-indigo-500/30 flex items-center justify-center text-indigo-400 mb-3 group-hover:scale-110 transition">
+                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
+                </svg>
+              </div>
+              <h3 className="text-sm font-bold text-white group-hover:text-indigo-300 transition">Initiate Transfer</h3>
               <p className="text-xs text-slate-400 mt-1">Transfer custody to escrow or verified collector</p>
             </Link>
 
@@ -378,7 +415,11 @@ const InstitutionDashboard: React.FC = () => {
               to="/verify"
               className="p-5 rounded-2xl bg-slate-900/70 border border-slate-800 hover:border-emerald-500/50 shadow-xl backdrop-blur-xl group transition hover:-translate-y-1 block"
             >
-              <div className="text-2xl mb-3">🔍</div>
+              <div className="w-10 h-10 rounded-xl bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center text-emerald-400 mb-3 group-hover:scale-110 transition">
+                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                </svg>
+              </div>
               <h3 className="text-sm font-bold text-white group-hover:text-emerald-300 transition">Verify Provenance</h3>
               <p className="text-xs text-slate-400 mt-1">Query cryptographic chain of custody records</p>
             </Link>
@@ -387,7 +428,12 @@ const InstitutionDashboard: React.FC = () => {
               to="/admin"
               className="p-5 rounded-2xl bg-slate-900/70 border border-slate-800 hover:border-violet-500/50 shadow-xl backdrop-blur-xl group transition hover:-translate-y-1 block"
             >
-              <div className="text-2xl mb-3">⚙️</div>
+              <div className="w-10 h-10 rounded-xl bg-violet-500/10 border border-violet-500/30 flex items-center justify-center text-violet-400 mb-3 group-hover:scale-110 transition">
+                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                </svg>
+              </div>
               <h3 className="text-sm font-bold text-white group-hover:text-violet-300 transition">Admin Console</h3>
               <p className="text-xs text-slate-400 mt-1">Manage guild memberships and disputes</p>
             </Link>

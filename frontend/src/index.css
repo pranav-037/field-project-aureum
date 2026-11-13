@@ -22,10 +22,64 @@ html {
 
 body {
   margin: 0;
-  background-color: #0b0f17;
+  background-color: #06080E;
   color: #f1f5f9;
   min-height: 100vh;
   overflow-x: hidden;
+}
+
+/* Custom Luxury Scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: #0B0F17;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #1e293b;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #C69927;
+}
+
+/* Gold foil gradient text utility */
+.text-gold-gradient {
+  background: linear-gradient(135deg, #FAF0CF 0%, #D4AF37 40%, #AA8520 80%, #ECC965 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.text-silver-gradient {
+  background: linear-gradient(135deg, #FFFFFF 0%, #CBD5E1 50%, #94A3B8 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+/* Luxury card with subtle hairline border */
+.luxury-card {
+  background: rgba(16, 22, 35, 0.7);
+  backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.luxury-card:hover {
+  border-color: rgba(212, 175, 55, 0.35);
+  box-shadow: 0 10px 30px -10px rgba(198, 153, 39, 0.15);
+}
+
+/* Archival certificate guilloche background */
+.guilloche-bg {
+  background-color: #0c101a;
+  background-image: radial-gradient(rgba(212, 175, 55, 0.08) 1px, transparent 0),
+                    radial-gradient(rgba(255, 255, 255, 0.03) 1px, transparent 0);
+  background-position: 0 0, 20px 20px;
+  background-size: 40px 40px;
 }
 
 #root {

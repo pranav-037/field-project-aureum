@@ -457,8 +457,10 @@ const CollectorDashboard: React.FC = () => {
         {!incomingAccepted && incomingTransfer && (
           <div className="p-5 rounded-2xl bg-gradient-to-r from-indigo-950/70 via-slate-900/80 to-slate-900/70 border border-indigo-500/40 shadow-xl backdrop-blur-xl flex flex-col md:flex-row md:items-center justify-between gap-4">
             <div className="flex items-start gap-4">
-              <div className="w-12 h-12 rounded-xl bg-indigo-500/20 border border-indigo-500/30 flex items-center justify-center text-indigo-300 flex-shrink-0 text-xl">
-                📥
+              <div className="w-12 h-12 rounded-xl bg-indigo-500/10 border border-indigo-500/30 flex items-center justify-center text-indigo-400 flex-shrink-0">
+                <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 14l-7 7m0 0l-7-7m7 7V3" />
+                </svg>
               </div>
               <div>
                 <div className="flex items-center gap-2">
@@ -531,13 +533,15 @@ const CollectorDashboard: React.FC = () => {
 
           {/* Artworks Grid */}
           {filteredArtworks.length === 0 ? (
-            <div className="py-16 px-6 text-center rounded-2xl bg-slate-900/40 border border-dashed border-slate-800">
-              <div className="w-12 h-12 mx-auto rounded-full bg-slate-800/80 flex items-center justify-center text-slate-400 text-xl mb-3">
-                🖼️
+            <div className="py-20 px-6 text-center rounded-2xl bg-gradient-to-b from-slate-900/60 to-[#0A0D15] border border-slate-800/80 luxury-card">
+              <div className="w-16 h-16 mx-auto rounded-2xl bg-gold-500/10 border border-gold-500/20 flex items-center justify-center text-gold-400 mb-4 shadow-inner">
+                <svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                </svg>
               </div>
-              <h3 className="text-base font-bold text-white">No Artworks in Vault</h3>
-              <p className="text-xs text-slate-400 max-w-sm mx-auto mt-1">
-                Your vault is currently empty. Artworks you acquire or register on the Artchain ledger will be displayed here with their cryptographic certificates.
+              <h3 className="text-lg font-serif font-light text-white tracking-wide">Sovereign Vault Empty</h3>
+              <p className="text-xs sm:text-sm text-slate-400 max-w-md mx-auto mt-1.5 leading-relaxed">
+                No authenticated masterworks are currently registered under this account. Verified acquisitions and custody handoffs will appear here with cryptographic certificates.
               </p>
             </div>
           ) : (
@@ -545,7 +549,7 @@ const CollectorDashboard: React.FC = () => {
             {filteredArtworks.map(artwork => (
               <div
                 key={artwork.id}
-                className="group rounded-2xl bg-slate-900/70 border border-slate-800 hover:border-slate-700/80 shadow-xl backdrop-blur-xl overflow-hidden transition-all duration-300 hover:-translate-y-1 flex flex-col justify-between"
+                className="group rounded-2xl bg-slate-900/70 border border-slate-800 hover:border-gold-500/40 shadow-xl backdrop-blur-xl overflow-hidden transition-all duration-300 hover:-translate-y-1 flex flex-col justify-between"
               >
                 {/* Visual Canvas Representation */}
                 <div className={`relative h-44 w-full bg-gradient-to-br ${artwork.thumbnailGradient} p-4 flex flex-col justify-between border-b border-slate-800/80 overflow-hidden`}>
@@ -554,20 +558,24 @@ const CollectorDashboard: React.FC = () => {
                   
                   {/* Top Badges */}
                   <div className="relative z-10 flex items-center justify-between">
-                    <span className="font-mono text-[10px] font-semibold px-2 py-0.5 rounded-md bg-black/60 text-amber-300 border border-amber-500/30 backdrop-blur-md">
+                    <span className="font-mono text-[10px] font-semibold px-2 py-0.5 rounded-md bg-black/60 text-gold-300 border border-gold-500/30 backdrop-blur-md">
                       {artwork.id}
                     </span>
                     <span className="inline-flex items-center gap-1.5 text-[11px] font-semibold px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 backdrop-blur-md">
                       <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
-                      Verified Provenance
+                      Verified
                     </span>
                   </div>
 
                   {/* Canvas Centerpiece Mock */}
                   <div className="relative z-10 my-auto text-center">
-                    <span className="text-3xl opacity-80 group-hover:scale-110 transition duration-300 inline-block">
-                      🎨
-                    </span>
+                    <div className="w-12 h-12 mx-auto rounded-xl bg-black/40 border border-white/10 flex items-center justify-center text-gold-300 group-hover:scale-110 transition duration-300">
+                      <svg className="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                        <polygon points="12 2 2 7 12 12 22 7 12 2" />
+                        <polyline points="2 17 12 22 22 17" />
+                        <polyline points="2 12 12 17 22 12" />
+                      </svg>
+                    </div>
                   </div>
 
                   {/* Bottom Art Specifications */}
@@ -656,9 +664,14 @@ const CollectorDashboard: React.FC = () => {
                 <tbody className="divide-y divide-slate-800/80">
                   {transactions.length === 0 ? (
                     <tr>
-                      <td colSpan={6} className="px-5 py-12 text-center text-slate-400 text-xs">
-                        <span className="block text-2xl mb-1.5">📜</span>
-                        No custody transfers or transactions recorded yet.
+                      <td colSpan={6} className="px-5 py-14 text-center text-slate-400 text-xs">
+                        <div className="w-12 h-12 mx-auto rounded-xl bg-slate-900 border border-slate-800 flex items-center justify-center text-gold-400 mb-2">
+                          <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                          </svg>
+                        </div>
+                        <span className="block font-medium text-slate-300">No Transactions Recorded</span>
+                        <span className="text-[11px] text-slate-500">Custody handoffs and ownership transfers will be logged here.</span>
                       </td>
                     </tr>
                   ) : (
@@ -671,7 +684,19 @@ const CollectorDashboard: React.FC = () => {
                             tx.type === 'OUTGOING' ? 'bg-amber-500/20 text-amber-400' :
                             'bg-emerald-500/20 text-emerald-400'
                           }`}>
-                            {tx.type === 'INCOMING' ? '📥' : tx.type === 'OUTGOING' ? '📤' : '🛡️'}
+                            {tx.type === 'INCOMING' ? (
+                              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 14l-7 7m0 0l-7-7m7 7V3" />
+                              </svg>
+                            ) : tx.type === 'OUTGOING' ? (
+                              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 10l7-7m0 0l7 7m-7-7v18" />
+                              </svg>
+                            ) : (
+                              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+                              </svg>
+                            )}
                           </div>
                           <div>
                             <span className="font-semibold text-white block">{tx.title}</span>
