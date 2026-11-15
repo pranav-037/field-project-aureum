@@ -44,14 +44,14 @@ app.get('/api', (req: Request, res: Response) => {
 app.post(['/api/register', '/api/auth/register'], async (req: Request, res: Response) => {
   try {
     const { email, password, name, fullName, role, userType, walletAddress } = req.body;
-    const resolvedName = (name || fullName || '').trim();
-    if (!email || !email.trim()) {
+    const resolvedName = name || fullName;
+    if (typeof email !== 'string' || !email.trim()) {
       return res.status(400).json({ error: 'Email address is required.' });
     }
-    if (!resolvedName) {
+    if (typeof resolvedName !== 'string' || !resolvedName.trim()) {
       return res.status(400).json({ error: 'Full name is required.' });
     }
-    if (!password) {
+    if (typeof password !== 'string' || !password) {
       return res.status(400).json({ error: 'Password is required.' });
     }
     const resolvedRole = role || (userType === 'institution' ? 'AUTHENTICATOR' : 'COLLECTOR');
@@ -67,10 +67,11 @@ app.post(['/api/register', '/api/auth/register'], async (req: Request, res: Resp
 app.post(['/api/login', '/api/auth/login'], async (req: Request, res: Response) => {
   try {
     const { email, password } = req.body;
-    if (!email || !email.trim()) {
-      return res.status(400).json({ error: 'Please enter your email address.' });
+    if (typeof email !== 'string' || !email.trim() || email.length > 254 ||
+        !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
+      return res.status(400).json({ error: 'Please enter a valid email address.' });
     }
-    if (!password) {
+    if (typeof password !== 'string' || !password) {
       return res.status(400).json({ error: 'Please enter your password.' });
     }
     const result = await AuthService.login(email, password);
@@ -99,7 +100,7 @@ app.post('/api/auth/google', async (req: Request, res: Response) => {
 app.post(['/api/reset-password', '/api/auth/reset-password'], async (req: Request, res: Response) => {
   try {
     const { email, redirectTo } = req.body;
-    if (!email || !email.trim()) {
+    if (typeof email !== 'string' || !email.trim()) {
       return res.status(400).json({ error: 'Email address is required.' });
     }
     const result = await AuthService.resetPassword(email, redirectTo);
@@ -249,13 +250,29 @@ app.get('/api/users', async (req: Request, res: Response) => {
 app.post('/api/users', async (req: Request, res: Response) => {
   try {
     const { email, name, role, password } = req.body;
-    if (!email || !name) {
-      return res.status(400).json({ error: 'Email and name are required' });
+    if (typeof email !== 'string' || !email.trim() || typeof name !== 'string' || !name.trim()) {
+      return res.status(400).json({ error: 'A valid email and name are required.' });
     }
-    const result = await AuthService.register(email, password || 'P@ssword123', name, role || 'COLLECTOR');
+    const normalizedEmail = email.trim();
+    if (normalizedEmail.length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedEmail)) {
+      return res.status(400).json({ error: 'Please provide a valid email address.' });
+    }
+    if (name.trim().length < 2 || name.trim().length > 100) {
+      return res.status(400).json({ error: 'Name must be between 2 and 100 characters.' });
+    }
+    if (typeof password !== 'string' || !password.trim() || password.length < 6) {
+      return res.status(400).json({ error: 'Password must be at least 6 characters long.' });
+    }
+    const result = await AuthService.register(email, password, name, role || 'COLLECTOR');
     res.status(201).json(result.user);
   } catch (error) {
-    res.status(500).json({ error: 'Failed to create user: ' + (error as Error).message });
+    const message = (error as Error).message || 'Failed to create user.';
+    const statusCode = message.includes('already exists')
+      ? 409
+      : /Email address is required|valid email|Full name|Password must/.test(message)
+        ? 400
+        : 500;
+    res.status(statusCode).json({ error: message });
   }
 });
 
@@ -412,8 +429,18 @@ app.post('/api/artworks', async (req: Request, res: Response) => {
       ownerAddress,
     } = req.body;
 
-    if (!title || !artist || !ownerId) {
-      return res.status(400).json({ error: 'Title, artist, and ownerId are required' });
+    if (
+      typeof title !== 'string' || !title.trim() ||
+      typeof artist !== 'string' || !artist.trim() ||
+      typeof medium !== 'string' || !medium.trim() ||
+      typeof dimensions !== 'string' || !dimensions.trim() ||
+      typeof ownerId !== 'string' || !ownerId.trim()
+    ) {
+      return res.status(400).json({ error: 'Title, artist, medium, dimensions, and owner are required.' });
+    }
+    if (title.trim().length > 120 || artist.trim().length > 100 ||
+        medium.trim().length > 100 || dimensions.trim().length > 100) {
+      return res.status(400).json({ error: 'Artwork fields exceed their maximum allowed length.' });
     }
 
     const parsedImageCids: string[] = Array.isArray(imageCids)
@@ -463,11 +490,11 @@ app.post('/api/artworks', async (req: Request, res: Response) => {
     if (isChainAvailable) {
       try {
         const chainRes = await BlockchainService.createGenesisRecord({
-          title,
-          artist,
+          title: title.trim(),
+          artist: artist.trim(),
           year,
-          medium: medium || 'Fine Art',
-          dimensions: dimensions || 'N/A',
+          medium: medium.trim(),
+          dimensions: dimensions.trim(),
           edition: edition || 'Original',
           authenticationMethod: authenticationMethod || 'Cryptographic Provenance Anchor',
           metadataCid: finalMetadataCid,
@@ -485,22 +512,28 @@ app.post('/api/artworks', async (req: Request, res: Response) => {
       }
     }
 
-    const artwork = await db.artworks.create({
-      title,
-      artist,
+    const artworkData = {
+      title: title.trim(),
+      artist: artist.trim(),
       year: year || null,
-      medium: medium || '',
-      dimensions: dimensions || '',
+      medium: medium.trim(),
+      dimensions: dimensions.trim(),
       metadataCid: finalMetadataCid,
       imageCids: JSON.stringify(parsedImageCids),
       documentCids: JSON.stringify(parsedDocCids),
       bindingReference: bindingReference || '',
       status: 'VERIFIED',
       ownerId,
-      blockchainArtworkId: onChainArtworkId,
       txHash: txHash || '0x' + '0'.repeat(64),
       blockNumber: blockNumber || 0,
-    });
+    };
+
+    const artwork = onChainArtworkId
+      ? await db.artworks.upsertByBlockchainId({
+          ...artworkData,
+          blockchainArtworkId: onChainArtworkId,
+        })
+      : await db.artworks.create(artworkData);
 
     // Record Genesis activity
     try {
@@ -564,8 +597,12 @@ app.get('/api/transfers', async (req: Request, res: Response) => {
 app.post('/api/transfers', async (req: Request, res: Response) => {
   try {
     const { artworkId, sellerId, buyerId, buyerAddress, transferDate, priceVisibility, priceCommitment, supportingDocCids } = req.body;
-    if (!artworkId || !sellerId) {
+    if (typeof artworkId !== 'string' || !artworkId.trim() ||
+        typeof sellerId !== 'string' || !sellerId.trim()) {
       return res.status(400).json({ error: 'Artwork ID and seller ID are required' });
+    }
+    if (typeof buyerAddress !== 'string' || !/^0x[a-fA-F0-9]{40}$/.test(buyerAddress.trim())) {
+      return res.status(400).json({ error: 'A valid recipient wallet address is required.' });
     }
 
     const artwork = await db.artworks.findUnique(artworkId);
@@ -578,7 +615,7 @@ app.post('/api/transfers', async (req: Request, res: Response) => {
     let blockNumber: number = 0;
 
     const isChainAvailable = await BlockchainService.isAvailable();
-    if (isChainAvailable && artwork.blockchainArtworkId && buyerAddress) {
+    if (isChainAvailable && artwork.blockchainArtworkId) {
       try {
         const chainRes = await BlockchainService.initiateTransfer({
           artworkId: artwork.blockchainArtworkId,
@@ -591,11 +628,12 @@ app.post('/api/transfers', async (req: Request, res: Response) => {
         txHash = chainRes.txHash;
         blockNumber = chainRes.blockNumber;
       } catch (chainErr) {
-        console.warn('⚠️ Blockchain initiateTransfer error:', (chainErr as Error).message);
+        console.error('Blockchain initiateTransfer failed:', chainErr);
+        return res.status(502).json({ error: 'Could not initiate the transfer on-chain' });
       }
     }
 
-    const transfer = await db.transfers.create({
+    const transferData = {
       artworkId,
       sellerId,
       buyerId: buyerId || null,
@@ -604,8 +642,14 @@ app.post('/api/transfers', async (req: Request, res: Response) => {
       txHash,
       blockNumber,
       status: 'PENDING',
-      blockchainTransferId: onChainTransferId,
-    });
+    };
+
+    const transfer = onChainTransferId
+      ? await db.transfers.upsertByBlockchainId({
+          ...transferData,
+          blockchainTransferId: onChainTransferId,
+        })
+      : await db.transfers.create(transferData);
 
     // Record Transfer Initiated activity
     try {
@@ -639,24 +683,14 @@ app.post('/api/transfers/:id/accept', async (req: Request, res: Response) => {
       return res.status(404).json({ error: 'Transfer not found' });
     }
 
-    let finalTxHash = transfer.txHash;
-    let finalBlockNumber = transfer.blockNumber;
-
-    const isChainAvailable = await BlockchainService.isAvailable();
-    if (isChainAvailable && transfer.blockchainTransferId) {
-      try {
-        const chainRes = await BlockchainService.acceptTransfer(transfer.blockchainTransferId);
-        finalTxHash = chainRes.txHash;
-        finalBlockNumber = chainRes.blockNumber;
-      } catch (chainErr) {
-        console.warn('⚠️ Blockchain acceptTransfer error:', (chainErr as Error).message);
-      }
+    if (transfer.blockchainTransferId) {
+      return res.status(409).json({
+        error: 'Accept this transfer from the recipient wallet. The transfer status will update after the on-chain confirmation.',
+      });
     }
 
     const updated = await db.transfers.update(id, {
       status: 'FINALIZED',
-      txHash: finalTxHash,
-      blockNumber: finalBlockNumber,
     });
 
     if (transfer.buyerId) {
@@ -671,7 +705,7 @@ app.post('/api/transfers/:id/accept', async (req: Request, res: Response) => {
         title: 'Custody Transfer Finalized',
         detail: `Transfer finalized on-chain`,
         badge: 'FINALIZED',
-        txHash: finalTxHash,
+        txHash: transfer.txHash,
       });
     } catch (actErr) {
       console.warn('Failed to log transfer finalize activity:', actErr);

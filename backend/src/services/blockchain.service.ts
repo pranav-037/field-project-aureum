@@ -231,9 +231,12 @@ export class BlockchainService {
   public static async initiateTransfer(params: InitiateTransferInput): Promise<InitiateTransferResult> {
     this.initialize();
     if (!this.contract) throw new Error('Smart contract not initialized');
+    if (!ethers.isAddress(params.buyerAddress)) {
+      throw new Error('A valid recipient wallet address is required');
+    }
 
     const artworkIdBig = BigInt(params.artworkId);
-    const buyerAddr = ethers.isAddress(params.buyerAddress) ? params.buyerAddress : this.signer?.address!;
+    const buyerAddr = params.buyerAddress;
     const intermediary = (params.intermediaryAddress && ethers.isAddress(params.intermediaryAddress))
       ? params.intermediaryAddress
       : ethers.ZeroAddress;

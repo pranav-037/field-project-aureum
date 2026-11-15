@@ -112,6 +112,11 @@ const RegisterPage: React.FC = () => {
       setLoading(false);
       return;
     }
+    if (trimmedName.length > 100) {
+      setError('Full name must be 100 characters or fewer.');
+      setLoading(false);
+      return;
+    }
 
     if (!trimmedEmail) {
       setError('Please enter your email address.');
@@ -120,13 +125,13 @@ const RegisterPage: React.FC = () => {
     }
 
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(trimmedEmail)) {
+    if (trimmedEmail.length > 254 || !emailRegex.test(trimmedEmail)) {
       setError('Please enter a valid email address (e.g. name@example.com).');
       setLoading(false);
       return;
     }
 
-    if (!formData.password) {
+    if (!formData.password || !formData.password.trim()) {
       setError('Please enter a password.');
       setLoading(false);
       return;
@@ -144,10 +149,13 @@ const RegisterPage: React.FC = () => {
       return;
     }
 
-    if (formData.userType === 'institution' && !formData.institutionName.trim()) {
-      setError('Institution name is required for institution accounts.');
-      setLoading(false);
-      return;
+    if (formData.userType === 'institution') {
+      const institutionName = formData.institutionName.trim();
+      if (institutionName.length < 2 || institutionName.length > 120) {
+        setError('Institution name must be between 2 and 120 characters.');
+        setLoading(false);
+        return;
+      }
     }
 
     try {
@@ -295,6 +303,8 @@ const RegisterPage: React.FC = () => {
                       name="fullName"
                       type="text"
                       required
+                      minLength={2}
+                      maxLength={100}
                       autoComplete="name"
                       value={formData.fullName}
                       onChange={handleChange}
@@ -316,6 +326,7 @@ const RegisterPage: React.FC = () => {
                       name="email"
                       type="email"
                       required
+                      maxLength={254}
                       autoComplete="off"
                       value={formData.email}
                       onChange={handleChange}
@@ -339,6 +350,7 @@ const RegisterPage: React.FC = () => {
                       name="password"
                       type={showPassword ? 'text' : 'password'}
                       required
+                      minLength={6}
                       autoComplete="new-password"
                       value={formData.password}
                       onChange={handleChange}
@@ -379,6 +391,7 @@ const RegisterPage: React.FC = () => {
                       name="confirmPassword"
                       type={showConfirmPassword ? 'text' : 'password'}
                       required
+                      minLength={6}
                       autoComplete="new-password"
                       value={formData.confirmPassword}
                       onChange={handleChange}
@@ -419,6 +432,9 @@ const RegisterPage: React.FC = () => {
                           id="institutionName"
                           name="institutionName"
                           type="text"
+                          required
+                          minLength={2}
+                          maxLength={120}
                           value={formData.institutionName}
                           onChange={handleChange}
                           disabled={loading}

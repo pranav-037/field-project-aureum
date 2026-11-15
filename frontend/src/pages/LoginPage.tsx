@@ -72,8 +72,13 @@ const LoginPage: React.FC = () => {
       setLoading(false);
       return;
     }
+    if (trimmedEmail.length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmedEmail)) {
+      setError('Please enter a valid email address.');
+      setLoading(false);
+      return;
+    }
 
-    if (!password) {
+    if (!password || !password.trim()) {
       setError('Please enter your password.');
       setLoading(false);
       return;
@@ -216,6 +221,7 @@ const LoginPage: React.FC = () => {
                       id="email"
                       type="email"
                       required
+                      maxLength={254}
                       autoComplete="off"
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
@@ -283,6 +289,8 @@ const LoginPage: React.FC = () => {
                       type="text"
                       inputMode="numeric"
                       maxLength={6}
+                      pattern="[0-9]{6}"
+                      title="Enter a 6-digit code."
                       autoComplete="one-time-code"
                       placeholder="e.g. 481920"
                       disabled={loading}

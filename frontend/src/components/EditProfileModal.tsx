@@ -131,17 +131,31 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({
       setError('Please provide a full legal name or entity name.');
       return;
     }
+    if (trimmedName.length < 2 || trimmedName.length > 100) {
+      setError('Name must be between 2 and 100 characters.');
+      return;
+    }
+
+    const trimmedWallet = institutionWallet.trim();
+    if (trimmedWallet && !/^0x[a-fA-F0-9]{40}$/.test(trimmedWallet)) {
+      setError('Enter a valid 42-character wallet address, or leave it blank.');
+      return;
+    }
 
     const finalInstitutionName = isCustomInstitution
       ? customInstitutionName.trim()
       : selectedInstitutionName.trim();
+    if (isCustomInstitution && (finalInstitutionName.length < 2 || finalInstitutionName.length > 120)) {
+      setError('Custom institution name must be between 2 and 120 characters.');
+      return;
+    }
 
     const updatedInstitution: Institution = {
       ...(user.institution || {}),
       name: finalInstitutionName || 'Not Assigned',
       jurisdiction: selectedCountry,
       registrationNumber: registrationNumber.trim() || undefined,
-      walletAddress: institutionWallet.trim() || undefined,
+      walletAddress: trimmedWallet || undefined,
       type: institutionType,
       status: user.institution?.status || 'APPROVED',
     };
@@ -151,7 +165,7 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({
       await onSave({
         name: trimmedName,
         role,
-        walletAddress: institutionWallet.trim() || user.walletAddress,
+        walletAddress: trimmedWallet || user.walletAddress,
         institution: updatedInstitution,
       });
       onClose();
@@ -224,6 +238,8 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({
               <input
                 type="text"
                 required
+                minLength={2}
+                maxLength={100}
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 placeholder="e.g. Elena Rostova"
@@ -335,6 +351,7 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({
                 </label>
                 <input
                   type="text"
+                  maxLength={120}
                   value={customInstitutionName}
                   onChange={(e) => setCustomInstitutionName(e.target.value)}
                   placeholder="e.g. Metropolitan Art Conservation Bureau"
@@ -360,6 +377,7 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({
               </label>
               <input
                 type="text"
+                maxLength={100}
                 value={registrationNumber}
                 onChange={(e) => setRegistrationNumber(e.target.value)}
                 placeholder="e.g. REG-IND-2026-8812"
@@ -384,6 +402,7 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({
               </div>
               <input
                 type="text"
+                maxLength={42}
                 value={institutionWallet}
                 onChange={(e) => setInstitutionWallet(e.target.value)}
                 placeholder="0x..."

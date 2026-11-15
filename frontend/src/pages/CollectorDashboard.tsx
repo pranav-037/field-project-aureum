@@ -7,6 +7,9 @@ import { artworkApi, transferApi } from '../services/api';
 
 interface Artwork {
   id: string;
+  databaseId: string;
+  ownerId?: string;
+  blockchainArtworkId?: string;
   title: string;
   artist: string;
   year: string;
@@ -21,6 +24,7 @@ interface Artwork {
 
 interface TransferItem {
   id: string;
+  blockchainTransferId?: string;
   type: 'INCOMING' | 'OUTGOING' | 'VERIFICATION';
   title: string;
   artist: string;
@@ -37,9 +41,13 @@ const CollectorDashboard: React.FC = () => {
   const [selectedArtwork, setSelectedArtwork] = useState<Artwork | null>(null);
   const [showTransferModal, setShowTransferModal] = useState(false);
   const [transferArtwork, setTransferArtwork] = useState<Artwork | null>(null);
+  const [recipientWallet, setRecipientWallet] = useState('');
+  const [transferError, setTransferError] = useState<string | null>(null);
+  const [isCreatingTransfer, setIsCreatingTransfer] = useState(false);
   const [showIncomingModal, setShowIncomingModal] = useState(false);
   const [incomingAccepted, setIncomingAccepted] = useState(false);
   const [copiedTx, setCopiedTx] = useState<string | null>(null);
+  const { isConnected, account } = useWallet();
 
   const scrollToSection = (id: string) => {
     const el = document.getElementById(id);
@@ -158,6 +166,9 @@ const CollectorDashboard: React.FC = () => {
 
             return {
               id: a.blockchainArtworkId ? `AUR-${a.blockchainArtworkId}` : (a.id ? `AUR-${a.id.slice(0, 8)}` : `AUR-${idx}`),
+              databaseId: a.id,
+              ownerId: a.ownerId,
+              blockchainArtworkId: a.blockchainArtworkId,
               title: a.title,
               artist: a.artist,
               year: a.year || 'Modern',
@@ -182,7 +193,8 @@ const CollectorDashboard: React.FC = () => {
           const mappedTrans: TransferItem[] = transRes.data.map((t: any) => {
             const isOutgoing =
               t.type === 'OUTGOING' ||
-              (currentUserId && t.sellerId === currentUserId && t.buyerId !== currentUserId);
+              (currentUserId && t.sellerId === currentUserId && t.buyerId !== currentUserId) ||
+              (typeof t.sellerId === 'string' && account && t.sellerId.toLowerCase() === account.toLowerCase());
             const type: 'INCOMING' | 'OUTGOING' = isOutgoing ? 'OUTGOING' : 'INCOMING';
             const counterparty = isOutgoing
               ? (t.buyerName || 'MoMA Custodial Vault Escrow')
@@ -190,6 +202,7 @@ const CollectorDashboard: React.FC = () => {
 
             return {
               id: t.id,
+              blockchainTransferId: t.blockchainTransferId,
               type,
               title: t.artworkTitle || `Artwork #${t.artworkId?.slice(0, 8)}`,
               artist: t.artworkArtist || 'Fine Art Masterpiece',
@@ -207,7 +220,7 @@ const CollectorDashboard: React.FC = () => {
     };
 
     loadArtworks();
-  }, []);
+  }, [account, navigate]);
 
   const filteredArtworks = artworks.filter(item => {
     if (filter === 'VERIFIED') return item.status === 'VERIFIED';
@@ -229,45 +242,76 @@ const CollectorDashboard: React.FC = () => {
     setTimeout(() => setCopiedTx(null), 2000);
   };
 
-  const { isConnected, account } = useWallet();
   const { acceptTransfer: acceptTransferOnChain } = useArtchainContract();
   const [isSigningTx, setIsSigningTx] = useState(false);
   const [signingError, setSigningError] = useState<string | null>(null);
   const [confirmedTx, setConfirmedTx] = useState<string | null>(null);
 
+  const handleInitiateTransfer = async () => {
+    setTransferError(null);
+    if (!transferArtwork?.ownerId) {
+      setTransferError('The selected artwork has no recorded owner.');
+      return;
+    }
+    if (!/^0x[a-fA-F0-9]{40}$/.test(recipientWallet.trim())) {
+      setTransferError('Enter a valid recipient wallet address.');
+      return;
+    }
+
+    try {
+      setIsCreatingTransfer(true);
+      const response = await transferApi.create({
+        artworkId: transferArtwork.databaseId,
+        sellerId: transferArtwork.ownerId,
+        buyerAddress: recipientWallet.trim(),
+      });
+      const transfer = response.data;
+      setTransactions(prev => [{
+        id: transfer.id,
+        blockchainTransferId: transfer.blockchainTransferId,
+        type: 'OUTGOING',
+        title: transferArtwork.title,
+        artist: transferArtwork.artist,
+        counterparty: recipientWallet.trim(),
+        date: new Date(transfer.transferDate || transfer.createdAt).toLocaleDateString(),
+        status: 'PENDING_ACCEPTANCE',
+        txHash: transfer.txHash,
+      }, ...prev]);
+      setRecipientWallet('');
+      setShowTransferModal(false);
+    } catch (err: any) {
+      setTransferError(err?.response?.data?.error || err?.message || 'Could not initiate the transfer.');
+    } finally {
+      setIsCreatingTransfer(false);
+    }
+  };
+
   const handleAcceptTransfer = async () => {
     setSigningError(null);
-    if (isConnected) {
-      try {
-        setIsSigningTx(true);
-        // Attempt on-chain signature via MetaMask
-        const receipt = await acceptTransferOnChain(1);
-        setConfirmedTx(receipt.txHash);
-        setIncomingAccepted(true);
-        if (incomingTransfer) {
-          setTransactions(prev =>
-            prev.map(t =>
-              t.id === incomingTransfer.id ? { ...t, status: 'COMPLETED' as const, txHash: receipt.txHash } : t
-            )
-          );
-        }
-        setTimeout(() => setShowIncomingModal(false), 2000);
-      } catch (err: any) {
-        console.warn('On-chain signature error:', err);
-        setSigningError(err?.message || 'Transaction rejected in wallet.');
-      } finally {
-        setIsSigningTx(false);
+    if (!isConnected) {
+      setSigningError('Connect the recipient wallet to accept this transfer.');
+      return;
+    }
+
+    try {
+      setIsSigningTx(true);
+      if (!incomingTransfer?.blockchainTransferId) {
+        throw new Error('This transfer is not available on the blockchain.');
       }
-    } else {
+      const receipt = await acceptTransferOnChain(incomingTransfer.blockchainTransferId);
+      setConfirmedTx(receipt.txHash);
       setIncomingAccepted(true);
-      if (incomingTransfer) {
-        setTransactions(prev =>
-          prev.map(t =>
-            t.id === incomingTransfer.id ? { ...t, status: 'COMPLETED' as const } : t
-          )
-        );
-      }
-      setShowIncomingModal(false);
+      setTransactions(prev =>
+        prev.map(t =>
+          t.id === incomingTransfer.id ? { ...t, status: 'COMPLETED' as const, txHash: receipt.txHash } : t
+        )
+      );
+      setTimeout(() => setShowIncomingModal(false), 2000);
+    } catch (err: any) {
+      console.warn('On-chain signature error:', err);
+      setSigningError(err?.message || 'Transaction rejected in wallet.');
+    } finally {
+      setIsSigningTx(false);
     }
   };
 
@@ -1289,15 +1333,15 @@ const CollectorDashboard: React.FC = () => {
               <div>
                 <label className="block text-slate-300 font-semibold mb-1">Select Artwork</label>
                 <select
-                  value={transferArtwork?.id || ''}
+                  value={transferArtwork?.databaseId || ''}
                   onChange={(e) => {
-                    const found = artworks.find(a => a.id === e.target.value);
+                    const found = artworks.find(a => a.databaseId === e.target.value);
                     if (found) setTransferArtwork(found);
                   }}
                   className="w-full px-3.5 py-2.5 rounded-xl bg-slate-950/80 border border-slate-700 text-white text-xs focus:ring-2 focus:ring-indigo-500 focus:outline-none"
                 >
                   {artworks.map(art => (
-                    <option key={art.id} value={art.id}>
+                    <option key={art.id} value={art.databaseId}>
                       {art.title} ({art.artist}) - {art.id}
                     </option>
                   ))}
@@ -1308,7 +1352,11 @@ const CollectorDashboard: React.FC = () => {
                 <label className="block text-slate-300 font-semibold mb-1">Recipient Wallet / Institution ID</label>
                 <input
                   type="text"
-                  placeholder="0x... or INST-ID"
+                  value={recipientWallet}
+                  onChange={(e) => setRecipientWallet(e.target.value)}
+                  maxLength={42}
+                  aria-invalid={Boolean(transferError)}
+                  placeholder="0x recipient wallet address"
                   className="w-full px-3.5 py-2.5 rounded-xl bg-slate-950/80 border border-slate-700 text-white text-xs focus:ring-2 focus:ring-indigo-500 focus:outline-none"
                 />
               </div>
@@ -1322,15 +1370,17 @@ const CollectorDashboard: React.FC = () => {
               </div>
             </div>
 
+            {transferError && (
+              <p role="alert" className="text-xs text-red-300">{transferError}</p>
+            )}
+
             <div className="flex items-center gap-3">
               <button
-                onClick={() => {
-                  alert('Transfer escrow initialized on Artchain testnet.');
-                  setShowTransferModal(false);
-                }}
-                className="flex-1 py-3 rounded-xl bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-500 hover:to-violet-500 text-white font-semibold text-xs shadow-lg shadow-indigo-600/30 transition cursor-pointer"
+                onClick={handleInitiateTransfer}
+                disabled={isCreatingTransfer}
+                className="flex-1 py-3 rounded-xl bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-500 hover:to-violet-500 text-white font-semibold text-xs shadow-lg shadow-indigo-600/30 transition cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                Initiate Secure Escrow
+                {isCreatingTransfer ? 'Initiating...' : 'Initiate Secure Escrow'}
               </button>
               <button
                 onClick={() => setShowTransferModal(false)}

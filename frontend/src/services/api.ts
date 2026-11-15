@@ -21,7 +21,7 @@ api.interceptors.request.use((config) => {
 // User API
 export const userApi = {
   getAll: () => api.get('/users'),
-  create: (data: { email: string; name: string; role?: string }) =>
+  create: (data: { email: string; name: string; password: string; role?: string }) =>
     api.post('/users', data),
   updateProfile: (data: any) =>
     api.put('/users/profile', data),
@@ -94,7 +94,7 @@ export const transferApi = {
     artworkId: string;
     sellerId: string;
     buyerId?: string;
-    buyerAddress?: string;
+    buyerAddress: string;
     transferDate?: string;
     priceVisibility?: string;
     priceCommitment?: string;

@@ -67,9 +67,31 @@ const ArtworkRegistration: React.FC = () => {
 
   const { account } = useWallet();
 
+  const validateArtworkDetails = () => {
+    if (!formData.title.trim()) return 'Artwork title is required.';
+    if (!formData.artist.trim()) return 'Artist name is required.';
+    if (!formData.medium.trim()) return 'Artwork medium is required.';
+    if (!formData.dimensions.trim()) return 'Artwork dimensions are required.';
+    if (formData.title.trim().length > 120) return 'Artwork title must be 120 characters or fewer.';
+    if (formData.artist.trim().length > 100) return 'Artist name must be 100 characters or fewer.';
+    if (formData.medium.trim().length > 100) return 'Artwork medium must be 100 characters or fewer.';
+    if (formData.dimensions.trim().length > 100) return 'Artwork dimensions must be 100 characters or fewer.';
+    return null;
+  };
+
+  const validateAuthenticationMethod = () =>
+    formData.authenticationMethod.trim() ? null : 'Select an authentication method.';
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
+    const detailsError = validateArtworkDetails();
+    const authenticationError = validateAuthenticationMethod();
+    if (detailsError || authenticationError) {
+      setError(detailsError || authenticationError);
+      setStep(detailsError ? 1 : 2);
+      return;
+    }
     setLoading(true);
 
     try {
@@ -110,13 +132,13 @@ const ArtworkRegistration: React.FC = () => {
       } catch {}
 
       const artworkData = {
-        title: formData.title,
-        artist: formData.artist,
-        year: formData.year || undefined,
-        medium: formData.medium,
-        dimensions: formData.dimensions,
-        edition: formData.edition || '1 of 1',
-        authenticationMethod: formData.authenticationMethod || 'NFC Cryptographic Provenance Anchor',
+        title: formData.title.trim(),
+        artist: formData.artist.trim(),
+        year: formData.year.trim() || undefined,
+        medium: formData.medium.trim(),
+        dimensions: formData.dimensions.trim(),
+        edition: formData.edition.trim() || '1 of 1',
+        authenticationMethod: formData.authenticationMethod,
         bindingReference: formData.bindingReference || `NFC-UUID-${Date.now()}`,
         imageCids: uploadedImageCids,
         documentCids: uploadedDocCids,
@@ -145,6 +167,23 @@ const ArtworkRegistration: React.FC = () => {
   };
 
   const goToStep = (stepNumber: number) => {
+    setError(null);
+    if (stepNumber > 1) {
+      const detailsError = validateArtworkDetails();
+      if (detailsError) {
+        setError(detailsError);
+        setStep(1);
+        return;
+      }
+    }
+    if (stepNumber > 2) {
+      const authenticationError = validateAuthenticationMethod();
+      if (authenticationError) {
+        setError(authenticationError);
+        setStep(2);
+        return;
+      }
+    }
     setStep(stepNumber);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
@@ -226,6 +265,8 @@ const ArtworkRegistration: React.FC = () => {
                     value={formData.title}
                     onChange={handleChange}
                     required
+                    minLength={1}
+                    maxLength={120}
                     placeholder="e.g., The Starry Night"
                     className="w-full px-3.5 py-2.5 rounded-xl bg-slate-950/80 border border-slate-700 text-white placeholder-slate-500 focus:ring-2 focus:ring-indigo-500 focus:outline-none"
                   />
@@ -239,6 +280,8 @@ const ArtworkRegistration: React.FC = () => {
                     value={formData.artist}
                     onChange={handleChange}
                     required
+                    minLength={1}
+                    maxLength={100}
                     placeholder="e.g., Vincent van Gogh"
                     className="w-full px-3.5 py-2.5 rounded-xl bg-slate-950/80 border border-slate-700 text-white placeholder-slate-500 focus:ring-2 focus:ring-indigo-500 focus:outline-none"
                   />
@@ -252,6 +295,7 @@ const ArtworkRegistration: React.FC = () => {
                       name="year"
                       value={formData.year}
                       onChange={handleChange}
+                      maxLength={50}
                       placeholder="e.g., 1889"
                       className="w-full px-3.5 py-2.5 rounded-xl bg-slate-950/80 border border-slate-700 text-white placeholder-slate-500 focus:ring-2 focus:ring-indigo-500 focus:outline-none"
                     />
@@ -263,6 +307,7 @@ const ArtworkRegistration: React.FC = () => {
                       name="edition"
                       value={formData.edition}
                       onChange={handleChange}
+                      maxLength={50}
                       placeholder="e.g., 1 of 1, Unique"
                       className="w-full px-3.5 py-2.5 rounded-xl bg-slate-950/80 border border-slate-700 text-white placeholder-slate-500 focus:ring-2 focus:ring-indigo-500 focus:outline-none"
                     />
@@ -278,6 +323,8 @@ const ArtworkRegistration: React.FC = () => {
                       value={formData.medium}
                       onChange={handleChange}
                       required
+                      minLength={1}
+                      maxLength={100}
                       placeholder="e.g., Oil on canvas"
                       className="w-full px-3.5 py-2.5 rounded-xl bg-slate-950/80 border border-slate-700 text-white placeholder-slate-500 focus:ring-2 focus:ring-indigo-500 focus:outline-none"
                     />
@@ -290,6 +337,8 @@ const ArtworkRegistration: React.FC = () => {
                       value={formData.dimensions}
                       onChange={handleChange}
                       required
+                      minLength={1}
+                      maxLength={100}
                       placeholder="e.g., 73.7 cm × 92.1 cm"
                       className="w-full px-3.5 py-2.5 rounded-xl bg-slate-950/80 border border-slate-700 text-white placeholder-slate-500 focus:ring-2 focus:ring-indigo-500 focus:outline-none"
                     />
@@ -337,6 +386,7 @@ const ArtworkRegistration: React.FC = () => {
                     value={formData.bindingReference}
                     onChange={handleChange}
                     rows={4}
+                    maxLength={200}
                     placeholder="Enter security tag ID, micro-engraving reference, or optical fingerprint hash"
                     className="w-full px-3.5 py-2.5 rounded-xl bg-slate-950/80 border border-slate-700 text-white placeholder-slate-500 focus:ring-2 focus:ring-indigo-500 focus:outline-none"
                   />

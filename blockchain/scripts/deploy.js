@@ -1,4 +1,4 @@
-const { ethers } = require("hardhat");
+const { ethers, network } = require("hardhat");
 
 async function main() {
   const [deployer] = await ethers.getSigners();
@@ -16,6 +16,11 @@ async function main() {
   const address = await registry.getAddress();
 
   console.log(" ArtchainRegistry successfully deployed to:", address);
+  if (network.name === "hardhat" || network.name === "localhost") {
+    const approval = await registry.approveInstitution(deployer.address);
+    await approval.wait();
+    console.log("Local demo authenticator enabled for:", deployer.address);
+  }
   console.log("=================================================");
   console.log("Admin Address:", deployer.address);
   console.log("Network:", (await ethers.provider.getNetwork()).name);

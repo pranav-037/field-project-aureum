@@ -300,6 +300,23 @@ export const db = {
       if (error) throw error;
       return data;
     },
+    async upsertByBlockchainId(
+      artworkData: Omit<Partial<DbArtwork>, 'id' | 'createdAt'> & { blockchainArtworkId: string }
+    ): Promise<DbArtwork> {
+      const { data, error } = await supabase
+        .from('Artwork')
+        .upsert(
+          {
+            ...artworkData,
+            updatedAt: new Date().toISOString(),
+          },
+          { onConflict: 'blockchainArtworkId' }
+        )
+        .select()
+        .single();
+      if (error) throw error;
+      return data;
+    },
     async update(id: string, updates: Partial<DbArtwork>): Promise<DbArtwork> {
       const now = new Date().toISOString();
       const { data, error } = await supabase
@@ -382,6 +399,23 @@ export const db = {
           updatedAt: now,
           ...transferData,
         })
+        .select()
+        .single();
+      if (error) throw error;
+      return data;
+    },
+    async upsertByBlockchainId(
+      transferData: Omit<Partial<DbTransfer>, 'id' | 'createdAt'> & { blockchainTransferId: string }
+    ): Promise<DbTransfer> {
+      const { data, error } = await supabase
+        .from('Transfer')
+        .upsert(
+          {
+            ...transferData,
+            updatedAt: new Date().toISOString(),
+          },
+          { onConflict: 'blockchainTransferId' }
+        )
         .select()
         .single();
       if (error) throw error;

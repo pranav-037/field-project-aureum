@@ -66,21 +66,24 @@ export class AuthService {
     role: string = 'COLLECTOR',
     walletAddress?: string
   ): Promise<LoginResponse> {
-    if (!email || !email.trim()) {
+    if (typeof email !== 'string' || !email.trim()) {
       throw new Error('Email address is required.');
     }
 
     const normalizedEmail = email.trim().toLowerCase();
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(normalizedEmail)) {
+    if (normalizedEmail.length > 254 || !emailRegex.test(normalizedEmail)) {
       throw new Error('Please provide a valid email address (e.g. name@domain.com).');
     }
 
-    if (!name || name.trim().length < 2) {
+    if (typeof name !== 'string' || name.trim().length < 2) {
       throw new Error('Full name is required and must be at least 2 characters long.');
     }
+    if (name.trim().length > 100) {
+      throw new Error('Full name must be 100 characters or fewer.');
+    }
 
-    if (!password || password.length < 6) {
+    if (typeof password !== 'string' || !password.trim() || password.length < 6) {
       throw new Error('Password must be at least 6 characters long.');
     }
 
@@ -206,14 +209,18 @@ export class AuthService {
    * Completely scraps legacy Prisma plain-text password comparison.
    */
   static async login(email: string, password: string): Promise<LoginResponse> {
-    if (!email || !email.trim()) {
+    if (typeof email !== 'string' || !email.trim()) {
       throw new Error('Please enter your email address.');
     }
-    if (!password) {
+    if (typeof password !== 'string' || !password) {
       throw new Error('Please enter your password.');
     }
 
     const normalizedEmail = email.trim().toLowerCase();
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (normalizedEmail.length > 254 || !emailRegex.test(normalizedEmail)) {
+      throw new Error('Please provide a valid email address.');
+    }
 
     // Authenticate with Supabase Auth
     const { data, error } = await supabase.auth.signInWithPassword({
@@ -517,7 +524,14 @@ export class AuthService {
    * Request password reset email via Supabase
    */
   static async resetPassword(email: string, redirectTo?: string): Promise<{ success: boolean; message: string }> {
+    if (typeof email !== 'string' || !email.trim()) {
+      throw new Error('Email address is required.');
+    }
     const normalizedEmail = email.trim().toLowerCase();
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (normalizedEmail.length > 254 || !emailRegex.test(normalizedEmail)) {
+      throw new Error('Please provide a valid email address.');
+    }
     const { error } = await supabase.auth.resetPasswordForEmail(normalizedEmail, {
       redirectTo: redirectTo || undefined,
     });
