@@ -473,19 +473,19 @@ const CollectorDashboard: React.FC = () => {
               >
                 {/* Visual Canvas Representation */}
                 <div className="relative h-52 w-full bg-slate-950 p-4 flex flex-col justify-between border-b border-slate-800/80 overflow-hidden">
-                  {artwork.imageUrl ? (
+                  <div className={`absolute inset-0 bg-gradient-to-br ${artwork.thumbnailGradient}`}>
+                    <div className="absolute inset-0 opacity-20 bg-[radial-gradient(#cbd5e1_1px,transparent_1px)] [background-size:16px_16px]"></div>
+                  </div>
+                  {artwork.imageUrl && (
                     <img
                       src={artwork.imageUrl}
                       alt={artwork.title}
                       className="absolute inset-0 w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
-                      loading="lazy"
-                      referrerPolicy="no-referrer"
-                      crossOrigin="anonymous"
+                      loading="eager"
+                      onError={(e) => {
+                        (e.currentTarget as HTMLElement).style.display = 'none';
+                      }}
                     />
-                  ) : (
-                    <div className={`absolute inset-0 bg-gradient-to-br ${artwork.thumbnailGradient}`}>
-                      <div className="absolute inset-0 opacity-20 bg-[radial-gradient(#cbd5e1_1px,transparent_1px)] [background-size:16px_16px]"></div>
-                    </div>
                   )}
 
                   {/* Dark gradient overlay for optimal readability */}
@@ -797,8 +797,6 @@ const CollectorDashboard: React.FC = () => {
                   src={selectedArtwork.imageUrl}
                   alt={selectedArtwork.title}
                   className="w-full h-full object-cover"
-                  referrerPolicy="no-referrer"
-                  crossOrigin="anonymous"
                 />
               </div>
             )}
