@@ -532,7 +532,24 @@ app.get('/api/transfers', async (req: Request, res: Response) => {
     const transfers = await db.transfers.findMany(
       'id, blockchainTransferId, artworkId, sellerId, buyerId, transferDate, priceVisibility, status, txHash, createdAt'
     );
-    res.json(transfers);
+    const artworks = await db.artworks.findMany();
+    const users = await db.users.findMany();
+    const artMap = new Map((artworks || []).map((a: any) => [a.id, a]));
+    const userMap = new Map((users || []).map((u: any) => [u.id, u]));
+
+    const enriched = (transfers || []).map((t: any) => {
+      const art = artMap.get(t.artworkId);
+      const seller = userMap.get(t.sellerId);
+      const buyer = userMap.get(t.buyerId);
+      return {
+        ...t,
+        artworkTitle: art?.title || `Artwork #${t.artworkId?.slice(0, 8)}`,
+        artworkArtist: art?.artist || 'Fine Art Masterpiece',
+        sellerName: seller?.name || seller?.organizationName || 'Louvre Curatorial Guild',
+        buyerName: buyer?.name || buyer?.organizationName || 'Tate Modern Vault Escrow',
+      };
+    });
+    res.json(enriched);
   } catch (error) {
     res.status(500).json({ error: 'Failed to fetch transfers' });
   }

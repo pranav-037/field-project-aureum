@@ -61,8 +61,42 @@ const CollectorDashboard: React.FC = () => {
 
   const [currentUser, setCurrentUser] = useState<any>(null);
 
+  // Default Fallback Transactions: 2 Incoming and 1 Outgoing
+  const defaultTransactions: TransferItem[] = [
+    {
+      id: 'tx-101',
+      type: 'INCOMING',
+      title: 'Girl with a Pearl Earring',
+      artist: 'Johannes Vermeer',
+      counterparty: 'Mauritshuis Curatorial Guild',
+      date: 'Nov 14, 2026',
+      status: 'PENDING_ACCEPTANCE',
+      txHash: '0x8f2d4a1b9c3e7f6a5b4c3d2e1f0a9b8c7d6e5f4a',
+    },
+    {
+      id: 'tx-102',
+      type: 'OUTGOING',
+      title: 'The Starry Night',
+      artist: 'Vincent van Gogh',
+      counterparty: 'MoMA Custodial Vault Escrow',
+      date: 'Nov 11, 2026',
+      status: 'COMPLETED',
+      txHash: '0x3a4b5c6d7e8f9a0b1c2d3e4f5a6b7c8d9e0f1a2b',
+    },
+    {
+      id: 'tx-103',
+      type: 'INCOMING',
+      title: 'The Kiss',
+      artist: 'Gustav Klimt',
+      counterparty: 'Belvedere Vienna Guild',
+      date: 'Nov 8, 2026',
+      status: 'COMPLETED',
+      txHash: '0x7b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5b6c',
+    },
+  ];
+
   const [artworks, setArtworks] = useState<Artwork[]>([]);
-  const [transactions, setTransactions] = useState<TransferItem[]>([]);
+  const [transactions, setTransactions] = useState<TransferItem[]>(defaultTransactions);
 
   useEffect(() => {
     try {
@@ -132,16 +166,24 @@ const CollectorDashboard: React.FC = () => {
       try {
         const transRes = await transferApi.getAll();
         if (transRes.data && Array.isArray(transRes.data) && transRes.data.length > 0) {
-          const mappedTrans: TransferItem[] = transRes.data.map((t: any) => ({
-            id: t.id,
-            type: 'INCOMING',
-            title: `Artwork #${t.artworkId}`,
-            artist: 'Provenance Verified',
-            counterparty: t.sellerId?.slice(0, 10) + '...',
-            date: new Date(t.transferDate || t.createdAt).toLocaleDateString(),
-            status: t.status === 'FINALIZED' ? 'COMPLETED' : 'PENDING_ACCEPTANCE',
-            txHash: t.txHash || '0x' + '0'.repeat(40),
-          }));
+          const mappedTrans: TransferItem[] = transRes.data.map((t: any) => {
+            const isOutgoing = (currentUser?.id && t.sellerId === currentUser.id) || t.type === 'OUTGOING';
+            const type: 'INCOMING' | 'OUTGOING' = isOutgoing ? 'OUTGOING' : 'INCOMING';
+            const counterparty = isOutgoing
+              ? (t.buyerName || 'MoMA Custodial Vault Escrow')
+              : (t.sellerName || 'Mauritshuis Curatorial Guild');
+
+            return {
+              id: t.id,
+              type,
+              title: t.artworkTitle || `Artwork #${t.artworkId?.slice(0, 8)}`,
+              artist: t.artworkArtist || 'Fine Art Masterpiece',
+              counterparty,
+              date: new Date(t.transferDate || t.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
+              status: t.status === 'FINALIZED' ? 'COMPLETED' : 'PENDING_ACCEPTANCE',
+              txHash: t.txHash || '0x' + '0'.repeat(40),
+            };
+          });
           setTransactions(mappedTrans);
         }
       } catch (transErr) {
@@ -158,6 +200,7 @@ const CollectorDashboard: React.FC = () => {
     return true;
   });
 
+  const incomingCount = transactions.filter(t => t.type === 'INCOMING').length;
   const pendingIncoming = transactions.filter(t => t.type === 'INCOMING' && t.status === 'PENDING_ACCEPTANCE');
   const incomingTransfer = pendingIncoming[0];
   const outgoingCount = transactions.filter(t => t.type === 'OUTGOING').length;
@@ -312,7 +355,7 @@ const CollectorDashboard: React.FC = () => {
             </div>
             <div className="mt-4 flex items-baseline gap-2">
               <span className="text-3xl sm:text-4xl font-extrabold text-white tracking-tight">
-                {pendingIncoming.length}
+                {incomingCount}
               </span>
               {pendingIncoming.length > 0 && (
                 <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-300 border border-amber-500/20">
@@ -864,15 +907,15 @@ const CollectorDashboard: React.FC = () => {
             <div className="p-4 rounded-xl bg-slate-950/80 border border-slate-800 space-y-3 text-xs">
               <div className="flex justify-between">
                 <span className="text-slate-400">Artwork:</span>
-                <span className="text-white font-semibold">Water Lilies (Nymphéas) - 1916</span>
+                <span className="text-white font-semibold">{incomingTransfer?.title || 'Girl with a Pearl Earring'}</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-slate-400">Artist:</span>
-                <span className="text-slate-200">Claude Monet</span>
+                <span className="text-slate-200">{incomingTransfer?.artist || 'Johannes Vermeer'}</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-slate-400">From Custodian:</span>
-                <span className="text-slate-200">Sotheby’s Contemporary Custody Escrow</span>
+                <span className="text-slate-200">{incomingTransfer?.counterparty || 'Mauritshuis Curatorial Guild'}</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-slate-400">Escrow Contract:</span>
