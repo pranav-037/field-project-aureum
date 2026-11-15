@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import Navbar from '../components/Navbar';
 import { activityApi, artworkApi, transferApi } from '../services/api';
 
@@ -21,6 +21,7 @@ function formatTimeAgo(dateStr?: string): string {
 }
 
 const InstitutionDashboard: React.FC = () => {
+  const navigate = useNavigate();
   const [copiedTx, setCopiedTx] = useState<string | null>(null);
   const [currentUser, setCurrentUser] = useState<any>(null);
   const [activities, setActivities] = useState<any[]>([]);

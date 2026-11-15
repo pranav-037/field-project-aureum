@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { artworkApi, ipfsApi } from '../services/api';
 import { useWallet } from '../contexts/WalletContext';
 import Navbar from '../components/Navbar';

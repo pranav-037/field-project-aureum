@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import Navbar from '../components/Navbar';
 import { institutionApi, artworkApi } from '../services/api';
 
 const AdminConsole: React.FC = () => {
+  const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState<'institutions' | 'users' | 'flags' | 'audit' | 'settings'>('institutions');
   const [institutions, setInstitutions] = useState<any[]>([]);
   const [artworksCount, setArtworksCount] = useState<number>(0);

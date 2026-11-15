@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { useWallet } from '../contexts/WalletContext';
 import { useArtchainContract } from '../hooks/useArtchainContract';
 import Navbar from '../components/Navbar';
@@ -30,6 +30,7 @@ interface TransferItem {
 }
 
 const CollectorDashboard: React.FC = () => {
+  const navigate = useNavigate();
   const [filter, setFilter] = useState<'ALL' | 'VERIFIED' | 'ESCROW'>('ALL');
   const [selectedArtwork, setSelectedArtwork] = useState<Artwork | null>(null);
   const [showTransferModal, setShowTransferModal] = useState(false);
