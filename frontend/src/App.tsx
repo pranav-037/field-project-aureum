@@ -38,11 +38,39 @@ function App() {
                 />
                 <Route path="/profile-dashboard" element={<Navigate to="/profile" replace />} />
 
-                <Route path="/institution/dashboard" element={<InstitutionDashboard />} />
-                <Route path="/collector/dashboard" element={<CollectorDashboard />} />
-                <Route path="/artwork/register" element={<ArtworkRegistration />} />
+                <Route
+                  path="/institution/dashboard"
+                  element={
+                    <ProtectedRoute requiredRoles={['ADMIN', 'AUTHENTICATOR']}>
+                      <InstitutionDashboard />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/collector/dashboard"
+                  element={
+                    <ProtectedRoute requiredRoles={['COLLECTOR']}>
+                      <CollectorDashboard />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/artwork/register"
+                  element={
+                    <ProtectedRoute requiredRoles={['ADMIN', 'AUTHENTICATOR']}>
+                      <ArtworkRegistration />
+                    </ProtectedRoute>
+                  }
+                />
                 <Route path="/verify" element={<ProvenanceVerification />} />
-                <Route path="/admin" element={<AdminConsole />} />
+                <Route
+                  path="/admin"
+                  element={
+                    <ProtectedRoute requiredRoles={['ADMIN']}>
+                      <AdminConsole />
+                    </ProtectedRoute>
+                  }
+                />
                 <Route path="*" element={<Navigate to="/" replace />} />
               </Routes>
             </main>

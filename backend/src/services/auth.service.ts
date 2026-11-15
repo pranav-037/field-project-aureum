@@ -83,8 +83,19 @@ export class AuthService {
       throw new Error('Full name must be 100 characters or fewer.');
     }
 
-    if (typeof password !== 'string' || !password.trim() || password.length < 6) {
-      throw new Error('Password must be at least 6 characters long.');
+    if (
+      typeof password !== 'string' ||
+      !password.trim() ||
+      password !== password.trim() ||
+      password.length < 8 ||
+      !/[A-Z]/.test(password) ||
+      !/[a-z]/.test(password) ||
+      !/[0-9]/.test(password) ||
+      !/[^A-Za-z0-9\s]/.test(password)
+    ) {
+      throw new Error(
+        'Password must be at least 8 characters, include an uppercase letter, a lowercase letter, a number, and a special character, and have no leading or trailing whitespace.'
+      );
     }
 
     const resolvedRole = role || 'COLLECTOR';
@@ -397,8 +408,19 @@ export class AuthService {
 
     if (!token) {
       const { sign } = await import('jsonwebtoken');
+      const attributes =
+        userProfile.walletAddress && /^0x[a-fA-F0-9]{40}$/.test(userProfile.walletAddress)
+          ? { walletAddress: userProfile.walletAddress }
+          : {};
       token = sign(
-        { userId: userProfile.id, email: userProfile.email, role: userProfile.role },
+        {
+          userId: userProfile.id,
+          email: userProfile.email,
+          role: userProfile.role,
+          roles: [userProfile.role],
+          permissions: [],
+          attributes,
+        },
         JWT_SECRET,
         { expiresIn: '7d' }
       );

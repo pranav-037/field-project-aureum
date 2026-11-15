@@ -260,9 +260,6 @@ app.post('/api/users', async (req: Request, res: Response) => {
     if (name.trim().length < 2 || name.trim().length > 100) {
       return res.status(400).json({ error: 'Name must be between 2 and 100 characters.' });
     }
-    if (typeof password !== 'string' || !password.trim() || password.length < 6) {
-      return res.status(400).json({ error: 'Password must be at least 6 characters long.' });
-    }
     const result = await AuthService.register(email, password, name, role || 'COLLECTOR');
     res.status(201).json(result.user);
   } catch (error) {

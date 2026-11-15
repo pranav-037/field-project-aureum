@@ -3,27 +3,20 @@ import { Link, useNavigate } from 'react-router-dom';
 import { authApi, formatAuthError } from '../services/api';
 import { useGoogleAuth } from '../hooks/useGoogleAuth';
 import { useAuth } from '../context/AuthContext';
+import { emailSchema, loginPasswordSchema, loginSchema } from '../schemas/authSchemas';
 
-/** Returns the dashboard path for the stored user, or null if not logged in */
-function getLoggedInDashboard(): string | null {
-  try {
-    const token = localStorage.getItem('aureum_token');
-    const userRaw = localStorage.getItem('aureum_user');
-    if (!token || !userRaw) return null;
-    const user = JSON.parse(userRaw) as { role?: string };
-    const role = user?.role || '';
-    if (role === 'ADMIN' || role === 'AUTHENTICATOR') return '/institution/dashboard';
-    return '/collector/dashboard';
-  } catch {
-    return null;
-  }
+function getDashboardPath(role?: string): string {
+  if (role === 'ADMIN' || role === 'AUTHENTICATOR') return '/institution/dashboard';
+  if (role === 'COLLECTOR') return '/collector/dashboard';
+  return '/profile';
 }
 
 const LoginPage: React.FC = () => {
   const navigate = useNavigate();
-  const { login } = useAuth();
+  const { login, user, loading: authLoading } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [fieldErrors, setFieldErrors] = useState<Partial<Record<'email' | 'password', string>>>({});
   const [isInstitution, setIsInstitution] = useState(true);
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -33,23 +26,24 @@ const LoginPage: React.FC = () => {
   const currentRole = isInstitution ? 'AUTHENTICATOR' : 'COLLECTOR';
 
   useEffect(() => {
-    const existingDashboard = getLoggedInDashboard();
-    if (existingDashboard) {
-      navigate(existingDashboard, { replace: true });
+    if (!authLoading && user) {
+      navigate(getDashboardPath(user.role), { replace: true });
     }
-  }, [navigate]);
+  }, [authLoading, navigate, user]);
 
   const { isConfigured, renderButton } = useGoogleAuth({
     role: currentRole,
     onSuccess: (data) => {
-      if (data.token && data.user) {
-        login(data.token, data.user as any);
+      try {
+        if (!data.token || !data.user) {
+          throw new Error('Authentication response did not return a valid session.');
+        }
+        login(data.token, data.user);
+        const role = typeof data.user.role === 'string' ? data.user.role : currentRole;
+        navigate(getDashboardPath(role), { replace: true });
+      } catch (authError) {
+        setError(authError instanceof Error ? authError.message : 'Unable to validate the sign-in session.');
       }
-      const role = data.user?.role || currentRole;
-      const target = (role === 'ADMIN' || role === 'AUTHENTICATOR')
-        ? '/institution/dashboard'
-        : '/collector/dashboard';
-      navigate(target, { replace: true });
     },
     onError: (msg) => setError(msg),
   });
@@ -63,36 +57,29 @@ const LoginPage: React.FC = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setLoading(true);
     setError(null);
-
-    const trimmedEmail = email.trim();
-    if (!trimmedEmail) {
-      setError('Please enter your email address.');
-      setLoading(false);
-      return;
-    }
-    if (trimmedEmail.length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmedEmail)) {
-      setError('Please enter a valid email address.');
-      setLoading(false);
-      return;
-    }
-
-    if (!password || !password.trim()) {
-      setError('Please enter your password.');
-      setLoading(false);
+    const validation = loginSchema.safeParse({ email, password });
+    if (!validation.success) {
+      const nextErrors: Partial<Record<'email' | 'password', string>> = {};
+      for (const issue of validation.error.issues) {
+        const field = issue.path[0];
+        if (field === 'email' || field === 'password') {
+          nextErrors[field] = nextErrors[field]
+            ? `${nextErrors[field]} ${issue.message}`
+            : issue.message;
+        }
+      }
+      setFieldErrors(nextErrors);
       return;
     }
 
+    setFieldErrors({});
+    setLoading(true);
     try {
-      const response = await authApi.login({ email: trimmedEmail, password });
+      const response = await authApi.login(validation.data);
       if (response.data && response.data.token) {
         login(response.data.token, response.data.user);
-        const role = response.data.user?.role || (isInstitution ? 'AUTHENTICATOR' : 'COLLECTOR');
-        const target = (role === 'ADMIN' || role === 'AUTHENTICATOR')
-          ? '/institution/dashboard'
-          : '/collector/dashboard';
-        navigate(target, { replace: true });
+        navigate(getDashboardPath(response.data.user?.role), { replace: true });
       } else {
         throw new Error('Authentication response did not return a valid session token.');
       }
@@ -109,7 +96,7 @@ const LoginPage: React.FC = () => {
       {/* Top Minimal Navigation */}
       <header className="w-full border-b border-slate-800/80 bg-[#0B0F17]/80 backdrop-blur-md">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
-          <Link to={getLoggedInDashboard() ?? '/'} className="flex items-center gap-2.5 group">
+          <Link to={user ? getDashboardPath(user.role) : '/'} className="flex items-center gap-2.5 group">
             <div className="w-8 h-8 rounded-lg bg-gradient-to-tr from-amber-500 via-indigo-600 to-violet-500 p-[1.5px] shadow-md shadow-indigo-500/20 group-hover:shadow-indigo-500/40 transition">
               <div className="w-full h-full bg-[#0B0F17] rounded-[6px] flex items-center justify-center">
                 <svg className="w-4 h-4 text-amber-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -210,7 +197,7 @@ const LoginPage: React.FC = () => {
               )}
 
               {/* Login Form */}
-              <form onSubmit={handleSubmit} autoComplete="off" className="space-y-4 text-left">
+              <form onSubmit={handleSubmit} noValidate autoComplete="off" className="space-y-4 text-left">
                 {/* Email Field */}
                 <div>
                   <label htmlFor="email" className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1.5">
@@ -224,12 +211,30 @@ const LoginPage: React.FC = () => {
                       maxLength={254}
                       autoComplete="off"
                       value={email}
-                      onChange={(e) => setEmail(e.target.value)}
+                      aria-invalid={Boolean(fieldErrors.email)}
+                      aria-describedby={fieldErrors.email ? 'login-email-error' : undefined}
+                      onChange={(e) => {
+                        setEmail(e.target.value);
+                        setFieldErrors((previous) => ({ ...previous, email: undefined }));
+                        setError(null);
+                      }}
+                      onBlur={() => {
+                        const result = emailSchema.safeParse(email);
+                        setFieldErrors((previous) => ({
+                          ...previous,
+                          email: result.success ? undefined : result.error.issues[0]?.message,
+                        }));
+                      }}
                       disabled={loading}
                       placeholder="curator@gallery.com"
                       className="w-full px-3.5 py-2.5 rounded-xl bg-slate-950/70 border border-slate-700/80 text-white placeholder-slate-500 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition duration-150"
                     />
                   </div>
+                  {fieldErrors.email && (
+                    <p id="login-email-error" className="mt-1 text-xs text-rose-300" role="alert">
+                      {fieldErrors.email}
+                    </p>
+                  )}
                 </div>
 
                 {/* Password Field with Show/Hide Toggle */}
@@ -252,7 +257,20 @@ const LoginPage: React.FC = () => {
                       required
                       autoComplete="new-password"
                       value={password}
-                      onChange={(e) => setPassword(e.target.value)}
+                      aria-invalid={Boolean(fieldErrors.password)}
+                      aria-describedby={fieldErrors.password ? 'login-password-error' : undefined}
+                      onChange={(e) => {
+                        setPassword(e.target.value);
+                        setFieldErrors((previous) => ({ ...previous, password: undefined }));
+                        setError(null);
+                      }}
+                      onBlur={() => {
+                        const result = loginPasswordSchema.safeParse(password);
+                        setFieldErrors((previous) => ({
+                          ...previous,
+                          password: result.success ? undefined : result.error.issues[0]?.message,
+                        }));
+                      }}
                       disabled={loading}
                       placeholder="••••••••••••"
                       className="w-full px-3.5 py-2.5 pr-10 rounded-xl bg-slate-950/70 border border-slate-700/80 text-white placeholder-slate-500 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition duration-150"
@@ -275,32 +293,12 @@ const LoginPage: React.FC = () => {
                       )}
                     </button>
                   </div>
-                </div>
-
-                {/* Two-Factor Authentication Code — institutions only */}
-                {isInstitution && (
-                  <div>
-                    <label htmlFor="totp" className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1.5 flex items-center justify-between">
-                      <span>Two-Factor Authentication Code</span>
-                      <span className="text-[10px] font-normal text-amber-300/80">Institutions only</span>
-                    </label>
-                    <input
-                      id="totp"
-                      type="text"
-                      inputMode="numeric"
-                      maxLength={6}
-                      pattern="[0-9]{6}"
-                      title="Enter a 6-digit code."
-                      autoComplete="one-time-code"
-                      placeholder="e.g. 481920"
-                      disabled={loading}
-                      className="w-full px-3.5 py-2.5 rounded-xl bg-slate-950/70 border border-slate-700/80 text-white font-mono placeholder-slate-500 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition duration-150"
-                    />
-                    <p className="text-[11px] text-slate-400 mt-1">
-                      Enter the 6-digit code from your authenticator app.
+                  {fieldErrors.password && (
+                    <p id="login-password-error" className="mt-1 text-xs text-rose-300" role="alert">
+                      {fieldErrors.password}
                     </p>
-                  </div>
-                )}
+                  )}
+                </div>
 
                 {/* Submit Action */}
                 <div className="pt-2">

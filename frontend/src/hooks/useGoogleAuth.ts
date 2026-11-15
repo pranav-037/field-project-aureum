@@ -86,8 +86,6 @@ export function useGoogleAuth({ role, onSuccess, onError }: UseGoogleAuthOptions
       try {
         const res = await authApi.googleLogin({ idToken: credential, role });
         if (res.data?.token) {
-          localStorage.setItem('aureum_token', res.data.token);
-          localStorage.setItem('aureum_user', JSON.stringify(res.data.user));
           onSuccess(res.data);
         } else {
           onError('Unexpected response from authentication server');

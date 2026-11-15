@@ -1,4 +1,6 @@
 import axios from 'axios';
+import { invalidateStoredAuth } from '../utils/authEvents';
+import { validateAuthSession } from '../utils/tokenValidator';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api';
 
@@ -9,14 +11,48 @@ const api = axios.create({
   },
 });
 
-// Attach JWT token to requests if present in localStorage
+// Only send a locally cached token when its structure and profile still validate.
 api.interceptors.request.use((config) => {
-  const token = localStorage.getItem('aureum_token');
-  if (token && config.headers) {
-    config.headers.Authorization = `Bearer ${token}`;
+  const token = localStorage.getItem('aureum_token') || localStorage.getItem('token');
+  if (!token) return config;
+
+  const storedUser = localStorage.getItem('aureum_user') || localStorage.getItem('user');
+  if (!storedUser) {
+    invalidateStoredAuth();
+    return config;
   }
+
+  let userData: unknown;
+  try {
+    userData = JSON.parse(storedUser) as unknown;
+  } catch {
+    invalidateStoredAuth();
+    return config;
+  }
+
+  const validation = validateAuthSession(token, userData);
+  if (!validation.success) {
+    invalidateStoredAuth();
+    return config;
+  }
+
+  config.headers.Authorization = `Bearer ${token}`;
   return config;
 });
+
+api.interceptors.response.use(
+  (response) => response,
+  (error: unknown) => {
+    if (
+      axios.isAxiosError(error) &&
+      error.response?.status === 401 &&
+      error.config?.headers?.Authorization
+    ) {
+      invalidateStoredAuth();
+    }
+    return Promise.reject(error);
+  }
+);
 
 // User API
 export const userApi = {

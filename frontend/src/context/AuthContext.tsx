@@ -1,7 +1,18 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useCallback, useContext, useEffect, useState } from 'react';
 import type { ReactNode } from 'react';
+import { AUTH_INVALID_EVENT, clearStoredAuth } from '../utils/authEvents';
+import {
+  CLOCK_SKEW_MS,
+  validateAuthSession,
+} from '../utils/tokenValidator';
+import type {
+  AuthAuthorization,
+  ValidatedAuthUser,
+} from '../utils/tokenValidator';
 
-export interface Institution {
+export type User = ValidatedAuthUser;
+
+export interface Institution extends Record<string, unknown> {
   id?: string;
   name: string;
   jurisdiction?: string;
@@ -11,24 +22,13 @@ export interface Institution {
   type?: string;
 }
 
-export interface User {
-  id: string;
-  email: string;
-  name: string;
-  role: 'ADMIN' | 'AUTHENTICATOR' | 'VIEWER' | 'COLLECTOR' | string;
-  walletAddress?: string | null;
-  institution?: Institution | null;
-  avatarUrl?: string | null;
-  createdAt?: string;
-  updatedAt?: string;
-}
-
 export interface AuthContextType {
   user: User | null;
   token: string | null;
+  authorization: AuthAuthorization | null;
   isAuthenticated: boolean;
   loading: boolean;
-  login: (token: string, userData: User) => void;
+  login: (token: string, userData: unknown) => void;
   logout: () => void;
   updateUser: (updatedData: Partial<User>) => void;
 }
@@ -38,69 +38,104 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
   const [token, setToken] = useState<string | null>(null);
+  const [authorization, setAuthorization] = useState<AuthAuthorization | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
 
-  // Hydrate user and token from localStorage on initial mount
+  const logout = useCallback(() => {
+    setToken(null);
+    setUser(null);
+    setAuthorization(null);
+    clearStoredAuth();
+  }, []);
+
   useEffect(() => {
     try {
       const storedToken = localStorage.getItem('aureum_token') || localStorage.getItem('token');
       const storedUser = localStorage.getItem('aureum_user') || localStorage.getItem('user');
 
       if (storedToken && storedUser) {
-        const parsedUser = JSON.parse(storedUser);
-        setToken(storedToken);
-        setUser(parsedUser);
+        const result = validateAuthSession(storedToken, JSON.parse(storedUser) as unknown);
+        if (result.success) {
+          setToken(storedToken);
+          setUser(result.session.user);
+          setAuthorization(result.session.authorization);
+        } else {
+          clearStoredAuth();
+        }
+      } else if (storedToken || storedUser) {
+        clearStoredAuth();
       }
-    } catch (err) {
-      console.error('Failed to parse auth data from localStorage:', err);
-      localStorage.removeItem('aureum_token');
-      localStorage.removeItem('token');
-      localStorage.removeItem('aureum_user');
-      localStorage.removeItem('user');
+    } catch (error) {
+      console.error('Failed to restore auth data from localStorage:', error);
+      clearStoredAuth();
     } finally {
       setLoading(false);
     }
   }, []);
 
-  const login = (newToken: string, userData: User) => {
+  useEffect(() => {
+    const handleInvalidAuth = () => logout();
+    window.addEventListener(AUTH_INVALID_EVENT, handleInvalidAuth);
+    return () => window.removeEventListener(AUTH_INVALID_EVENT, handleInvalidAuth);
+  }, [logout]);
+
+  useEffect(() => {
+    if (!authorization) return;
+
+    let timeout: number | undefined;
+    const checkExpiration = () => {
+      const expiresIn = authorization.exp * 1000 - Date.now() - CLOCK_SKEW_MS;
+      if (expiresIn <= 0) {
+        logout();
+        return;
+      }
+      timeout = window.setTimeout(checkExpiration, Math.min(expiresIn, 2_147_483_647));
+    };
+
+    checkExpiration();
+    return () => {
+      if (timeout !== undefined) window.clearTimeout(timeout);
+    };
+  }, [authorization, logout]);
+
+  const login = (newToken: string, userData: unknown) => {
+    const result = validateAuthSession(newToken, userData);
+    if (!result.success) {
+      logout();
+      throw new Error(`The server returned an invalid session: ${result.reason}`);
+    }
+
     setToken(newToken);
-    setUser(userData);
+    setUser(result.session.user);
+    setAuthorization(result.session.authorization);
     try {
       localStorage.setItem('aureum_token', newToken);
       localStorage.setItem('token', newToken);
-      localStorage.setItem('aureum_user', JSON.stringify(userData));
-      localStorage.setItem('user', JSON.stringify(userData));
-    } catch (err) {
-      console.error('Failed to persist auth data in localStorage:', err);
-    }
-  };
-
-  const logout = () => {
-    setToken(null);
-    setUser(null);
-    try {
-      localStorage.removeItem('aureum_token');
-      localStorage.removeItem('token');
-      localStorage.removeItem('aureum_user');
-      localStorage.removeItem('user');
-    } catch (err) {
-      console.error('Failed to clear localStorage on logout:', err);
+      localStorage.setItem('aureum_user', JSON.stringify(result.session.user));
+      localStorage.setItem('user', JSON.stringify(result.session.user));
+    } catch (error) {
+      console.error('Failed to persist auth data in localStorage:', error);
     }
   };
 
   const updateUser = (updatedData: Partial<User>) => {
-    setUser((prev) => {
-      if (!prev) return null;
-      const updated = {
-        ...prev,
+    setUser((previous) => {
+      if (!previous) return null;
+      const updated: User = {
+        ...previous,
         ...updatedData,
-        institution: updatedData.institution !== undefined ? updatedData.institution : prev.institution,
+        id: previous.id,
+        email: previous.email,
+        role: previous.role,
+        roles: previous.roles,
+        permissions: previous.permissions,
+        attributes: previous.attributes,
       };
       try {
         localStorage.setItem('aureum_user', JSON.stringify(updated));
         localStorage.setItem('user', JSON.stringify(updated));
-      } catch (err) {
-        console.error('Failed to update user in localStorage:', err);
+      } catch (error) {
+        console.error('Failed to update user in localStorage:', error);
       }
       return updated;
     });
@@ -111,7 +146,8 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       value={{
         user,
         token,
-        isAuthenticated: !!user,
+        authorization,
+        isAuthenticated: !!token && !!user && !!authorization,
         loading,
         login,
         logout,

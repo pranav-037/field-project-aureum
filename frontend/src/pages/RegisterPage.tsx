@@ -3,25 +3,25 @@ import { Link, useNavigate } from 'react-router-dom';
 import { useGoogleAuth } from '../hooks/useGoogleAuth';
 import { authApi, formatAuthError } from '../services/api';
 import { useAuth } from '../context/AuthContext';
+import {
+  emailSchema,
+  fullNameSchema,
+  institutionNameSchema,
+  registrationSchema,
+  signupPasswordSchema,
+} from '../schemas/authSchemas';
 
-/** Returns the dashboard path for the stored user, or null if not logged in */
-function getLoggedInDashboard(): string | null {
-  try {
-    const token = localStorage.getItem('aureum_token');
-    const userRaw = localStorage.getItem('aureum_user');
-    if (!token || !userRaw) return null;
-    const user = JSON.parse(userRaw) as { role?: string };
-    const role = user?.role || '';
-    if (role === 'ADMIN' || role === 'AUTHENTICATOR') return '/institution/dashboard';
-    return '/collector/dashboard';
-  } catch {
-    return null;
-  }
+function getDashboardPath(role?: string): string {
+  if (role === 'ADMIN' || role === 'AUTHENTICATOR') return '/institution/dashboard';
+  if (role === 'COLLECTOR') return '/collector/dashboard';
+  return '/profile';
 }
+
+type RegistrationField = 'fullName' | 'email' | 'password' | 'confirmPassword' | 'institutionName';
 
 const RegisterPage: React.FC = () => {
   const navigate = useNavigate();
-  const { login } = useAuth();
+  const { login, user, loading: authLoading } = useAuth();
   const [formData, setFormData] = useState({
     fullName: '',
     email: '',
@@ -35,36 +35,31 @@ const RegisterPage: React.FC = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [fieldErrors, setFieldErrors] = useState<Partial<Record<RegistrationField, string>>>({});
   const [loading, setLoading] = useState(false);
   const googleBtnRef = useRef<HTMLDivElement>(null);
 
   const currentRole = formData.userType === 'institution' ? 'AUTHENTICATOR' : 'COLLECTOR';
 
   useEffect(() => {
-    try {
-      const token = localStorage.getItem('aureum_token');
-      const userRaw = localStorage.getItem('aureum_user');
-      if (token && userRaw) {
-        const u = JSON.parse(userRaw);
-        const target = (u.role === 'ADMIN' || u.role === 'AUTHENTICATOR')
-          ? '/institution/dashboard'
-          : '/collector/dashboard';
-        navigate(target, { replace: true });
-      }
-    } catch {}
-  }, [navigate]);
+    if (!authLoading && user) {
+      navigate(getDashboardPath(user.role), { replace: true });
+    }
+  }, [authLoading, navigate, user]);
 
   const { isConfigured, renderButton } = useGoogleAuth({
     role: currentRole,
     onSuccess: (data) => {
-      if (data.token && data.user) {
-        login(data.token, data.user as any);
+      try {
+        if (!data.token || !data.user) {
+          throw new Error('Authentication response did not return a valid session.');
+        }
+        login(data.token, data.user);
+        const role = typeof data.user.role === 'string' ? data.user.role : currentRole;
+        navigate(getDashboardPath(role), { replace: true });
+      } catch (authError) {
+        setError(authError instanceof Error ? authError.message : 'Unable to validate the registration session.');
       }
-      const role = data.user?.role || currentRole;
-      const target = (role === 'ADMIN' || role === 'AUTHENTICATOR')
-        ? '/institution/dashboard'
-        : '/collector/dashboard';
-      navigate(target, { replace: true });
     },
     onError: (msg) => setError(msg),
   });
@@ -90,90 +85,79 @@ const RegisterPage: React.FC = () => {
         [fieldName]: value
       }));
     }
+    if (['fullName', 'email', 'password', 'confirmPassword', 'institutionName'].includes(fieldName)) {
+      setFieldErrors((previous) => ({
+        ...previous,
+        [fieldName as RegistrationField]: undefined,
+      }));
+    }
+    setError(null);
+  };
+
+  const validateField = (field: RegistrationField) => {
+    let messages: string[] = [];
+
+    if (field === 'fullName') {
+      const result = fullNameSchema.safeParse(formData.fullName);
+      if (!result.success) messages = result.error.issues.map((issue) => issue.message);
+    } else if (field === 'email') {
+      const result = emailSchema.safeParse(formData.email);
+      if (!result.success) messages = result.error.issues.map((issue) => issue.message);
+    } else if (field === 'password') {
+      const result = signupPasswordSchema.safeParse(formData.password);
+      if (!result.success) messages = result.error.issues.map((issue) => issue.message);
+    } else if (field === 'confirmPassword') {
+      if (!formData.confirmPassword) messages = ['Confirm your password.'];
+      else if (formData.password !== formData.confirmPassword) messages = ['Passwords do not match.'];
+    } else if (field === 'institutionName' && formData.userType === 'institution') {
+      const result = institutionNameSchema.safeParse(formData.institutionName);
+      if (!result.success) messages = result.error.issues.map((issue) => issue.message);
+    }
+
+    setFieldErrors((previous) => ({
+      ...previous,
+      [field]: messages.length > 0 ? [...new Set(messages)].join(' ') : undefined,
+    }));
   };
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setError(null);
-    setLoading(true);
-
-    // Precise client-side validation
-    const trimmedName = formData.fullName.trim();
-    const trimmedEmail = formData.email.trim();
-
-    if (!trimmedName) {
-      setError('Please enter your full name.');
-      setLoading(false);
-      return;
-    }
-
-    if (trimmedName.length < 2) {
-      setError('Full name must be at least 2 characters long.');
-      setLoading(false);
-      return;
-    }
-    if (trimmedName.length > 100) {
-      setError('Full name must be 100 characters or fewer.');
-      setLoading(false);
-      return;
-    }
-
-    if (!trimmedEmail) {
-      setError('Please enter your email address.');
-      setLoading(false);
-      return;
-    }
-
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (trimmedEmail.length > 254 || !emailRegex.test(trimmedEmail)) {
-      setError('Please enter a valid email address (e.g. name@example.com).');
-      setLoading(false);
-      return;
-    }
-
-    if (!formData.password || !formData.password.trim()) {
-      setError('Please enter a password.');
-      setLoading(false);
-      return;
-    }
-
-    if (formData.password.length < 6) {
-      setError('Password must be at least 6 characters long.');
-      setLoading(false);
-      return;
-    }
-
-    if (formData.password !== formData.confirmPassword) {
-      setError('Passwords do not match. Please verify your confirm password.');
-      setLoading(false);
-      return;
-    }
-
-    if (formData.userType === 'institution') {
-      const institutionName = formData.institutionName.trim();
-      if (institutionName.length < 2 || institutionName.length > 120) {
-        setError('Institution name must be between 2 and 120 characters.');
-        setLoading(false);
-        return;
+    const validation = registrationSchema.safeParse(formData);
+    if (!validation.success) {
+      const nextErrors: Partial<Record<RegistrationField, string>> = {};
+      for (const issue of validation.error.issues) {
+        const field = issue.path[0];
+        if (
+          field === 'fullName' ||
+          field === 'email' ||
+          field === 'password' ||
+          field === 'confirmPassword' ||
+          field === 'institutionName'
+        ) {
+          nextErrors[field] = nextErrors[field]
+            ? `${nextErrors[field]} ${issue.message}`
+            : issue.message;
+        }
       }
+      setFieldErrors(nextErrors);
+      return;
     }
 
+    setFieldErrors({});
+    setLoading(true);
     try {
       const res = await authApi.register({
-        fullName: trimmedName,
-        email: trimmedEmail,
-        password: formData.password,
-        userType: formData.userType,
-        role: formData.userType === 'institution' ? 'AUTHENTICATOR' : 'COLLECTOR',
+        fullName: validation.data.fullName,
+        email: validation.data.email,
+        password: validation.data.password,
+        userType: validation.data.userType,
+        role: validation.data.userType === 'institution' ? 'AUTHENTICATOR' : 'COLLECTOR',
       });
 
       if (res.data?.token) {
         login(res.data.token, res.data.user);
-        const role = res.data.user?.role || (formData.userType === 'institution' ? 'AUTHENTICATOR' : 'COLLECTOR');
-        const target = (role === 'ADMIN' || role === 'AUTHENTICATOR')
-          ? '/institution/dashboard'
-          : '/collector/dashboard';
-        navigate(target, { replace: true });
+        navigate(getDashboardPath(res.data.user?.role), { replace: true });
       } else {
         navigate('/login');
       }
@@ -190,7 +174,7 @@ const RegisterPage: React.FC = () => {
       {/* Top Minimal Navigation */}
       <header className="w-full border-b border-slate-800/80 bg-[#0B0F17]/80 backdrop-blur-md">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
-          <Link to={getLoggedInDashboard() ?? '/'} className="flex items-center gap-2.5 group">
+          <Link to={user ? getDashboardPath(user.role) : '/'} className="flex items-center gap-2.5 group">
             <div className="w-8 h-8 rounded-lg bg-gradient-to-tr from-amber-500 via-indigo-600 to-violet-500 p-[1.5px] shadow-md shadow-indigo-500/20 group-hover:shadow-indigo-500/40 transition">
               <div className="w-full h-full bg-[#0B0F17] rounded-[6px] flex items-center justify-center">
                 <svg className="w-4 h-4 text-amber-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -291,7 +275,7 @@ const RegisterPage: React.FC = () => {
               )}
 
               {/* Registration Form */}
-              <form onSubmit={handleSubmit} autoComplete="off" className="space-y-4 text-left">
+              <form onSubmit={handleSubmit} noValidate autoComplete="off" className="space-y-4 text-left">
                 {/* Full Name Field */}
                 <div>
                   <label htmlFor="fullName" className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1.5">
@@ -308,11 +292,19 @@ const RegisterPage: React.FC = () => {
                       autoComplete="name"
                       value={formData.fullName}
                       onChange={handleChange}
+                      onBlur={() => validateField('fullName')}
+                      aria-invalid={Boolean(fieldErrors.fullName)}
+                      aria-describedby={fieldErrors.fullName ? 'register-name-error' : undefined}
                       disabled={loading}
                       placeholder="Your full legal name"
                       className="w-full px-3.5 py-2.5 rounded-xl bg-slate-950/70 border border-slate-700/80 text-white placeholder-slate-500 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition duration-150"
                     />
                   </div>
+                  {fieldErrors.fullName && (
+                    <p id="register-name-error" className="mt-1 text-xs text-rose-300" role="alert">
+                      {fieldErrors.fullName}
+                    </p>
+                  )}
                 </div>
 
                 {/* Email Field */}
@@ -330,11 +322,19 @@ const RegisterPage: React.FC = () => {
                       autoComplete="off"
                       value={formData.email}
                       onChange={handleChange}
+                      onBlur={() => validateField('email')}
+                      aria-invalid={Boolean(fieldErrors.email)}
+                      aria-describedby={fieldErrors.email ? 'register-email-error' : undefined}
                       disabled={loading}
                       placeholder="yourname@domain.com"
                       className="w-full px-3.5 py-2.5 rounded-xl bg-slate-950/70 border border-slate-700/80 text-white placeholder-slate-500 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition duration-150"
                     />
                   </div>
+                  {fieldErrors.email && (
+                    <p id="register-email-error" className="mt-1 text-xs text-rose-300" role="alert">
+                      {fieldErrors.email}
+                    </p>
+                  )}
                 </div>
 
                 {/* Password Field with Show/Hide Toggle */}
@@ -350,10 +350,13 @@ const RegisterPage: React.FC = () => {
                       name="password"
                       type={showPassword ? 'text' : 'password'}
                       required
-                      minLength={6}
+                      minLength={8}
                       autoComplete="new-password"
                       value={formData.password}
                       onChange={handleChange}
+                      onBlur={() => validateField('password')}
+                      aria-invalid={Boolean(fieldErrors.password)}
+                      aria-describedby={fieldErrors.password ? 'register-password-error' : 'register-password-hint'}
                       disabled={loading}
                       placeholder="••••••••••••"
                       className="w-full px-3.5 py-2.5 pr-10 rounded-xl bg-slate-950/70 border border-slate-700/80 text-white placeholder-slate-500 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition duration-150"
@@ -376,6 +379,14 @@ const RegisterPage: React.FC = () => {
                       )}
                     </button>
                   </div>
+                  <p id="register-password-hint" className="mt-1 text-[11px] text-slate-400">
+                    Use at least 8 characters with uppercase, lowercase, number, and special character.
+                  </p>
+                  {fieldErrors.password && (
+                    <p id="register-password-error" className="mt-1 text-xs text-rose-300" role="alert">
+                      {fieldErrors.password}
+                    </p>
+                  )}
                 </div>
 
                 {/* Confirm Password Field with Show/Hide Toggle */}
@@ -391,10 +402,12 @@ const RegisterPage: React.FC = () => {
                       name="confirmPassword"
                       type={showConfirmPassword ? 'text' : 'password'}
                       required
-                      minLength={6}
                       autoComplete="new-password"
                       value={formData.confirmPassword}
                       onChange={handleChange}
+                      onBlur={() => validateField('confirmPassword')}
+                      aria-invalid={Boolean(fieldErrors.confirmPassword)}
+                      aria-describedby={fieldErrors.confirmPassword ? 'register-confirm-error' : undefined}
                       disabled={loading}
                       placeholder="••••••••••••"
                       className="w-full px-3.5 py-2.5 pr-10 rounded-xl bg-slate-950/70 border border-slate-700/80 text-white placeholder-slate-500 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition duration-150"
@@ -417,6 +430,11 @@ const RegisterPage: React.FC = () => {
                       )}
                     </button>
                   </div>
+                  {fieldErrors.confirmPassword && (
+                    <p id="register-confirm-error" className="mt-1 text-xs text-rose-300" role="alert">
+                      {fieldErrors.confirmPassword}
+                    </p>
+                  )}
                 </div>
 
                 {/* Institution Details (Conditional) */}
@@ -437,11 +455,19 @@ const RegisterPage: React.FC = () => {
                           maxLength={120}
                           value={formData.institutionName}
                           onChange={handleChange}
+                          onBlur={() => validateField('institutionName')}
+                          aria-invalid={Boolean(fieldErrors.institutionName)}
+                          aria-describedby={fieldErrors.institutionName ? 'register-institution-error' : undefined}
                           disabled={loading}
                           placeholder="e.g., Sotheby's, Christie's, or your gallery name"
                           className="w-full px-3.5 py-2.5 rounded-xl bg-slate-950/70 border border-slate-700/80 text-white placeholder-slate-500 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition duration-150"
                         />
                       </div>
+                      {fieldErrors.institutionName && (
+                        <p id="register-institution-error" className="mt-1 text-xs text-rose-300" role="alert">
+                          {fieldErrors.institutionName}
+                        </p>
+                      )}
                     </div>
 
                     {/* Jurisdiction & Registration Number Group */}

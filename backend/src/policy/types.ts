@@ -1,5 +1,5 @@
 // Policy core types for RBAC + ABAC
-export type Role = 'COLLECTOR' | 'AUTHENTICATOR' | 'ADMIN';
+export type Role = 'COLLECTOR' | 'AUTHENTICATOR' | 'ADMIN' | 'VIEWER';
 
 export interface DecodedUser {
   id: string;
