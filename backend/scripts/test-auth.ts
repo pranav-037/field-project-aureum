@@ -42,12 +42,15 @@ async function runTests() {
     assert(err.message.includes('valid email address'), 'Reject invalid email format');
   }
 
-  // Test 3: Short password
+  // Test 3: Password does not meet the signup policy
   try {
     await AuthService.register('john@example.com', '123', 'John Doe');
-    assert(false, 'Reject password shorter than 6 characters');
+    assert(false, 'Reject password that does not meet signup policy');
   } catch (err: any) {
-    assert(err.message.includes('at least 6 characters'), 'Reject password shorter than 6 characters');
+    assert(
+      err.message.includes('at least 8 characters') && err.message.includes('special character'),
+      'Reject password that does not meet signup policy'
+    );
   }
 
   // Test 4: Empty full name

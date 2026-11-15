@@ -20,6 +20,9 @@ const LoginPage: React.FC = () => {
   const [isInstitution, setIsInstitution] = useState(true);
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [needsVerification, setNeedsVerification] = useState(false);
+  const [verificationNotice, setVerificationNotice] = useState<string | null>(null);
+  const [verificationResending, setVerificationResending] = useState(false);
   const [loading, setLoading] = useState(false);
   const googleBtnRef = useRef<HTMLDivElement>(null);
 
@@ -58,6 +61,8 @@ const LoginPage: React.FC = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
+    setNeedsVerification(false);
+    setVerificationNotice(null);
     const validation = loginSchema.safeParse({ email, password });
     if (!validation.success) {
       const nextErrors: Partial<Record<'email' | 'password', string>> = {};
@@ -86,8 +91,31 @@ const LoginPage: React.FC = () => {
     } catch (err: any) {
       const exactMsg = formatAuthError(err, 'Unable to sign in. Please verify your credentials.');
       setError(exactMsg);
+      setNeedsVerification(exactMsg.toLowerCase().includes('has not been confirmed'));
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleResendVerification = async () => {
+    const emailResult = emailSchema.safeParse(email);
+    if (!emailResult.success) {
+      setFieldErrors((previous) => ({
+        ...previous,
+        email: emailResult.error.issues[0]?.message,
+      }));
+      return;
+    }
+
+    setVerificationResending(true);
+    setVerificationNotice(null);
+    try {
+      await authApi.resendVerification({ email: emailResult.data });
+      setVerificationNotice('If this address has an unverified account, a new link will be sent.');
+    } catch (resendError: unknown) {
+      setVerificationNotice(formatAuthError(resendError, 'Could not request another verification email.'));
+    } finally {
+      setVerificationResending(false);
     }
   };
 
@@ -181,6 +209,20 @@ const LoginPage: React.FC = () => {
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                   </svg>
                   <span>{error}</span>
+                </div>
+              )}
+
+              {needsVerification && (
+                <div className="mb-5 rounded-xl border border-amber-500/30 bg-amber-500/10 p-3 text-xs text-amber-200">
+                  <button
+                    type="button"
+                    onClick={handleResendVerification}
+                    disabled={verificationResending}
+                    className="font-semibold underline underline-offset-4 disabled:opacity-50"
+                  >
+                    {verificationResending ? 'Sending...' : 'Resend verification email'}
+                  </button>
+                  {verificationNotice && <p className="mt-2" role="status">{verificationNotice}</p>}
                 </div>
               )}
 

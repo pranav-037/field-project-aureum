@@ -52,7 +52,20 @@ Edit `field-project-aureum/backend/.env` with your Supabase credentials:
 SUPABASE_URL=https://<your-project-id>.supabase.co
 SUPABASE_ANON_KEY=<your-anon-key>
 SUPABASE_SERVICE_ROLE_KEY=<your-service-role-key>
+FRONTEND_URL=http://localhost:5173
 ```
+
+### Authentication email setup
+
+The backend sends sign-up confirmation and password-reset emails through Supabase Auth. In the Supabase Dashboard:
+
+1. Enable **Confirm email** under **Authentication -> Providers -> Email**. The app does not auto-confirm new accounts.
+2. Set the **Site URL** to your frontend origin and add these URLs to the redirect allow list:
+   - `http://localhost:5173/auth/callback?flow=signup`
+   - `http://localhost:5173/reset-password`
+   Replace the origin with the deployed frontend URL in production.
+3. Configure a production SMTP provider and review the **Confirm signup** and **Reset password** email templates.
+4. Set `FRONTEND_URL` in `backend/.env` to the exact frontend origin. The service role key must remain backend-only; it is used to apply a password reset after Supabase validates the recovery token.
 
 ---
 

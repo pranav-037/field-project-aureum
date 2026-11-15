@@ -35,8 +35,11 @@ const RegisterPage: React.FC = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [registrationNotice, setRegistrationNotice] = useState<string | null>(null);
+  const [resendNotice, setResendNotice] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<Partial<Record<RegistrationField, string>>>({});
   const [loading, setLoading] = useState(false);
+  const [resending, setResending] = useState(false);
   const googleBtnRef = useRef<HTMLDivElement>(null);
 
   const currentRole = formData.userType === 'institution' ? 'AUTHENTICATOR' : 'COLLECTOR';
@@ -123,6 +126,7 @@ const RegisterPage: React.FC = () => {
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setError(null);
+    setRegistrationNotice(null);
     const validation = registrationSchema.safeParse(formData);
     if (!validation.success) {
       const nextErrors: Partial<Record<RegistrationField, string>> = {};
@@ -155,17 +159,34 @@ const RegisterPage: React.FC = () => {
         role: validation.data.userType === 'institution' ? 'AUTHENTICATOR' : 'COLLECTOR',
       });
 
-      if (res.data?.token) {
+      if (res.data?.emailVerificationRequired) {
+        setRegistrationNotice(
+          `We sent a verification link to ${validation.data.email}. Verify your email before signing in.`
+        );
+      } else if (res.data?.token) {
         login(res.data.token, res.data.user);
         navigate(getDashboardPath(res.data.user?.role), { replace: true });
       } else {
-        navigate('/login');
+        setRegistrationNotice('Your account was created. You can now sign in.');
       }
     } catch (err: any) {
       const exactMsg = formatAuthError(err, 'Registration could not be completed.');
       setError(exactMsg);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleResendVerification = async () => {
+    setResending(true);
+    setResendNotice(null);
+    try {
+      await authApi.resendVerification({ email: formData.email.trim().toLowerCase() });
+      setResendNotice('If this address has an unverified account, a new link will be sent.');
+    } catch (resendError: unknown) {
+      setResendNotice(formatAuthError(resendError, 'Could not request another verification email.'));
+    } finally {
+      setResending(false);
     }
   };
 
@@ -262,8 +283,28 @@ const RegisterPage: React.FC = () => {
                 </div>
               )}
 
+              {registrationNotice && (
+                <div className="mb-6 rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-4 text-sm text-emerald-200" role="status">
+                  <p>{registrationNotice}</p>
+                  {resendNotice && <p className="mt-2 text-xs">{resendNotice}</p>}
+                  <div className="mt-4 flex flex-wrap items-center gap-4">
+                    <Link to="/login" className="font-semibold text-indigo-300 hover:text-indigo-200">
+                      Continue to sign in
+                    </Link>
+                    <button
+                      type="button"
+                      onClick={handleResendVerification}
+                      disabled={resending}
+                      className="text-xs font-medium text-slate-300 underline underline-offset-4 disabled:opacity-50"
+                    >
+                      {resending ? 'Sending...' : 'Resend verification email'}
+                    </button>
+                  </div>
+                </div>
+              )}
+
               {/* Google Sign-Up */}
-              {isConfigured && (
+              {!registrationNotice && isConfigured && (
                 <div className="mb-4">
                   <div ref={googleBtnRef} className="w-full flex justify-center" />
                   <div className="flex items-center gap-3 mt-5 mb-5">
@@ -275,7 +316,8 @@ const RegisterPage: React.FC = () => {
               )}
 
               {/* Registration Form */}
-              <form onSubmit={handleSubmit} noValidate autoComplete="off" className="space-y-4 text-left">
+              {!registrationNotice && (
+                <form onSubmit={handleSubmit} noValidate autoComplete="off" className="space-y-4 text-left">
                 {/* Full Name Field */}
                 <div>
                   <label htmlFor="fullName" className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1.5">
@@ -543,7 +585,8 @@ const RegisterPage: React.FC = () => {
                     </Link>
                   </p>
                 </div>
-              </form>
+                </form>
+              )}
             </div>
           </div>
       </main>

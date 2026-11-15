@@ -81,6 +81,12 @@ export const authApi = {
     userType?: string;
     walletAddress?: string;
   }) => api.post('/auth/register', data),
+  resendVerification: (data: { email: string }) =>
+    api.post('/auth/resend-verification', data),
+  requestPasswordReset: (data: { email: string }) =>
+    api.post('/auth/forgot-password', data),
+  completePasswordReset: (data: { accessToken: string; password: string }) =>
+    api.post('/auth/reset-password', data),
   getMe: () => api.get('/auth/me'),
   googleLogin: (data: { idToken: string; role?: string }) => api.post('/auth/google', data),
 };

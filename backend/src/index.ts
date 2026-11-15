@@ -96,17 +96,45 @@ app.post('/api/auth/google', async (req: Request, res: Response) => {
   }
 });
 
-// Password reset request
-app.post(['/api/reset-password', '/api/auth/reset-password'], async (req: Request, res: Response) => {
+// Resend the Supabase sign-up confirmation email
+app.post('/api/auth/resend-verification', async (req: Request, res: Response) => {
   try {
-    const { email, redirectTo } = req.body;
+    const { email } = req.body;
     if (typeof email !== 'string' || !email.trim()) {
       return res.status(400).json({ error: 'Email address is required.' });
     }
-    const result = await AuthService.resetPassword(email, redirectTo);
+    const result = await AuthService.resendVerificationEmail(email);
     res.json(result);
   } catch (error) {
-    res.status(400).json({ error: (error as Error).message || 'Password reset request failed' });
+    res.status(400).json({ error: (error as Error).message || 'Verification email could not be sent.' });
+  }
+});
+
+// Request a password reset email
+app.post(['/api/reset-password', '/api/auth/forgot-password'], async (req: Request, res: Response) => {
+  try {
+    const { email } = req.body;
+    if (typeof email !== 'string' || !email.trim()) {
+      return res.status(400).json({ error: 'Email address is required.' });
+    }
+    const result = await AuthService.requestPasswordReset(email);
+    res.json(result);
+  } catch (error) {
+    res.status(400).json({ error: (error as Error).message || 'Password reset request failed.' });
+  }
+});
+
+// Complete a password reset using the short-lived token returned by Supabase
+app.post('/api/auth/reset-password', async (req: Request, res: Response) => {
+  try {
+    const { accessToken, password } = req.body;
+    if (typeof accessToken !== 'string' || typeof password !== 'string') {
+      return res.status(400).json({ error: 'A reset token and new password are required.' });
+    }
+    const result = await AuthService.completePasswordReset(accessToken, password);
+    res.json(result);
+  } catch (error) {
+    res.status(400).json({ error: (error as Error).message || 'Password reset failed.' });
   }
 });
 

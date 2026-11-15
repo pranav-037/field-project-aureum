@@ -21,6 +21,37 @@ export interface LoginResponse {
   user: AuthenticatedUser;
 }
 
+export interface RegistrationResponse extends LoginResponse {
+  emailVerificationRequired: boolean;
+}
+
+const STRONG_PASSWORD_MESSAGE =
+  'Password must be at least 8 characters, include an uppercase letter, a lowercase letter, a number, and a special character, and have no leading or trailing whitespace.';
+
+function validateStrongPassword(password: unknown): asserts password is string {
+  if (
+    typeof password !== 'string' ||
+    !password.trim() ||
+    password !== password.trim() ||
+    password.length < 8 ||
+    !/[A-Z]/.test(password) ||
+    !/[a-z]/.test(password) ||
+    !/[0-9]/.test(password) ||
+    !/[^A-Za-z0-9\s]/.test(password)
+  ) {
+    throw new Error(STRONG_PASSWORD_MESSAGE);
+  }
+}
+
+function getFrontendAuthRedirect(path: string): string {
+  const configuredUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+  const frontendUrl = new URL(configuredUrl);
+  if (frontendUrl.protocol !== 'http:' && frontendUrl.protocol !== 'https:') {
+    throw new Error('FRONTEND_URL must use HTTP or HTTPS.');
+  }
+  return new URL(path, frontendUrl).toString();
+}
+
 /** Subset of the Google tokeninfo payload */
 interface GoogleTokenPayload {
   sub: string;
@@ -65,7 +96,7 @@ export class AuthService {
     name: string,
     role: string = 'COLLECTOR',
     walletAddress?: string
-  ): Promise<LoginResponse> {
+  ): Promise<RegistrationResponse> {
     if (typeof email !== 'string' || !email.trim()) {
       throw new Error('Email address is required.');
     }
@@ -83,20 +114,7 @@ export class AuthService {
       throw new Error('Full name must be 100 characters or fewer.');
     }
 
-    if (
-      typeof password !== 'string' ||
-      !password.trim() ||
-      password !== password.trim() ||
-      password.length < 8 ||
-      !/[A-Z]/.test(password) ||
-      !/[a-z]/.test(password) ||
-      !/[0-9]/.test(password) ||
-      !/[^A-Za-z0-9\s]/.test(password)
-    ) {
-      throw new Error(
-        'Password must be at least 8 characters, include an uppercase letter, a lowercase letter, a number, and a special character, and have no leading or trailing whitespace.'
-      );
-    }
+    validateStrongPassword(password);
 
     const resolvedRole = role || 'COLLECTOR';
     const trimmedName = name.trim();
@@ -110,6 +128,7 @@ export class AuthService {
       email: normalizedEmail,
       password,
       options: {
+        emailRedirectTo: getFrontendAuthRedirect('/auth/callback?flow=signup'),
         data: {
           name: trimmedName,
           role: resolvedRole,
@@ -131,26 +150,8 @@ export class AuthService {
     }
 
     authUser = signUpData.user;
-    sessionToken = signUpData.session?.access_token || '';
-
-    // If email confirmation is required and no session was returned,
-    // attempt auto-confirming if service role is available, then sign in
-    if (!sessionToken && process.env.SUPABASE_SERVICE_ROLE_KEY) {
-      try {
-        await supabase.auth.admin.updateUserById(authUser.id, {
-          email_confirm: true,
-        });
-        const { data: signInData } = await supabase.auth.signInWithPassword({
-          email: normalizedEmail,
-          password,
-        });
-        if (signInData?.session?.access_token) {
-          sessionToken = signInData.session.access_token;
-        }
-      } catch (autoConfirmErr) {
-        console.warn('Could not auto-confirm email via admin API:', autoConfirmErr);
-      }
-    }
+    const emailVerified = Boolean(authUser.email_confirmed_at || authUser.confirmed_at);
+    sessionToken = emailVerified ? signUpData.session?.access_token || '' : '';
 
     // 2. Synchronize user profile in "User" table in Supabase
     const userProfile: AuthenticatedUser = {
@@ -212,6 +213,7 @@ export class AuthService {
     return {
       token: sessionToken,
       user: userProfile,
+      emailVerificationRequired: !emailVerified,
     };
   }
 
@@ -245,18 +247,6 @@ export class AuthService {
         throw new Error('Incorrect password or email. Please double-check your credentials and try again.');
       }
       if (msg.includes('email not confirmed')) {
-        // If unconfirmed and we have admin credentials, auto-confirm for dev ease
-        if (process.env.SUPABASE_SERVICE_ROLE_KEY) {
-          const { data: usersList } = await supabase.auth.admin.listUsers();
-          const target = usersList?.users.find((u) => u.email?.toLowerCase() === normalizedEmail);
-          if (target) {
-            await supabase.auth.admin.updateUserById(target.id, { email_confirm: true });
-            const retry = await supabase.auth.signInWithPassword({ email: normalizedEmail, password });
-            if (retry.data?.session?.access_token) {
-              return this.buildLoginSuccess(retry.data.user, retry.data.session.access_token);
-            }
-          }
-        }
         throw new Error('Email address has not been confirmed yet. Please check your inbox or confirmation email.');
       }
       throw new Error(error.message);
@@ -542,10 +532,7 @@ export class AuthService {
     return null;
   }
 
-  /**
-   * Request password reset email via Supabase
-   */
-  static async resetPassword(email: string, redirectTo?: string): Promise<{ success: boolean; message: string }> {
+  static async resendVerificationEmail(email: string): Promise<{ success: boolean; message: string }> {
     if (typeof email !== 'string' || !email.trim()) {
       throw new Error('Email address is required.');
     }
@@ -554,17 +541,74 @@ export class AuthService {
     if (normalizedEmail.length > 254 || !emailRegex.test(normalizedEmail)) {
       throw new Error('Please provide a valid email address.');
     }
-    const { error } = await supabase.auth.resetPasswordForEmail(normalizedEmail, {
-      redirectTo: redirectTo || undefined,
-    });
 
+    const { error } = await supabase.auth.resend({
+      type: 'signup',
+      email: normalizedEmail,
+      options: {
+        emailRedirectTo: getFrontendAuthRedirect('/auth/callback?flow=signup'),
+      },
+    });
+    if (error) {
+      throw new Error(`Verification email could not be sent: ${error.message}`);
+    }
+
+    return {
+      success: true,
+      message: 'If this address has an unverified account, a verification link will be sent.',
+    };
+  }
+
+  static async requestPasswordReset(email: string): Promise<{ success: boolean; message: string }> {
+    if (typeof email !== 'string' || !email.trim()) {
+      throw new Error('Email address is required.');
+    }
+    const normalizedEmail = email.trim().toLowerCase();
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (normalizedEmail.length > 254 || !emailRegex.test(normalizedEmail)) {
+      throw new Error('Please provide a valid email address.');
+    }
+
+    const { error } = await supabase.auth.resetPasswordForEmail(normalizedEmail, {
+      redirectTo: getFrontendAuthRedirect('/reset-password'),
+    });
     if (error) {
       throw new Error(`Password reset request failed: ${error.message}`);
     }
 
     return {
       success: true,
-      message: `Password reset link has been sent to "${normalizedEmail}".`,
+      message: 'If an account exists for this address, a password reset link will be sent.',
+    };
+  }
+
+  static async completePasswordReset(
+    accessToken: string,
+    password: string
+  ): Promise<{ success: boolean; message: string }> {
+    if (typeof accessToken !== 'string' || !accessToken.trim()) {
+      throw new Error('The password reset link is invalid or has expired.');
+    }
+    validateStrongPassword(password);
+    if (!process.env.SUPABASE_SERVICE_ROLE_KEY) {
+      throw new Error('Password reset is not configured on the server.');
+    }
+
+    const { data, error: tokenError } = await supabase.auth.getUser(accessToken);
+    if (tokenError || !data.user) {
+      throw new Error('The password reset link is invalid or has expired. Request a new one.');
+    }
+
+    const { error: updateError } = await supabase.auth.admin.updateUserById(data.user.id, {
+      password,
+    });
+    if (updateError) {
+      throw new Error(`Password could not be updated: ${updateError.message}`);
+    }
+
+    return {
+      success: true,
+      message: 'Password updated. You can now sign in.',
     };
   }
 }
