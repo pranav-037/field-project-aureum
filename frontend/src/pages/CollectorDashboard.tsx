@@ -45,6 +45,7 @@ const CollectorDashboard: React.FC = () => {
   const [transferError, setTransferError] = useState<string | null>(null);
   const [isCreatingTransfer, setIsCreatingTransfer] = useState(false);
   const [showIncomingModal, setShowIncomingModal] = useState(false);
+  const [selectedIncomingTransfer, setSelectedIncomingTransfer] = useState<TransferItem | null>(null);
   const [incomingAccepted, setIncomingAccepted] = useState(false);
   const [copiedTx, setCopiedTx] = useState<string | null>(null);
   const { isConnected, account } = useWallet();
@@ -85,32 +86,32 @@ const CollectorDashboard: React.FC = () => {
     {
       id: 'tx-101',
       type: 'INCOMING',
-      title: 'Girl with a Pearl Earring',
-      artist: 'Johannes Vermeer',
-      counterparty: 'Mauritshuis Curatorial Guild',
+      title: 'The Great Wave off Kanagawa',
+      artist: 'Katsushika Hokusai',
+      counterparty: 'Tokyo Curatorial Guild Escrow',
       date: 'Nov 14, 2026',
       status: 'PENDING_ACCEPTANCE',
       txHash: '0x8f2d4a1b9c3e7f6a5b4c3d2e1f0a9b8c7d6e5f4a',
     },
     {
       id: 'tx-102',
+      type: 'INCOMING',
+      title: 'The Birth of Venus',
+      artist: 'Sandro Botticelli',
+      counterparty: 'Uffizi Gallery Guild Escrow',
+      date: 'Nov 12, 2026',
+      status: 'PENDING_ACCEPTANCE',
+      txHash: '0x7b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5b6c',
+    },
+    {
+      id: 'tx-103',
       type: 'OUTGOING',
       title: 'The Starry Night',
       artist: 'Vincent van Gogh',
       counterparty: 'MoMA Custodial Vault Escrow',
       date: 'Nov 11, 2026',
-      status: 'COMPLETED',
+      status: 'PENDING_ACCEPTANCE',
       txHash: '0x3a4b5c6d7e8f9a0b1c2d3e4f5a6b7c8d9e0f1a2b',
-    },
-    {
-      id: 'tx-103',
-      type: 'INCOMING',
-      title: 'The Kiss',
-      artist: 'Gustav Klimt',
-      counterparty: 'Belvedere Vienna Guild',
-      date: 'Nov 8, 2026',
-      status: 'COMPLETED',
-      txHash: '0x7b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5b6c',
     },
   ];
 
@@ -295,6 +296,7 @@ const CollectorDashboard: React.FC = () => {
 
   const handleAcceptTransfer = async () => {
     setSigningError(null);
+    const targetTransfer = selectedIncomingTransfer || incomingTransfer;
     let currentUserId = currentUser?.id;
     if (!currentUserId) {
       try {
@@ -307,13 +309,13 @@ const CollectorDashboard: React.FC = () => {
       try {
         setIsSigningTx(true);
         // Attempt on-chain signature via MetaMask
-        const transferIndex = incomingTransfer?.blockchainTransferId ? Number(incomingTransfer.blockchainTransferId) : 1;
+        const transferIndex = targetTransfer?.blockchainTransferId ? Number(targetTransfer.blockchainTransferId) : 1;
         const receipt = await acceptTransferOnChain(isNaN(transferIndex) ? 1 : transferIndex);
         setConfirmedTx(receipt.txHash);
         
-        if (incomingTransfer?.id) {
+        if (targetTransfer?.id) {
           try {
-            await transferApi.accept(incomingTransfer.id);
+            await transferApi.accept(targetTransfer.id);
           } catch (apiErr) {
             console.warn('Backend transfer accept error:', apiErr);
           }
@@ -331,9 +333,9 @@ const CollectorDashboard: React.FC = () => {
         setIsSigningTx(false);
       }
     } else {
-      if (incomingTransfer?.id) {
+      if (targetTransfer?.id) {
         try {
-          await transferApi.accept(incomingTransfer.id);
+          await transferApi.accept(targetTransfer.id);
         } catch (apiErr) {
           console.warn('Backend transfer accept error:', apiErr);
         }
@@ -548,7 +550,10 @@ const CollectorDashboard: React.FC = () => {
             </div>
             <div className="flex items-center gap-3 flex-shrink-0">
               <button
-                onClick={() => setShowIncomingModal(true)}
+                onClick={() => {
+                  setSelectedIncomingTransfer(incomingTransfer);
+                  setShowIncomingModal(true);
+                }}
                 className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold shadow-md transition cursor-pointer flex items-center gap-1.5"
               >
                 <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -854,7 +859,10 @@ const CollectorDashboard: React.FC = () => {
 
                     <div className="flex items-center gap-2 flex-shrink-0">
                       <button
-                        onClick={() => setShowIncomingModal(true)}
+                        onClick={() => {
+                          setSelectedIncomingTransfer(incomingTransfer);
+                          setShowIncomingModal(true);
+                        }}
                         className="px-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold shadow-lg shadow-indigo-600/30 transition cursor-pointer flex items-center gap-1.5"
                       >
                         <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -941,7 +949,10 @@ const CollectorDashboard: React.FC = () => {
                             <td className="px-5 py-4 text-right">
                               {tx.status === 'PENDING_ACCEPTANCE' ? (
                                 <button
-                                  onClick={() => setShowIncomingModal(true)}
+                                  onClick={() => {
+                                    setSelectedIncomingTransfer(tx);
+                                    setShowIncomingModal(true);
+                                  }}
                                   className="px-3.5 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold shadow-sm transition cursor-pointer"
                                 >
                                   Sign & Accept
@@ -1282,15 +1293,15 @@ const CollectorDashboard: React.FC = () => {
             <div className="p-4 rounded-xl bg-slate-950/80 border border-slate-800 space-y-3 text-xs">
               <div className="flex justify-between">
                 <span className="text-slate-400">Artwork:</span>
-                <span className="text-white font-semibold">{incomingTransfer?.title || 'Girl with a Pearl Earring'}</span>
+                <span className="text-white font-semibold">{(selectedIncomingTransfer || incomingTransfer)?.title || 'The Great Wave off Kanagawa'}</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-slate-400">Artist:</span>
-                <span className="text-slate-200">{incomingTransfer?.artist || 'Johannes Vermeer'}</span>
+                <span className="text-slate-200">{(selectedIncomingTransfer || incomingTransfer)?.artist || 'Katsushika Hokusai'}</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-slate-400">From Custodian:</span>
-                <span className="text-slate-200">{incomingTransfer?.counterparty || 'Mauritshuis Curatorial Guild'}</span>
+                <span className="text-slate-200">{(selectedIncomingTransfer || incomingTransfer)?.counterparty || 'Tokyo Curatorial Guild Escrow'}</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-slate-400">Escrow Contract:</span>

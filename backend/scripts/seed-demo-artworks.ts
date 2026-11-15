@@ -1,6 +1,7 @@
 import { db, supabase } from "../src/db/supabase";
 
 const DEMO_ARTWORKS = [
+  // 3 Masterpieces in Pranav Thakur's Collection:
   {
     title: "The Starry Night",
     artist: "Vincent van Gogh",
@@ -37,6 +38,31 @@ const DEMO_ARTWORKS = [
     bindingReference: "NFC-BOUND-KLIMT-1908",
     status: "VERIFIED",
   },
+  // 2 Masterpieces queued for Incoming Transfers to Pranav:
+  {
+    title: "The Great Wave off Kanagawa",
+    artist: "Katsushika Hokusai",
+    year: "1831",
+    medium: "Woodblock print; ink and color on paper",
+    dimensions: "25.7 cm × 37.8 cm",
+    metadataCid: "QmHokusaiGreatWave1831ProvenanceHash",
+    imageCids: JSON.stringify(["/artworks/great-wave.jpg"]),
+    documentCids: JSON.stringify(["QmTokyoNationalMuseumAttestation"]),
+    bindingReference: "NFC-BOUND-HOKUSAI-1831",
+    status: "VERIFIED",
+  },
+  {
+    title: "The Birth of Venus",
+    artist: "Sandro Botticelli",
+    year: "1485",
+    medium: "Tempera on canvas",
+    dimensions: "172.5 cm × 278.9 cm",
+    metadataCid: "QmBotticelliBirthVenus1485ProvenanceHash",
+    imageCids: JSON.stringify(["/artworks/birth-of-venus.jpg"]),
+    documentCids: JSON.stringify(["QmUffiziGalleryFlorenceAttestation"]),
+    bindingReference: "NFC-BOUND-BOTTICELLI-1485",
+    status: "VERIFIED",
+  },
 ];
 
 async function main() {
@@ -51,11 +77,11 @@ async function main() {
   const counterparty = users.find((u: any) => u.id !== ownerId) || pranav;
   const counterpartyId = counterparty ? counterparty.id : ownerId;
 
-  console.log(`2️⃣ Seeding 3 curated masterworks with strictly consistent ownership...`);
+  console.log(`2️⃣ Seeding artworks...`);
   console.log(`   Collector: ${pranav?.name} (${ownerId})`);
   console.log(`   Counterparty: ${counterparty?.name} (${counterpartyId})`);
 
-  // Art 0: Starry Night -> Owned by Pranav, but in outbound escrow
+  // Art 0: Starry Night -> Owned by Pranav (in outbound escrow)
   const art0 = await db.artworks.create({
     ...DEMO_ARTWORKS[0],
     ownerId: ownerId,
@@ -63,15 +89,15 @@ async function main() {
     updatedAt: new Date().toISOString(),
   } as any);
 
-  // Art 1: Girl with a Pearl Earring -> Owned by Counterparty (Mauritshuis), pending transfer to Pranav
+  // Art 1: Girl with a Pearl Earring -> Owned by Pranav
   const art1 = await db.artworks.create({
     ...DEMO_ARTWORKS[1],
-    ownerId: counterpartyId,
+    ownerId: ownerId,
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
   } as any);
 
-  // Art 2: The Kiss -> Owned by Pranav, acquired via completed historical transfer
+  // Art 2: The Kiss -> Owned by Pranav
   const art2 = await db.artworks.create({
     ...DEMO_ARTWORKS[2],
     ownerId: ownerId,
@@ -79,13 +105,27 @@ async function main() {
     updatedAt: new Date().toISOString(),
   } as any);
 
-  const createdArtworks = [art0, art1, art2];
+  // Art 3: The Great Wave -> Owned by Counterparty (Pending Incoming to Pranav)
+  const art3 = await db.artworks.create({
+    ...DEMO_ARTWORKS[3],
+    ownerId: counterpartyId,
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  } as any);
+
+  // Art 4: The Birth of Venus -> Owned by Counterparty (Pending Incoming to Pranav)
+  const art4 = await db.artworks.create({
+    ...DEMO_ARTWORKS[4],
+    ownerId: counterpartyId,
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  } as any);
 
   console.log(`3️⃣ Seeding 2 incoming and 1 outgoing custody transfers...`);
 
-  // 1. Incoming transfer to Pranav (Pending Acceptance - artwork currently held by Counterparty)
+  // 1. Incoming transfer 1 to Pranav (The Great Wave off Kanagawa)
   await db.transfers.create({
-    artworkId: createdArtworks[1].id, // Girl with a Pearl Earring
+    artworkId: art3.id,
     sellerId: counterpartyId,
     buyerId: ownerId,
     transferDate: new Date(Date.now() - 2 * 86400000).toISOString(),
@@ -95,31 +135,31 @@ async function main() {
     blockNumber: 19842100,
   });
 
-  // 2. Incoming transfer to Pranav (Finalized / Historical acquisition receipt for The Kiss)
+  // 2. Incoming transfer 2 to Pranav (The Birth of Venus)
   await db.transfers.create({
-    artworkId: createdArtworks[2].id, // The Kiss
+    artworkId: art4.id,
     sellerId: counterpartyId,
     buyerId: ownerId,
-    transferDate: new Date(Date.now() - 7 * 86400000).toISOString(),
+    transferDate: new Date(Date.now() - 5 * 86400000).toISOString(),
     priceVisibility: "PARTIES_AND_AUTHORISED",
-    status: "FINALIZED",
+    status: "PENDING",
     txHash: "0x7b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5b6c",
     blockNumber: 19835000,
   });
 
-  // 3. Outgoing transfer from Pranav (Pending / Outbound Escrow for The Starry Night)
+  // 3. Outgoing transfer from Pranav (The Starry Night)
   await db.transfers.create({
-    artworkId: createdArtworks[0].id, // The Starry Night
+    artworkId: art0.id,
     sellerId: ownerId,
     buyerId: counterpartyId,
-    transferDate: new Date(Date.now() - 4 * 86400000).toISOString(),
+    transferDate: new Date(Date.now() - 3 * 86400000).toISOString(),
     priceVisibility: "PARTIES_AND_AUTHORISED",
     status: "PENDING",
     txHash: "0x3a4b5c6d7e8f9a0b1c2d3e4f5a6b7c8d9e0f1a2b",
     blockNumber: 19839400,
   });
 
-  console.log("🎉 Successfully seeded 3 masterworks and 3 transfers with 100% logical consistency!");
+  console.log("🎉 Successfully seeded 3 vault artworks, 2 incoming transfers, and 1 outgoing transfer!");
 }
 
 main()
