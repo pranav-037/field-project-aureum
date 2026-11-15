@@ -44,11 +44,15 @@ export const Navbar: React.FC = () => {
 
   const userInitial = user?.name ? user.name.trim()[0].toUpperCase() : 'U';
 
+  const homeTarget = !isAuthenticated
+    ? '/'
+    : (user?.role === 'ADMIN' || user?.role === 'AUTHENTICATOR' ? '/institution/dashboard' : '/collector/dashboard');
+
   return (
     <nav className="sticky top-0 z-50 backdrop-blur-xl bg-[#0B0F17]/85 border-b border-slate-800/80 transition-all duration-300">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-20 flex items-center justify-between">
         {/* Brand Logo */}
-        <Link to="/" className="flex items-center gap-3 group">
+        <Link to={homeTarget} className="flex items-center gap-3 group">
           <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-amber-500 via-indigo-600 to-violet-500 p-[1.5px] shadow-lg shadow-indigo-500/20 group-hover:shadow-indigo-500/40 transition duration-300">
             <div className="w-full h-full bg-[#0B0F17] rounded-[10px] flex items-center justify-center">
               <svg

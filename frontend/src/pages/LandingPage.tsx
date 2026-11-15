@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import Navbar from '../components/Navbar';
 
 const LandingPage: React.FC = () => {
+  const navigate = useNavigate();
   const [currentUser] = useState<{ email?: string; role?: string; name?: string } | null>(() => {
     try {
       const token = localStorage.getItem('aureum_token');
@@ -17,6 +18,16 @@ const LandingPage: React.FC = () => {
   const dashboardUrl = currentUser?.role === 'ADMIN' || currentUser?.role === 'AUTHENTICATOR'
     ? '/institution/dashboard'
     : '/collector/dashboard';
+
+  useEffect(() => {
+    if (currentUser) {
+      navigate(dashboardUrl, { replace: true });
+    }
+  }, [currentUser, dashboardUrl, navigate]);
+
+  if (currentUser) {
+    return null;
+  }
 
   // Smooth scroll handler for tabs on the same page
   const handleNavScroll = (e: React.MouseEvent<HTMLAnchorElement>, targetId: string) => {

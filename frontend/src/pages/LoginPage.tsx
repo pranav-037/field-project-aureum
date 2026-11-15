@@ -32,13 +32,24 @@ const LoginPage: React.FC = () => {
 
   const currentRole = isInstitution ? 'AUTHENTICATOR' : 'COLLECTOR';
 
+  useEffect(() => {
+    const existingDashboard = getLoggedInDashboard();
+    if (existingDashboard) {
+      navigate(existingDashboard, { replace: true });
+    }
+  }, [navigate]);
+
   const { isConfigured, renderButton } = useGoogleAuth({
     role: currentRole,
     onSuccess: (data) => {
       if (data.token && data.user) {
         login(data.token, data.user as any);
       }
-      navigate('/profile');
+      const role = data.user?.role || currentRole;
+      const target = (role === 'ADMIN' || role === 'AUTHENTICATOR')
+        ? '/institution/dashboard'
+        : '/collector/dashboard';
+      navigate(target, { replace: true });
     },
     onError: (msg) => setError(msg),
   });
@@ -72,7 +83,11 @@ const LoginPage: React.FC = () => {
       const response = await authApi.login({ email: trimmedEmail, password });
       if (response.data && response.data.token) {
         login(response.data.token, response.data.user);
-        navigate('/profile');
+        const role = response.data.user?.role || (isInstitution ? 'AUTHENTICATOR' : 'COLLECTOR');
+        const target = (role === 'ADMIN' || role === 'AUTHENTICATOR')
+          ? '/institution/dashboard'
+          : '/collector/dashboard';
+        navigate(target, { replace: true });
       } else {
         throw new Error('Authentication response did not return a valid session token.');
       }

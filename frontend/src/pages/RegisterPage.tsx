@@ -40,13 +40,31 @@ const RegisterPage: React.FC = () => {
 
   const currentRole = formData.userType === 'institution' ? 'AUTHENTICATOR' : 'COLLECTOR';
 
+  useEffect(() => {
+    try {
+      const token = localStorage.getItem('aureum_token');
+      const userRaw = localStorage.getItem('aureum_user');
+      if (token && userRaw) {
+        const u = JSON.parse(userRaw);
+        const target = (u.role === 'ADMIN' || u.role === 'AUTHENTICATOR')
+          ? '/institution/dashboard'
+          : '/collector/dashboard';
+        navigate(target, { replace: true });
+      }
+    } catch {}
+  }, [navigate]);
+
   const { isConfigured, renderButton } = useGoogleAuth({
     role: currentRole,
     onSuccess: (data) => {
       if (data.token && data.user) {
         login(data.token, data.user as any);
       }
-      navigate('/profile');
+      const role = data.user?.role || currentRole;
+      const target = (role === 'ADMIN' || role === 'AUTHENTICATOR')
+        ? '/institution/dashboard'
+        : '/collector/dashboard';
+      navigate(target, { replace: true });
     },
     onError: (msg) => setError(msg),
   });
@@ -143,7 +161,11 @@ const RegisterPage: React.FC = () => {
 
       if (res.data?.token) {
         login(res.data.token, res.data.user);
-        navigate('/profile');
+        const role = res.data.user?.role || (formData.userType === 'institution' ? 'AUTHENTICATOR' : 'COLLECTOR');
+        const target = (role === 'ADMIN' || role === 'AUTHENTICATOR')
+          ? '/institution/dashboard'
+          : '/collector/dashboard';
+        navigate(target, { replace: true });
       } else {
         navigate('/login');
       }
