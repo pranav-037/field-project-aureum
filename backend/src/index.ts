@@ -574,10 +574,8 @@ app.get('/api/transfers', async (req: Request, res: Response) => {
       const art = artMap.get(t.artworkId);
       const seller = userMap.get(t.sellerId);
       const buyer = userMap.get(t.buyerId);
-      const isOutgoing = (seller?.email === 'pranavthakur037@gmail.com') ||
-                         (seller?.role === 'COLLECTOR' && buyer?.role !== 'COLLECTOR') ||
-                         (t.sellerId !== t.buyerId && buyer?.role === 'ADMIN') ||
-                         (t.sellerId !== t.buyerId && buyer?.role === 'AUTHENTICATOR');
+      const isOutgoing = (seller?.email === 'pranavthakur037@gmail.com' && buyer?.email !== 'pranavthakur037@gmail.com') ||
+                         (seller?.role === 'COLLECTOR' && buyer?.role !== 'COLLECTOR');
       return {
         ...t,
         type: isOutgoing ? 'OUTGOING' : 'INCOMING',

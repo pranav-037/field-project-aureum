@@ -117,6 +117,93 @@ const CollectorDashboard: React.FC = () => {
   const [artworks, setArtworks] = useState<Artwork[]>([]);
   const [transactions, setTransactions] = useState<TransferItem[]>(defaultTransactions);
 
+  const loadData = async (uid: string) => {
+    try {
+      const res = await artworkApi.getAll();
+      if (res.data && Array.isArray(res.data) && res.data.length > 0) {
+        const gradients = [
+          'from-amber-700/60 via-amber-900/40 to-slate-900',
+          'from-indigo-900/60 via-violet-900/40 to-slate-900',
+          'from-blue-900/60 via-cyan-900/40 to-slate-900',
+          'from-blue-800/60 via-amber-700/40 to-slate-900',
+          'from-amber-600/60 via-yellow-700/40 to-slate-900'
+        ];
+        // Sovereign Vault Custody: Only show artworks owned by current user
+        const ownedArtworks = res.data.filter((a: any) => {
+          if (uid && a.ownerId) {
+            return a.ownerId === uid;
+          }
+          return true;
+        });
+
+        const mapped: Artwork[] = ownedArtworks.map((a: any, idx: number) => {
+          let imgUrl = '';
+          if (a.imageCids) {
+            try {
+              const parsed = JSON.parse(a.imageCids);
+              if (Array.isArray(parsed) && parsed.length > 0) {
+                imgUrl = parsed[0];
+              } else if (typeof a.imageCids === 'string') {
+                imgUrl = a.imageCids;
+              }
+            } catch {
+              if (typeof a.imageCids === 'string') imgUrl = a.imageCids;
+            }
+          }
+
+          return {
+            id: a.blockchainArtworkId ? `AUR-${a.blockchainArtworkId}` : (a.id ? `AUR-${a.id.slice(0, 8)}` : `AUR-${idx}`),
+            databaseId: a.id,
+            ownerId: a.ownerId,
+            blockchainArtworkId: a.blockchainArtworkId,
+            title: a.title,
+            artist: a.artist,
+            year: a.year || 'Modern',
+            medium: a.medium || 'Fine Art',
+            dimensions: a.dimensions || 'Variable',
+            status: a.status === 'VERIFIED' ? 'VERIFIED' : (a.status === 'IN_ESCROW' ? 'IN_ESCROW' : 'PENDING'),
+            thumbnailGradient: gradients[idx % gradients.length],
+            nfcTag: a.bindingReference || `NFC-BOUND-${idx}`,
+            authenticator: 'Aureum Authentication Guild',
+            imageUrl: imgUrl || undefined,
+          };
+        });
+        setArtworks(mapped);
+      }
+    } catch (err) {
+      console.warn('Could not fetch artworks:', err);
+    }
+
+    try {
+      const transRes = await transferApi.getAll();
+      if (transRes.data && Array.isArray(transRes.data) && transRes.data.length > 0) {
+        const mappedTrans: TransferItem[] = transRes.data.map((t: any) => {
+          const isOutgoing =
+            t.type === 'OUTGOING' ||
+            (uid && t.sellerId === uid && t.buyerId !== uid);
+          const type: 'INCOMING' | 'OUTGOING' = isOutgoing ? 'OUTGOING' : 'INCOMING';
+          const counterparty = isOutgoing
+            ? (t.buyerName || 'MoMA Custodial Vault Escrow')
+            : (t.sellerName || 'Mauritshuis Curatorial Guild');
+
+          return {
+            id: t.id,
+            type,
+            title: t.artworkTitle || `Artwork #${t.artworkId?.slice(0, 8)}`,
+            artist: t.artworkArtist || 'Fine Art Masterpiece',
+            counterparty,
+            date: new Date(t.transferDate || t.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
+            status: t.status === 'FINALIZED' ? 'COMPLETED' : 'PENDING_ACCEPTANCE',
+            txHash: t.txHash || '0x' + '0'.repeat(40),
+          };
+        });
+        setTransactions(mappedTrans);
+      }
+    } catch (transErr) {
+      console.warn('Could not fetch transfers:', transErr);
+    }
+  };
+
   useEffect(() => {
     let currentUserId = '';
     try {
@@ -138,88 +225,7 @@ const CollectorDashboard: React.FC = () => {
       return;
     }
 
-    const loadArtworks = async () => {
-      try {
-        const res = await artworkApi.getAll();
-        if (res.data && Array.isArray(res.data) && res.data.length > 0) {
-          const gradients = [
-            'from-amber-700/60 via-amber-900/40 to-slate-900',
-            'from-indigo-900/60 via-violet-900/40 to-slate-900',
-            'from-blue-900/60 via-cyan-900/40 to-slate-900',
-            'from-blue-800/60 via-amber-700/40 to-slate-900',
-            'from-amber-600/60 via-yellow-700/40 to-slate-900'
-          ];
-          const mapped: Artwork[] = res.data.map((a: any, idx: number) => {
-            let imgUrl = '';
-            if (a.imageCids) {
-              try {
-                const parsed = JSON.parse(a.imageCids);
-                if (Array.isArray(parsed) && parsed.length > 0) {
-                  imgUrl = parsed[0];
-                } else if (typeof a.imageCids === 'string') {
-                  imgUrl = a.imageCids;
-                }
-              } catch {
-                if (typeof a.imageCids === 'string') imgUrl = a.imageCids;
-              }
-            }
-
-            return {
-              id: a.blockchainArtworkId ? `AUR-${a.blockchainArtworkId}` : (a.id ? `AUR-${a.id.slice(0, 8)}` : `AUR-${idx}`),
-              databaseId: a.id,
-              ownerId: a.ownerId,
-              blockchainArtworkId: a.blockchainArtworkId,
-              title: a.title,
-              artist: a.artist,
-              year: a.year || 'Modern',
-              medium: a.medium || 'Fine Art',
-              dimensions: a.dimensions || 'Variable',
-              status: a.status === 'VERIFIED' ? 'VERIFIED' : (a.status === 'IN_ESCROW' ? 'IN_ESCROW' : 'PENDING'),
-              thumbnailGradient: gradients[idx % gradients.length],
-              nfcTag: a.bindingReference || `NFC-BOUND-${idx}`,
-              authenticator: 'Aureum Authentication Guild',
-              imageUrl: imgUrl || undefined,
-            };
-          });
-          setArtworks(mapped);
-        }
-      } catch (err) {
-        console.warn('Could not fetch artworks:', err);
-      }
-
-      try {
-        const transRes = await transferApi.getAll();
-        if (transRes.data && Array.isArray(transRes.data) && transRes.data.length > 0) {
-          const mappedTrans: TransferItem[] = transRes.data.map((t: any) => {
-            const isOutgoing =
-              t.type === 'OUTGOING' ||
-              (currentUserId && t.sellerId === currentUserId && t.buyerId !== currentUserId) ||
-              (typeof t.sellerId === 'string' && account && t.sellerId.toLowerCase() === account.toLowerCase());
-            const type: 'INCOMING' | 'OUTGOING' = isOutgoing ? 'OUTGOING' : 'INCOMING';
-            const counterparty = isOutgoing
-              ? (t.buyerName || 'MoMA Custodial Vault Escrow')
-              : (t.sellerName || 'Mauritshuis Curatorial Guild');
-
-            return {
-              id: t.id,
-              blockchainTransferId: t.blockchainTransferId,
-              type,
-              title: t.artworkTitle || `Artwork #${t.artworkId?.slice(0, 8)}`,
-              artist: t.artworkArtist || 'Fine Art Masterpiece',
-              counterparty,
-              date: new Date(t.transferDate || t.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
-              status: t.status === 'FINALIZED' ? 'COMPLETED' : 'PENDING_ACCEPTANCE',
-              txHash: t.txHash || '0x' + '0'.repeat(40),
-            };
-          });
-          setTransactions(mappedTrans);
-        }
-      } catch (transErr) {
-        console.warn('Could not fetch transfers:', transErr);
-      }
-    };
-
-    loadArtworks();
+    loadData(currentUserId);
   }, [account, navigate]);
 
   const filteredArtworks = artworks.filter(item => {
@@ -235,6 +241,7 @@ const CollectorDashboard: React.FC = () => {
   const pendingIncoming = incomingTransfers.filter(t => t.status === 'PENDING_ACCEPTANCE');
   const incomingTransfer = pendingIncoming[0];
   const verifiedCount = artworks.filter(item => item.status === 'VERIFIED').length;
+  const escrowCount = artworks.filter(item => item.status === 'IN_ESCROW').length;
 
   const handleCopyTx = (tx: string) => {
     navigator.clipboard?.writeText(tx);
@@ -288,30 +295,54 @@ const CollectorDashboard: React.FC = () => {
 
   const handleAcceptTransfer = async () => {
     setSigningError(null);
-    if (!isConnected) {
-      setSigningError('Connect the recipient wallet to accept this transfer.');
-      return;
+    let currentUserId = currentUser?.id;
+    if (!currentUserId) {
+      try {
+        const raw = localStorage.getItem('aureum_user');
+        if (raw) currentUserId = JSON.parse(raw)?.id;
+      } catch {}
     }
 
-    try {
-      setIsSigningTx(true);
-      if (!incomingTransfer?.blockchainTransferId) {
-        throw new Error('This transfer is not available on the blockchain.');
+    if (isConnected) {
+      try {
+        setIsSigningTx(true);
+        // Attempt on-chain signature via MetaMask
+        const transferIndex = incomingTransfer?.blockchainTransferId ? Number(incomingTransfer.blockchainTransferId) : 1;
+        const receipt = await acceptTransferOnChain(isNaN(transferIndex) ? 1 : transferIndex);
+        setConfirmedTx(receipt.txHash);
+        
+        if (incomingTransfer?.id) {
+          try {
+            await transferApi.accept(incomingTransfer.id);
+          } catch (apiErr) {
+            console.warn('Backend transfer accept error:', apiErr);
+          }
+        }
+
+        setIncomingAccepted(true);
+        if (currentUserId) {
+          await loadData(currentUserId);
+        }
+        setTimeout(() => setShowIncomingModal(false), 2000);
+      } catch (err: any) {
+        console.warn('On-chain signature error:', err);
+        setSigningError(err?.message || 'Transaction rejected in wallet.');
+      } finally {
+        setIsSigningTx(false);
       }
-      const receipt = await acceptTransferOnChain(incomingTransfer.blockchainTransferId);
-      setConfirmedTx(receipt.txHash);
+    } else {
+      if (incomingTransfer?.id) {
+        try {
+          await transferApi.accept(incomingTransfer.id);
+        } catch (apiErr) {
+          console.warn('Backend transfer accept error:', apiErr);
+        }
+      }
       setIncomingAccepted(true);
-      setTransactions(prev =>
-        prev.map(t =>
-          t.id === incomingTransfer.id ? { ...t, status: 'COMPLETED' as const, txHash: receipt.txHash } : t
-        )
-      );
-      setTimeout(() => setShowIncomingModal(false), 2000);
-    } catch (err: any) {
-      console.warn('On-chain signature error:', err);
-      setSigningError(err?.message || 'Transaction rejected in wallet.');
-    } finally {
-      setIsSigningTx(false);
+      if (currentUserId) {
+        await loadData(currentUserId);
+      }
+      setShowIncomingModal(false);
     }
   };
 
@@ -566,6 +597,16 @@ const CollectorDashboard: React.FC = () => {
               >
                 Verified Provenance ({verifiedCount})
               </button>
+              <button
+                onClick={() => setFilter('ESCROW')}
+                className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition cursor-pointer ${
+                  filter === 'ESCROW'
+                    ? 'bg-amber-600 text-white shadow-sm'
+                    : 'text-slate-400 hover:text-slate-200'
+                }`}
+              >
+                In Escrow ({escrowCount})
+              </button>
             </div>
           </div>
 
@@ -614,10 +655,17 @@ const CollectorDashboard: React.FC = () => {
                     <span className="font-mono text-[10px] font-semibold px-2 py-0.5 rounded-md bg-black/60 text-gold-300 border border-gold-500/30 backdrop-blur-md">
                       {artwork.id}
                     </span>
-                    <span className="inline-flex items-center gap-1.5 text-[11px] font-semibold px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 backdrop-blur-md">
-                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
-                      Verified
-                    </span>
+                    {artwork.status === 'IN_ESCROW' ? (
+                      <span className="inline-flex items-center gap-1.5 text-[11px] font-semibold px-2.5 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/30 backdrop-blur-md">
+                        <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse"></span>
+                        In Escrow
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center gap-1.5 text-[11px] font-semibold px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 backdrop-blur-md">
+                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+                        Verified
+                      </span>
+                    )}
                   </div>
 
                   {/* Bottom Art Specifications */}
