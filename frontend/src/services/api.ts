@@ -1,6 +1,5 @@
 import axios from 'axios';
-import { invalidateStoredAuth } from '../utils/authEvents';
-import { validateAuthSession } from '../utils/tokenValidator';
+import { supabase } from './supabase';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api';
 
@@ -11,32 +10,13 @@ const api = axios.create({
   },
 });
 
-// Only send a locally cached token when its structure and profile still validate.
-api.interceptors.request.use((config) => {
-  const token = localStorage.getItem('aureum_token') || localStorage.getItem('token');
-  if (!token) return config;
-
-  const storedUser = localStorage.getItem('aureum_user') || localStorage.getItem('user');
-  if (!storedUser) {
-    invalidateStoredAuth();
-    return config;
+api.interceptors.request.use(async (config) => {
+  if (!supabase) return config;
+  const { data, error } = await supabase.auth.getSession();
+  if (error) throw error;
+  if (data.session) {
+    config.headers.Authorization = `Bearer ${data.session.access_token}`;
   }
-
-  let userData: unknown;
-  try {
-    userData = JSON.parse(storedUser) as unknown;
-  } catch {
-    invalidateStoredAuth();
-    return config;
-  }
-
-  const validation = validateAuthSession(token, userData);
-  if (!validation.success) {
-    invalidateStoredAuth();
-    return config;
-  }
-
-  config.headers.Authorization = `Bearer ${token}`;
   return config;
 });
 
@@ -48,7 +28,11 @@ api.interceptors.response.use(
       error.response?.status === 401 &&
       error.config?.headers?.Authorization
     ) {
-      invalidateStoredAuth();
+      if (supabase) {
+        void supabase.auth.signOut().catch((signOutError: unknown) => {
+          console.error('Failed to sign out after an unauthorized API response:', signOutError);
+        });
+      }
     }
     return Promise.reject(error);
   }

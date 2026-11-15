@@ -9,6 +9,7 @@ export const Navbar: React.FC = () => {
   const navigate = useNavigate();
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [logoutError, setLogoutError] = useState<string | null>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
   // Close dropdown on outside click
@@ -22,10 +23,15 @@ export const Navbar: React.FC = () => {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  const handleSignOut = () => {
-    logout();
-    setDropdownOpen(false);
-    navigate('/login');
+  const handleSignOut = async () => {
+    setLogoutError(null);
+    try {
+      await logout();
+      setDropdownOpen(false);
+      navigate('/login');
+    } catch (error: unknown) {
+      setLogoutError(error instanceof Error ? error.message : 'Could not sign out.');
+    }
   };
 
   const navLinks = [
@@ -167,6 +173,9 @@ export const Navbar: React.FC = () => {
               {/* User Dropdown Menu */}
               {dropdownOpen && (
                 <div className="absolute right-0 mt-2 w-56 rounded-xl bg-[#0F172A] border border-slate-700/80 shadow-2xl shadow-black/80 py-2 z-50 animate-in fade-in slide-in-from-top-2 duration-150">
+                  {logoutError && (
+                    <p className="px-4 py-2 text-xs text-rose-300" role="alert">{logoutError}</p>
+                  )}
                   <div className="px-4 py-2 border-b border-slate-800">
                     <p className="text-xs font-medium text-slate-200 truncate">{user?.name}</p>
                     <p className="text-[11px] text-slate-400 font-mono truncate">{user?.email}</p>

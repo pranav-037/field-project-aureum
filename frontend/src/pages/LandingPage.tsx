@@ -1,33 +1,21 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import Navbar from '../components/Navbar';
+import { useAuth } from '../context/AuthContext';
 
 const LandingPage: React.FC = () => {
   const navigate = useNavigate();
-  const [currentUser] = useState<{ email?: string; role?: string; name?: string } | null>(() => {
-    try {
-      const token = localStorage.getItem('aureum_token');
-      const userRaw = localStorage.getItem('aureum_user');
-      if (!token || !userRaw) return null;
-      return JSON.parse(userRaw);
-    } catch {
-      return null;
-    }
-  });
+  const { user: currentUser, loading } = useAuth();
 
   const dashboardUrl = currentUser?.role === 'ADMIN' || currentUser?.role === 'AUTHENTICATOR'
     ? '/institution/dashboard'
     : '/collector/dashboard';
 
   useEffect(() => {
-    if (currentUser) {
+    if (!loading && currentUser) {
       navigate(dashboardUrl, { replace: true });
     }
-  }, [currentUser, dashboardUrl, navigate]);
-
-  if (currentUser) {
-    return null;
-  }
+  }, [currentUser, dashboardUrl, loading, navigate]);
 
   // Smooth scroll handler for tabs on the same page
   const handleNavScroll = (e: React.MouseEvent<HTMLAnchorElement>, targetId: string) => {
@@ -72,6 +60,10 @@ const LandingPage: React.FC = () => {
       }
     }
   }, []);
+
+  if (loading || currentUser) {
+    return null;
+  }
 
   return (
     <div className="min-h-screen bg-[#0B0F17] text-slate-100 flex flex-col selection:bg-indigo-500/30 selection:text-indigo-200">

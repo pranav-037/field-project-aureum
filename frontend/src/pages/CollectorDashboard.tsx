@@ -4,6 +4,7 @@ import { useWallet } from '../contexts/WalletContext';
 import { useArtchainContract } from '../hooks/useArtchainContract';
 import Navbar from '../components/Navbar';
 import { artworkApi, transferApi } from '../services/api';
+import { useAuth } from '../context/AuthContext';
 
 interface Artwork {
   id: string;
@@ -36,6 +37,7 @@ interface TransferItem {
 
 const CollectorDashboard: React.FC = () => {
   const navigate = useNavigate();
+  const { user: currentUser, loading: authLoading } = useAuth();
   const [filter, setFilter] = useState<'ALL' | 'VERIFIED' | 'ESCROW'>('ALL');
   const [transfersTab, setTransfersTab] = useState<'ALL' | 'INCOMING' | 'OUTGOING'>('ALL');
   const [selectedArtwork, setSelectedArtwork] = useState<Artwork | null>(null);
@@ -79,7 +81,6 @@ const CollectorDashboard: React.FC = () => {
     }
   }, []);
 
-  const [currentUser, setCurrentUser] = useState<any>(null);
 
   // Default Fallback Transactions: 2 Incoming and 1 Outgoing
   const defaultTransactions: TransferItem[] = [
@@ -206,28 +207,18 @@ const CollectorDashboard: React.FC = () => {
   };
 
   useEffect(() => {
-    let currentUserId = '';
-    try {
-      const token = localStorage.getItem('aureum_token');
-      const stored = localStorage.getItem('aureum_user');
-      if (!token || !stored) {
-        navigate('/login', { replace: true });
-        return;
-      }
-      const user = JSON.parse(stored);
-      currentUserId = user?.id || '';
-      setCurrentUser(user);
-      if (user.role === 'AUTHENTICATOR') {
-        navigate('/institution/dashboard', { replace: true });
-        return;
-      }
-    } catch {
+    if (authLoading) return;
+    if (!currentUser) {
       navigate('/login', { replace: true });
       return;
     }
+    if (currentUser.role === 'AUTHENTICATOR') {
+      navigate('/institution/dashboard', { replace: true });
+      return;
+    }
 
-    loadData(currentUserId);
-  }, [account, navigate]);
+    loadData(currentUser.id);
+  }, [account, authLoading, currentUser, navigate]);
 
   const filteredArtworks = artworks.filter(item => {
     if (filter === 'VERIFIED') return item.status === 'VERIFIED';
@@ -297,13 +288,7 @@ const CollectorDashboard: React.FC = () => {
   const handleAcceptTransfer = async () => {
     setSigningError(null);
     const targetTransfer = selectedIncomingTransfer || incomingTransfer;
-    let currentUserId = currentUser?.id;
-    if (!currentUserId) {
-      try {
-        const raw = localStorage.getItem('aureum_user');
-        if (raw) currentUserId = JSON.parse(raw)?.id;
-      } catch {}
-    }
+    const currentUserId = currentUser?.id;
 
     if (isConnected) {
       try {

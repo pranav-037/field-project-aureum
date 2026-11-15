@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import Navbar from '../components/Navbar';
 import { activityApi, artworkApi, transferApi } from '../services/api';
+import { useAuth } from '../context/AuthContext';
 
 function formatTimeAgo(dateStr?: string): string {
   if (!dateStr) return 'Recently';
@@ -22,29 +23,21 @@ function formatTimeAgo(dateStr?: string): string {
 
 const InstitutionDashboard: React.FC = () => {
   const navigate = useNavigate();
+  const { user: currentUser, loading: authLoading } = useAuth();
   const [copiedTx, setCopiedTx] = useState<string | null>(null);
-  const [currentUser, setCurrentUser] = useState<any>(null);
   const [activities, setActivities] = useState<any[]>([]);
   const [artworkCount, setArtworkCount] = useState<number>(0);
   const [pendingCount, setPendingCount] = useState<number>(0);
   const [completedCount, setCompletedCount] = useState<number>(0);
 
   useEffect(() => {
-    try {
-      const token = localStorage.getItem('aureum_token');
-      const stored = localStorage.getItem('aureum_user');
-      if (!token || !stored) {
-        navigate('/login', { replace: true });
-        return;
-      }
-      const user = JSON.parse(stored);
-      setCurrentUser(user);
-      if (user.role === 'COLLECTOR') {
-        navigate('/collector/dashboard', { replace: true });
-        return;
-      }
-    } catch {
+    if (authLoading) return;
+    if (!currentUser) {
       navigate('/login', { replace: true });
+      return;
+    }
+    if (currentUser.role === 'COLLECTOR') {
+      navigate('/collector/dashboard', { replace: true });
       return;
     }
 
@@ -86,7 +79,7 @@ const InstitutionDashboard: React.FC = () => {
     };
 
     fetchData();
-  }, []);
+  }, [authLoading, currentUser, navigate]);
 
   const handleCopy = (tx: string) => {
     navigator.clipboard?.writeText(tx);

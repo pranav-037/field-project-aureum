@@ -1,13 +1,13 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useGoogleAuth } from '../hooks/useGoogleAuth';
-import { authApi, formatAuthError } from '../services/api';
 import { useAuth } from '../context/AuthContext';
+import { requestEmailOtp } from '../services/emailOtp';
 import {
   emailSchema,
   fullNameSchema,
   institutionNameSchema,
-  registrationSchema,
+  otpRegistrationSchema,
   signupPasswordSchema,
 } from '../schemas/authSchemas';
 
@@ -21,7 +21,7 @@ type RegistrationField = 'fullName' | 'email' | 'password' | 'confirmPassword' |
 
 const RegisterPage: React.FC = () => {
   const navigate = useNavigate();
-  const { login, user, loading: authLoading } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const [formData, setFormData] = useState({
     fullName: '',
     email: '',
@@ -35,11 +35,8 @@ const RegisterPage: React.FC = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [registrationNotice, setRegistrationNotice] = useState<string | null>(null);
-  const [resendNotice, setResendNotice] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<Partial<Record<RegistrationField, string>>>({});
   const [loading, setLoading] = useState(false);
-  const [resending, setResending] = useState(false);
   const googleBtnRef = useRef<HTMLDivElement>(null);
 
   const currentRole = formData.userType === 'institution' ? 'AUTHENTICATOR' : 'COLLECTOR';
@@ -52,17 +49,8 @@ const RegisterPage: React.FC = () => {
 
   const { isConfigured, renderButton } = useGoogleAuth({
     role: currentRole,
-    onSuccess: (data) => {
-      try {
-        if (!data.token || !data.user) {
-          throw new Error('Authentication response did not return a valid session.');
-        }
-        login(data.token, data.user);
-        const role = typeof data.user.role === 'string' ? data.user.role : currentRole;
-        navigate(getDashboardPath(role), { replace: true });
-      } catch (authError) {
-        setError(authError instanceof Error ? authError.message : 'Unable to validate the registration session.');
-      }
+    onSuccess: ({ role }) => {
+      navigate(getDashboardPath(role), { replace: true });
     },
     onError: (msg) => setError(msg),
   });
@@ -126,8 +114,7 @@ const RegisterPage: React.FC = () => {
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setError(null);
-    setRegistrationNotice(null);
-    const validation = registrationSchema.safeParse(formData);
+    const validation = otpRegistrationSchema.safeParse(formData);
     if (!validation.success) {
       const nextErrors: Partial<Record<RegistrationField, string>> = {};
       for (const issue of validation.error.issues) {
@@ -151,42 +138,21 @@ const RegisterPage: React.FC = () => {
     setFieldErrors({});
     setLoading(true);
     try {
-      const res = await authApi.register({
-        fullName: validation.data.fullName,
-        email: validation.data.email,
-        password: validation.data.password,
-        userType: validation.data.userType,
-        role: validation.data.userType === 'institution' ? 'AUTHENTICATOR' : 'COLLECTOR',
+      const role = validation.data.userType === 'institution' ? 'AUTHENTICATOR' : 'COLLECTOR';
+      await requestEmailOtp(validation.data.email, {
+        shouldCreateUser: true,
+        data: {
+          name: validation.data.fullName,
+          role,
+          accountType: validation.data.userType,
+          institutionName: validation.data.institutionName ?? '',
+        },
       });
-
-      if (res.data?.emailVerificationRequired) {
-        setRegistrationNotice(
-          `We sent a verification link to ${validation.data.email}. Verify your email before signing in.`
-        );
-      } else if (res.data?.token) {
-        login(res.data.token, res.data.user);
-        navigate(getDashboardPath(res.data.user?.role), { replace: true });
-      } else {
-        setRegistrationNotice('Your account was created. You can now sign in.');
-      }
-    } catch (err: any) {
-      const exactMsg = formatAuthError(err, 'Registration could not be completed.');
-      setError(exactMsg);
+      navigate(`/verify-otp?email=${encodeURIComponent(validation.data.email)}`);
+    } catch (requestError: unknown) {
+      setError(requestError instanceof Error ? requestError.message : 'Could not send a verification code.');
     } finally {
       setLoading(false);
-    }
-  };
-
-  const handleResendVerification = async () => {
-    setResending(true);
-    setResendNotice(null);
-    try {
-      await authApi.resendVerification({ email: formData.email.trim().toLowerCase() });
-      setResendNotice('If this address has an unverified account, a new link will be sent.');
-    } catch (resendError: unknown) {
-      setResendNotice(formatAuthError(resendError, 'Could not request another verification email.'));
-    } finally {
-      setResending(false);
     }
   };
 
@@ -283,28 +249,8 @@ const RegisterPage: React.FC = () => {
                 </div>
               )}
 
-              {registrationNotice && (
-                <div className="mb-6 rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-4 text-sm text-emerald-200" role="status">
-                  <p>{registrationNotice}</p>
-                  {resendNotice && <p className="mt-2 text-xs">{resendNotice}</p>}
-                  <div className="mt-4 flex flex-wrap items-center gap-4">
-                    <Link to="/login" className="font-semibold text-indigo-300 hover:text-indigo-200">
-                      Continue to sign in
-                    </Link>
-                    <button
-                      type="button"
-                      onClick={handleResendVerification}
-                      disabled={resending}
-                      className="text-xs font-medium text-slate-300 underline underline-offset-4 disabled:opacity-50"
-                    >
-                      {resending ? 'Sending...' : 'Resend verification email'}
-                    </button>
-                  </div>
-                </div>
-              )}
-
               {/* Google Sign-Up */}
-              {!registrationNotice && isConfigured && (
+              {isConfigured && (
                 <div className="mb-4">
                   <div ref={googleBtnRef} className="w-full flex justify-center" />
                   <div className="flex items-center gap-3 mt-5 mb-5">
@@ -316,8 +262,7 @@ const RegisterPage: React.FC = () => {
               )}
 
               {/* Registration Form */}
-              {!registrationNotice && (
-                <form onSubmit={handleSubmit} noValidate autoComplete="off" className="space-y-4 text-left">
+              <form onSubmit={handleSubmit} noValidate autoComplete="off" className="space-y-4 text-left">
                 {/* Full Name Field */}
                 <div>
                   <label htmlFor="fullName" className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1.5">
@@ -379,8 +324,12 @@ const RegisterPage: React.FC = () => {
                   )}
                 </div>
 
+                <p className="text-xs text-slate-400">
+                  We’ll email a 6-digit code to verify your address and create your account.
+                </p>
+
                 {/* Password Field with Show/Hide Toggle */}
-                <div>
+                <div className="hidden">
                   <div className="flex items-center justify-between mb-1.5">
                     <label htmlFor="password" className="block text-xs font-semibold text-slate-300 uppercase tracking-wider">
                       Password
@@ -432,7 +381,7 @@ const RegisterPage: React.FC = () => {
                 </div>
 
                 {/* Confirm Password Field with Show/Hide Toggle */}
-                <div>
+                <div className="hidden">
                   <div className="flex items-center justify-between mb-1.5">
                     <label htmlFor="confirmPassword" className="block text-xs font-semibold text-slate-300 uppercase tracking-wider">
                       Confirm Password
@@ -568,10 +517,10 @@ const RegisterPage: React.FC = () => {
                           <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                           <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                         </svg>
-                        <span>Establishing Sovereign Account...</span>
+                        <span>Sending verification code...</span>
                       </>
                     ) : (
-                      <span>Complete Registration</span>
+                      <span>Send verification code</span>
                     )}
                   </button>
                 </div>
@@ -586,7 +535,6 @@ const RegisterPage: React.FC = () => {
                   </p>
                 </div>
                 </form>
-              )}
             </div>
           </div>
       </main>

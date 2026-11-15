@@ -3,9 +3,11 @@ import { useNavigate } from 'react-router-dom';
 import { artworkApi, ipfsApi } from '../services/api';
 import { useWallet } from '../contexts/WalletContext';
 import Navbar from '../components/Navbar';
+import { useAuth } from '../context/AuthContext';
 
 const ArtworkRegistration: React.FC = () => {
   const navigate = useNavigate();
+  const { user, loading: authLoading } = useAuth();
   const [step, setStep] = useState(1);
   const [formData, setFormData] = useState({
     title: '',
@@ -24,22 +26,13 @@ const ArtworkRegistration: React.FC = () => {
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    try {
-      const token = localStorage.getItem('aureum_token');
-      const stored = localStorage.getItem('aureum_user');
-      if (!token || !stored) {
-        navigate('/login', { replace: true });
-        return;
-      }
-      const user = JSON.parse(stored);
-      if (user.role === 'COLLECTOR') {
-        navigate('/collector/dashboard', { replace: true });
-        return;
-      }
-    } catch {
+    if (authLoading) return;
+    if (!user) {
       navigate('/login', { replace: true });
+      return;
     }
-  }, [navigate]);
+    if (user.role === 'COLLECTOR') navigate('/collector/dashboard', { replace: true });
+  }, [authLoading, navigate, user]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const target = e.target;
@@ -122,14 +115,7 @@ const ArtworkRegistration: React.FC = () => {
         }
       }
 
-      let currentOwnerId = account || 'current-institution-id';
-      try {
-        const rawUser = localStorage.getItem('aureum_user');
-        if (rawUser) {
-          const parsed = JSON.parse(rawUser);
-          currentOwnerId = parsed.id || parsed.email || currentOwnerId;
-        }
-      } catch {}
+      const currentOwnerId = user?.id || account || 'current-institution-id';
 
       const artworkData = {
         title: formData.title.trim(),

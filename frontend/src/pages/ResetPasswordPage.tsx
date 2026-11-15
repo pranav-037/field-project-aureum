@@ -53,7 +53,7 @@ const ResetPasswordPage: React.FC = () => {
     setLoading(true);
     try {
       await authApi.completePasswordReset({ accessToken, password });
-      logout();
+      await logout();
       window.history.replaceState(null, document.title, location.pathname);
       setSuccess(true);
     } catch (resetError: unknown) {

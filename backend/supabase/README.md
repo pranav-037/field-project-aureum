@@ -57,15 +57,15 @@ FRONTEND_URL=http://localhost:5173
 
 ### Authentication email setup
 
-The backend sends sign-up confirmation and password-reset emails through Supabase Auth. In the Supabase Dashboard:
+Email sign-in and registration use Supabase Email OTP from the frontend. In the Supabase Dashboard:
 
-1. Enable **Confirm email** under **Authentication -> Providers -> Email**. The app does not auto-confirm new accounts.
-2. Set the **Site URL** to your frontend origin and add these URLs to the redirect allow list:
-   - `http://localhost:5173/auth/callback?flow=signup`
-   - `http://localhost:5173/reset-password`
-   Replace the origin with the deployed frontend URL in production.
-3. Configure a production SMTP provider and review the **Confirm signup** and **Reset password** email templates.
-4. Set `FRONTEND_URL` in `backend/.env` to the exact frontend origin. The service role key must remain backend-only; it is used to apply a password reset after Supabase validates the recovery token.
+1. Enable the Email provider and email confirmation under **Authentication -> Providers -> Email**.
+2. Update the **Confirm signup** and **Magic Link** email templates to display the six-digit code with `{{ .Token }}`. Keep the token visible as plain text; the app asks the user to enter it.
+3. Configure a production SMTP provider for reliable delivery and review the **Reset password** template, which remains a link-based flow.
+4. Set the **Site URL** to your frontend origin and allow the local reset URL `http://localhost:5173/reset-password`. Add production URLs when deploying.
+5. Copy the project URL and **anon/public** key into `frontend/.env` as `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY`. Never use the service-role key in the frontend. Keep `FRONTEND_URL` in `backend/.env` for password-reset redirects.
+
+**RLS warning:** the current schema grants anonymous/authenticated SELECT on every table. A browser Supabase client exposes the anon key by design, so do not use it with sensitive production data until table-specific RLS policies are reviewed and applied. The OTP client only uses Auth, but the exposed key can also be used against the project's Data API.
 
 ---
 

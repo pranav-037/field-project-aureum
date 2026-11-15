@@ -6,7 +6,7 @@ export const CLOCK_SKEW_MS = 30_000;
 export const AppRoleSchema = z.enum(APP_ROLES);
 export type AppRole = z.infer<typeof AppRoleSchema>;
 
-const AttributesSchema = z
+export const AuthAttributesSchema = z
   .object({
     approved: z.boolean().optional(),
     walletAddress: z.string().regex(/^0x[a-fA-F0-9]{40}$/).optional(),
@@ -20,14 +20,14 @@ const AttributesSchema = z
   })
   .passthrough();
 
-export type AuthAttributes = z.infer<typeof AttributesSchema>;
+export type AuthAttributes = z.infer<typeof AuthAttributesSchema>;
 
 const MetadataSchema = z
   .object({
     role: z.string().optional(),
     roles: z.array(AppRoleSchema).optional(),
     permissions: z.array(z.string().min(1)).optional(),
-    attributes: AttributesSchema.optional(),
+    attributes: AuthAttributesSchema.optional(),
   })
   .passthrough();
 
@@ -41,7 +41,7 @@ const JwtPayloadSchema = z
     role: z.string().optional(),
     roles: z.array(AppRoleSchema).optional(),
     permissions: z.array(z.string().min(1)).optional(),
-    attributes: AttributesSchema.optional(),
+    attributes: AuthAttributesSchema.optional(),
     app_metadata: MetadataSchema.optional(),
     user_metadata: MetadataSchema.optional(),
   })
@@ -67,7 +67,7 @@ const UserProfileSchema = z
     role: AppRoleSchema,
     roles: z.array(AppRoleSchema).optional(),
     permissions: z.array(z.string().min(1)).optional(),
-    attributes: AttributesSchema.optional(),
+    attributes: AuthAttributesSchema.optional(),
     walletAddress: z.string().regex(/^0x[a-fA-F0-9]{40}$/).nullable().optional(),
     institution: InstitutionSchema.nullable().optional(),
     avatarUrl: z.string().nullable().optional(),

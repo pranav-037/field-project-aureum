@@ -1,9 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { authApi, formatAuthError } from '../services/api';
 import { useGoogleAuth } from '../hooks/useGoogleAuth';
 import { useAuth } from '../context/AuthContext';
-import { emailSchema, loginPasswordSchema, loginSchema } from '../schemas/authSchemas';
+import { emailSchema } from '../schemas/authSchemas';
+import { requestEmailOtp } from '../services/emailOtp';
 
 function getDashboardPath(role?: string): string {
   if (role === 'ADMIN' || role === 'AUTHENTICATOR') return '/institution/dashboard';
@@ -13,16 +13,11 @@ function getDashboardPath(role?: string): string {
 
 const LoginPage: React.FC = () => {
   const navigate = useNavigate();
-  const { login, user, loading: authLoading } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [fieldErrors, setFieldErrors] = useState<Partial<Record<'email' | 'password', string>>>({});
+  const [fieldErrors, setFieldErrors] = useState<Partial<Record<'email', string>>>({});
   const [isInstitution, setIsInstitution] = useState(true);
-  const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [needsVerification, setNeedsVerification] = useState(false);
-  const [verificationNotice, setVerificationNotice] = useState<string | null>(null);
-  const [verificationResending, setVerificationResending] = useState(false);
   const [loading, setLoading] = useState(false);
   const googleBtnRef = useRef<HTMLDivElement>(null);
 
@@ -36,17 +31,8 @@ const LoginPage: React.FC = () => {
 
   const { isConfigured, renderButton } = useGoogleAuth({
     role: currentRole,
-    onSuccess: (data) => {
-      try {
-        if (!data.token || !data.user) {
-          throw new Error('Authentication response did not return a valid session.');
-        }
-        login(data.token, data.user);
-        const role = typeof data.user.role === 'string' ? data.user.role : currentRole;
-        navigate(getDashboardPath(role), { replace: true });
-      } catch (authError) {
-        setError(authError instanceof Error ? authError.message : 'Unable to validate the sign-in session.');
-      }
+    onSuccess: ({ role }) => {
+      navigate(getDashboardPath(role), { replace: true });
     },
     onError: (msg) => setError(msg),
   });
@@ -61,61 +47,21 @@ const LoginPage: React.FC = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
-    setNeedsVerification(false);
-    setVerificationNotice(null);
-    const validation = loginSchema.safeParse({ email, password });
+    const validation = emailSchema.safeParse(email);
     if (!validation.success) {
-      const nextErrors: Partial<Record<'email' | 'password', string>> = {};
-      for (const issue of validation.error.issues) {
-        const field = issue.path[0];
-        if (field === 'email' || field === 'password') {
-          nextErrors[field] = nextErrors[field]
-            ? `${nextErrors[field]} ${issue.message}`
-            : issue.message;
-        }
-      }
-      setFieldErrors(nextErrors);
+      setFieldErrors({ email: validation.error.issues[0]?.message });
       return;
     }
 
     setFieldErrors({});
     setLoading(true);
     try {
-      const response = await authApi.login(validation.data);
-      if (response.data && response.data.token) {
-        login(response.data.token, response.data.user);
-        navigate(getDashboardPath(response.data.user?.role), { replace: true });
-      } else {
-        throw new Error('Authentication response did not return a valid session token.');
-      }
-    } catch (err: any) {
-      const exactMsg = formatAuthError(err, 'Unable to sign in. Please verify your credentials.');
-      setError(exactMsg);
-      setNeedsVerification(exactMsg.toLowerCase().includes('has not been confirmed'));
+      await requestEmailOtp(validation.data, { shouldCreateUser: false });
+      navigate(`/verify-otp?email=${encodeURIComponent(validation.data)}`);
+    } catch (requestError: unknown) {
+      setError(requestError instanceof Error ? requestError.message : 'Unable to send a sign-in code.');
     } finally {
       setLoading(false);
-    }
-  };
-
-  const handleResendVerification = async () => {
-    const emailResult = emailSchema.safeParse(email);
-    if (!emailResult.success) {
-      setFieldErrors((previous) => ({
-        ...previous,
-        email: emailResult.error.issues[0]?.message,
-      }));
-      return;
-    }
-
-    setVerificationResending(true);
-    setVerificationNotice(null);
-    try {
-      await authApi.resendVerification({ email: emailResult.data });
-      setVerificationNotice('If this address has an unverified account, a new link will be sent.');
-    } catch (resendError: unknown) {
-      setVerificationNotice(formatAuthError(resendError, 'Could not request another verification email.'));
-    } finally {
-      setVerificationResending(false);
     }
   };
 
@@ -212,20 +158,6 @@ const LoginPage: React.FC = () => {
                 </div>
               )}
 
-              {needsVerification && (
-                <div className="mb-5 rounded-xl border border-amber-500/30 bg-amber-500/10 p-3 text-xs text-amber-200">
-                  <button
-                    type="button"
-                    onClick={handleResendVerification}
-                    disabled={verificationResending}
-                    className="font-semibold underline underline-offset-4 disabled:opacity-50"
-                  >
-                    {verificationResending ? 'Sending...' : 'Resend verification email'}
-                  </button>
-                  {verificationNotice && <p className="mt-2" role="status">{verificationNotice}</p>}
-                </div>
-              )}
-
               {/* Google Sign-In */}
               {isConfigured && (
                 <div className="mb-4">
@@ -251,7 +183,7 @@ const LoginPage: React.FC = () => {
                       type="email"
                       required
                       maxLength={254}
-                      autoComplete="off"
+                      autoComplete="email"
                       value={email}
                       aria-invalid={Boolean(fieldErrors.email)}
                       aria-describedby={fieldErrors.email ? 'login-email-error' : undefined}
@@ -279,12 +211,11 @@ const LoginPage: React.FC = () => {
                   )}
                 </div>
 
-                {/* Password Field with Show/Hide Toggle */}
                 <div>
                   <div className="flex items-center justify-between mb-1.5">
-                    <label htmlFor="password" className="block text-xs font-semibold text-slate-300 uppercase tracking-wider">
-                      Password
-                    </label>
+                    <p className="text-xs text-slate-400">
+                      We’ll email you a 6-digit code to sign in.
+                    </p>
                     <Link
                       to="/forgot-password"
                       className="text-xs text-indigo-400 hover:text-indigo-300 transition"
@@ -292,54 +223,6 @@ const LoginPage: React.FC = () => {
                       Forgot password?
                     </Link>
                   </div>
-                  <div className="relative">
-                    <input
-                      id="password"
-                      type={showPassword ? 'text' : 'password'}
-                      required
-                      autoComplete="new-password"
-                      value={password}
-                      aria-invalid={Boolean(fieldErrors.password)}
-                      aria-describedby={fieldErrors.password ? 'login-password-error' : undefined}
-                      onChange={(e) => {
-                        setPassword(e.target.value);
-                        setFieldErrors((previous) => ({ ...previous, password: undefined }));
-                        setError(null);
-                      }}
-                      onBlur={() => {
-                        const result = loginPasswordSchema.safeParse(password);
-                        setFieldErrors((previous) => ({
-                          ...previous,
-                          password: result.success ? undefined : result.error.issues[0]?.message,
-                        }));
-                      }}
-                      disabled={loading}
-                      placeholder="••••••••••••"
-                      className="w-full px-3.5 py-2.5 pr-10 rounded-xl bg-slate-950/70 border border-slate-700/80 text-white placeholder-slate-500 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition duration-150"
-                    />
-                    <button
-                      type="button"
-                      aria-label={showPassword ? 'Hide password' : 'Show password'}
-                      onClick={() => setShowPassword(!showPassword)}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-200 transition p-1"
-                    >
-                      {showPassword ? (
-                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l18 18" />
-                        </svg>
-                      ) : (
-                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                        </svg>
-                      )}
-                    </button>
-                  </div>
-                  {fieldErrors.password && (
-                    <p id="login-password-error" className="mt-1 text-xs text-rose-300" role="alert">
-                      {fieldErrors.password}
-                    </p>
-                  )}
                 </div>
 
                 {/* Submit Action */}
@@ -355,10 +238,10 @@ const LoginPage: React.FC = () => {
                           <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                           <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                         </svg>
-                        <span>Authenticating Credentials...</span>
+                        <span>Sending sign-in code...</span>
                       </>
                     ) : (
-                      <span>Enter Sovereign Vault</span>
+                      <span>Send sign-in code</span>
                     )}
                   </button>
                 </div>

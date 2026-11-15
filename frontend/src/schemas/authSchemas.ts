@@ -35,6 +35,28 @@ export const loginSchema = z.object({
   password: loginPasswordSchema,
 });
 
+export const otpRegistrationSchema = z
+  .object({
+    fullName: fullNameSchema,
+    email: emailSchema,
+    userType: z.enum(['institution', 'collector']),
+    institutionName: z.string().optional(),
+  })
+  .superRefine((form, context) => {
+    if (form.userType === 'institution') {
+      const result = institutionNameSchema.safeParse(form.institutionName ?? '');
+      if (!result.success) {
+        for (const issue of result.error.issues) {
+          context.addIssue({
+            code: 'custom',
+            path: ['institutionName'],
+            message: issue.message,
+          });
+        }
+      }
+    }
+  });
+
 export const registrationSchema = z
   .object({
     fullName: fullNameSchema,

@@ -1,5 +1,5 @@
 ﻿import { useCallback, useEffect, useRef } from 'react';
-import { authApi } from '../services/api';
+import { getSupabaseClient } from '../services/supabase';
 
 declare global {
   interface Window {
@@ -64,8 +64,8 @@ function loadGSIScript(): Promise<void> {
 export interface UseGoogleAuthOptions {
   /** The user role to pass to the backend on first sign-up */
   role?: string;
-  /** Called with { token, user } on successful auth */
-  onSuccess: (data: { token: string; user: Record<string, unknown> }) => void;
+  /** Called after Supabase creates a session */
+  onSuccess: (data: { role: string }) => void;
   /** Called with an error message on failure */
   onError: (message: string) => void;
 }
@@ -84,16 +84,24 @@ export function useGoogleAuth({ role, onSuccess, onError }: UseGoogleAuthOptions
   const handleCredential = useCallback(
     async (credential: string) => {
       try {
-        const res = await authApi.googleLogin({ idToken: credential, role });
-        if (res.data?.token) {
-          onSuccess(res.data);
-        } else {
-          onError('Unexpected response from authentication server');
+        const client = getSupabaseClient();
+        const { data, error } = await client.auth.signInWithIdToken({
+          provider: 'google',
+          token: credential,
+        });
+        if (error) throw error;
+
+        const existingRole = data.user.user_metadata?.role;
+        const selectedRole = typeof existingRole === 'string' ? existingRole : role || 'COLLECTOR';
+        if (role && typeof existingRole !== 'string') {
+          const { error: metadataError } = await client.auth.updateUser({
+            data: { role },
+          });
+          if (metadataError) throw metadataError;
         }
+        onSuccess({ role: selectedRole });
       } catch (err: unknown) {
-        const message =
-          (err as { response?: { data?: { error?: string } } })?.response?.data?.error ||
-          (err instanceof Error ? err.message : 'Google sign-in failed');
+        const message = err instanceof Error ? err.message : 'Google sign-in failed';
         onError(message);
       }
     },

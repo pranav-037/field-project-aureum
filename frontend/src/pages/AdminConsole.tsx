@@ -2,32 +2,23 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Navbar from '../components/Navbar';
 import { institutionApi, artworkApi } from '../services/api';
+import { useAuth } from '../context/AuthContext';
 
 const AdminConsole: React.FC = () => {
   const navigate = useNavigate();
+  const { user, loading } = useAuth();
   const [activeTab, setActiveTab] = useState<'institutions' | 'users' | 'flags' | 'audit' | 'settings'>('institutions');
   const [institutions, setInstitutions] = useState<any[]>([]);
   const [artworksCount, setArtworksCount] = useState<number>(0);
 
   useEffect(() => {
-    try {
-      const token = localStorage.getItem('aureum_token');
-      const stored = localStorage.getItem('aureum_user');
-      if (!token || !stored) {
-        navigate('/login', { replace: true });
-        return;
-      }
-      const user = JSON.parse(stored);
-      if (user.role !== 'ADMIN') {
-        if (user.role === 'AUTHENTICATOR') {
-          navigate('/institution/dashboard', { replace: true });
-        } else {
-          navigate('/collector/dashboard', { replace: true });
-        }
-        return;
-      }
-    } catch {
+    if (loading) return;
+    if (!user) {
       navigate('/login', { replace: true });
+      return;
+    }
+    if (user.role !== 'ADMIN') {
+      navigate(user.role === 'AUTHENTICATOR' ? '/institution/dashboard' : '/collector/dashboard', { replace: true });
       return;
     }
 
@@ -50,7 +41,7 @@ const AdminConsole: React.FC = () => {
     };
 
     fetchData();
-  }, []);
+  }, [loading, navigate, user]);
 
   const pendingInstitutions = institutions.filter(i => i.status === 'PENDING');
   const activeInstitutions = institutions.filter(i => i.status === 'APPROVED');

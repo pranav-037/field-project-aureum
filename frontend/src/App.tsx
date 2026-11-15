@@ -11,6 +11,7 @@ import RegisterPage from './pages/RegisterPage';
 import ForgotPasswordPage from './pages/ForgotPasswordPage';
 import ResetPasswordPage from './pages/ResetPasswordPage';
 import AuthCallbackPage from './pages/AuthCallbackPage';
+import VerifyOtpPage from './pages/VerifyOtpPage';
 import ProfileDashboard from './pages/ProfileDashboard';
 import InstitutionDashboard from './pages/InstitutionDashboard';
 import CollectorDashboard from './pages/CollectorDashboard';
@@ -32,6 +33,7 @@ function App() {
                 <Route path="/forgot-password" element={<ForgotPasswordPage />} />
                 <Route path="/reset-password" element={<ResetPasswordPage />} />
                 <Route path="/auth/callback" element={<AuthCallbackPage />} />
+                <Route path="/verify-otp" element={<VerifyOtpPage />} />
                 
                 {/* Auth-Guarded Profile Dashboard */}
                 <Route
