@@ -2,8 +2,8 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useGoogleAuth } from '../hooks/useGoogleAuth';
 import { useAuth } from '../context/AuthContext';
-import { emailSchema } from '../schemas/authSchemas';
-import { requestEmailOtp } from '../services/emailOtp';
+import { emailSchema, loginPasswordSchema } from '../schemas/authSchemas';
+import { signInWithEmail } from '../services/supabaseAuth';
 
 function getDashboardPath(role?: string): string {
   if (role === 'ADMIN' || role === 'AUTHENTICATOR') return '/institution/dashboard';
@@ -15,7 +15,8 @@ const LoginPage: React.FC = () => {
   const navigate = useNavigate();
   const { user, loading: authLoading } = useAuth();
   const [email, setEmail] = useState('');
-  const [fieldErrors, setFieldErrors] = useState<Partial<Record<'email', string>>>({});
+  const [password, setPassword] = useState('');
+  const [fieldErrors, setFieldErrors] = useState<Partial<Record<'email' | 'password', string>>>({});
   const [isInstitution, setIsInstitution] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -47,19 +48,28 @@ const LoginPage: React.FC = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
-    const validation = emailSchema.safeParse(email);
-    if (!validation.success) {
-      setFieldErrors({ email: validation.error.issues[0]?.message });
+    const emailValidation = emailSchema.safeParse(email);
+    const passwordValidation = loginPasswordSchema.safeParse(password);
+    if (!emailValidation.success || !passwordValidation.success) {
+      setFieldErrors({
+        email: emailValidation.success ? undefined : emailValidation.error.issues[0]?.message,
+        password: passwordValidation.success ? undefined : passwordValidation.error.issues[0]?.message,
+      });
       return;
     }
 
     setFieldErrors({});
     setLoading(true);
     try {
-      await requestEmailOtp(validation.data, { shouldCreateUser: false });
-      navigate(`/verify-otp?email=${encodeURIComponent(validation.data)}`);
+      const data = await signInWithEmail(emailValidation.data, passwordValidation.data);
+      navigate(getDashboardPath(data.user.user_metadata.role), { replace: true });
     } catch (requestError: unknown) {
-      setError(requestError instanceof Error ? requestError.message : 'Unable to send a sign-in code.');
+      const message = requestError instanceof Error ? requestError.message : 'Unable to sign in.';
+      setError(
+        /email not confirmed/i.test(message)
+          ? 'Verify your email using the link we sent before signing in.'
+          : message,
+      );
     } finally {
       setLoading(false);
     }
@@ -212,9 +222,41 @@ const LoginPage: React.FC = () => {
                 </div>
 
                 <div>
-                  <div className="flex items-center justify-between mb-1.5">
+                  <label htmlFor="password" className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-slate-300">
+                    Password
+                  </label>
+                  <input
+                    id="password"
+                    type="password"
+                    autoComplete="current-password"
+                    value={password}
+                    aria-invalid={Boolean(fieldErrors.password)}
+                    aria-describedby={fieldErrors.password ? 'login-password-error' : undefined}
+                    onChange={(e) => {
+                      setPassword(e.target.value);
+                      setFieldErrors((previous) => ({ ...previous, password: undefined }));
+                      setError(null);
+                    }}
+                    onBlur={() => {
+                      const result = loginPasswordSchema.safeParse(password);
+                      setFieldErrors((previous) => ({
+                        ...previous,
+                        password: result.success ? undefined : result.error.issues[0]?.message,
+                      }));
+                    }}
+                    disabled={loading}
+                    className="w-full px-3.5 py-2.5 rounded-xl bg-slate-950/70 border border-slate-700/80 text-white text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition duration-150"
+                  />
+                  {fieldErrors.password && (
+                    <p id="login-password-error" className="mt-1 text-xs text-rose-300" role="alert">
+                      {fieldErrors.password}
+                    </p>
+                  )}
+                </div>
+
+                <div className="flex items-center justify-between">
                     <p className="text-xs text-slate-400">
-                      We’ll email you a 6-digit code to sign in.
+                      Sign in with your account password.
                     </p>
                     <Link
                       to="/forgot-password"
@@ -222,7 +264,6 @@ const LoginPage: React.FC = () => {
                     >
                       Forgot password?
                     </Link>
-                  </div>
                 </div>
 
                 {/* Submit Action */}
@@ -238,10 +279,10 @@ const LoginPage: React.FC = () => {
                           <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                           <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                         </svg>
-                        <span>Sending sign-in code...</span>
+                        <span>Signing in...</span>
                       </>
                     ) : (
-                      <span>Send sign-in code</span>
+                      <span>Sign in</span>
                     )}
                   </button>
                 </div>

@@ -57,13 +57,13 @@ FRONTEND_URL=http://localhost:5173
 
 ### Authentication email setup
 
-Email sign-in and registration use Supabase Email OTP from the frontend. In the Supabase Dashboard:
+Email registration, sign-in, and password recovery use Supabase Auth from the frontend. In the Supabase Dashboard:
 
-1. Enable the Email provider and email confirmation under **Authentication -> Providers -> Email**.
-2. Update the **Confirm signup** and **Magic Link** email templates to display the six-digit code with `{{ .Token }}`. Keep the token visible as plain text; the app asks the user to enter it.
-3. Configure a production SMTP provider for reliable delivery and review the **Reset password** template, which remains a link-based flow.
-4. Set the **Site URL** to your frontend origin and allow the local reset URL `http://localhost:5173/reset-password`. Add production URLs when deploying.
-5. Copy the project URL and **anon/public** key into `frontend/.env` as `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY`. Never use the service-role key in the frontend. Keep `FRONTEND_URL` in `backend/.env` for password-reset redirects.
+1. Enable the Email provider and **Confirm email** under **Authentication -> Providers -> Email**.
+2. Keep the **Confirm signup** and **Reset password** templates link-based using `{{ .ConfirmationURL }}`. The app redirects confirmation links to `/auth/callback` and recovery links to `/reset-password`.
+3. Configure a production SMTP provider for reliable delivery; Supabase's default email service is rate-limited and intended for testing.
+4. Set the **Site URL** to your frontend origin and add `http://localhost:5173/auth/callback` and `http://localhost:5173/reset-password` to the allowed redirect URLs. Add the equivalent production URLs when deploying.
+5. Copy the project URL and **anon/public** key into `frontend/.env` as `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY`. Never use the service-role key in the frontend.
 
 **RLS warning:** the current schema grants anonymous/authenticated SELECT on every table. A browser Supabase client exposes the anon key by design, so do not use it with sensitive production data until table-specific RLS policies are reviewed and applied. The OTP client only uses Auth, but the exposed key can also be used against the project's Data API.
 

@@ -2,12 +2,12 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useGoogleAuth } from '../hooks/useGoogleAuth';
 import { useAuth } from '../context/AuthContext';
-import { requestEmailOtp } from '../services/emailOtp';
+import { signUpWithEmail } from '../services/supabaseAuth';
 import {
   emailSchema,
   fullNameSchema,
   institutionNameSchema,
-  otpRegistrationSchema,
+  registrationSchema,
   signupPasswordSchema,
 } from '../schemas/authSchemas';
 
@@ -35,6 +35,7 @@ const RegisterPage: React.FC = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<Partial<Record<RegistrationField, string>>>({});
   const [loading, setLoading] = useState(false);
   const googleBtnRef = useRef<HTMLDivElement>(null);
@@ -83,6 +84,7 @@ const RegisterPage: React.FC = () => {
       }));
     }
     setError(null);
+    setNotice(null);
   };
 
   const validateField = (field: RegistrationField) => {
@@ -114,7 +116,8 @@ const RegisterPage: React.FC = () => {
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setError(null);
-    const validation = otpRegistrationSchema.safeParse(formData);
+    setNotice(null);
+    const validation = registrationSchema.safeParse(formData);
     if (!validation.success) {
       const nextErrors: Partial<Record<RegistrationField, string>> = {};
       for (const issue of validation.error.issues) {
@@ -139,18 +142,19 @@ const RegisterPage: React.FC = () => {
     setLoading(true);
     try {
       const role = validation.data.userType === 'institution' ? 'AUTHENTICATOR' : 'COLLECTOR';
-      await requestEmailOtp(validation.data.email, {
-        shouldCreateUser: true,
-        data: {
-          name: validation.data.fullName,
-          role,
-          accountType: validation.data.userType,
-          institutionName: validation.data.institutionName ?? '',
-        },
+      const data = await signUpWithEmail(validation.data.email, validation.data.password, {
+        name: validation.data.fullName,
+        role,
+        accountType: validation.data.userType,
+        institutionName: validation.data.institutionName ?? '',
       });
-      navigate(`/verify-otp?email=${encodeURIComponent(validation.data.email)}`);
+      if (data.session) {
+        navigate(getDashboardPath(role), { replace: true });
+      } else {
+        setNotice(`A verification link has been sent to ${validation.data.email}. Open it to verify your email and finish creating your account.`);
+      }
     } catch (requestError: unknown) {
-      setError(requestError instanceof Error ? requestError.message : 'Could not send a verification code.');
+      setError(requestError instanceof Error ? requestError.message : 'Could not send a verification link.');
     } finally {
       setLoading(false);
     }
@@ -248,6 +252,11 @@ const RegisterPage: React.FC = () => {
                   <span>{error}</span>
                 </div>
               )}
+              {notice && (
+                <div className="mb-6 rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-3.5 text-sm text-emerald-200" role="status">
+                  {notice}
+                </div>
+              )}
 
               {/* Google Sign-Up */}
               {isConfigured && (
@@ -262,7 +271,7 @@ const RegisterPage: React.FC = () => {
               )}
 
               {/* Registration Form */}
-              <form onSubmit={handleSubmit} noValidate autoComplete="off" className="space-y-4 text-left">
+              <form onSubmit={handleSubmit} noValidate autoComplete="on" className="space-y-4 text-left">
                 {/* Full Name Field */}
                 <div>
                   <label htmlFor="fullName" className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1.5">
@@ -325,11 +334,11 @@ const RegisterPage: React.FC = () => {
                 </div>
 
                 <p className="text-xs text-slate-400">
-                  We’ll email a 6-digit code to verify your address and create your account.
+                  We’ll email a verification link to confirm your address and activate your account.
                 </p>
 
                 {/* Password Field with Show/Hide Toggle */}
-                <div className="hidden">
+                <div>
                   <div className="flex items-center justify-between mb-1.5">
                     <label htmlFor="password" className="block text-xs font-semibold text-slate-300 uppercase tracking-wider">
                       Password
@@ -381,7 +390,7 @@ const RegisterPage: React.FC = () => {
                 </div>
 
                 {/* Confirm Password Field with Show/Hide Toggle */}
-                <div className="hidden">
+                <div>
                   <div className="flex items-center justify-between mb-1.5">
                     <label htmlFor="confirmPassword" className="block text-xs font-semibold text-slate-300 uppercase tracking-wider">
                       Confirm Password
@@ -517,10 +526,10 @@ const RegisterPage: React.FC = () => {
                           <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                           <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                         </svg>
-                        <span>Sending verification code...</span>
+                        <span>Creating account...</span>
                       </>
                     ) : (
-                      <span>Send verification code</span>
+                      <span>Create account</span>
                     )}
                   </button>
                 </div>

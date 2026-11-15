@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { authApi, formatAuthError } from '../services/api';
 import { emailSchema } from '../schemas/authSchemas';
+import { requestPasswordReset } from '../services/supabaseAuth';
 
 const ForgotPasswordPage: React.FC = () => {
   const [email, setEmail] = useState('');
@@ -24,10 +24,10 @@ const ForgotPasswordPage: React.FC = () => {
     setEmailError(undefined);
     setLoading(true);
     try {
-      await authApi.requestPasswordReset({ email: validation.data });
+      await requestPasswordReset(validation.data);
       setNotice(`If an account exists for ${validation.data}, password reset instructions will be sent.`);
     } catch (requestError: unknown) {
-      setError(formatAuthError(requestError, 'Could not request a password reset email.'));
+      setError(requestError instanceof Error ? requestError.message : 'Could not request a password reset email.');
     } finally {
       setLoading(false);
     }

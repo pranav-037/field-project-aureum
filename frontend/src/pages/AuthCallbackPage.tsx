@@ -1,8 +1,10 @@
 import React, { useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext';
 
 const AuthCallbackPage: React.FC = () => {
   const location = useLocation();
+  const { user, loading } = useAuth();
   const fragment = new URLSearchParams(location.hash.replace(/^#/, ''));
   const query = new URLSearchParams(location.search);
   const errorMessage =
@@ -10,17 +12,20 @@ const AuthCallbackPage: React.FC = () => {
     query.get('error_description') ||
     fragment.get('error') ||
     query.get('error');
-  const completedSignup =
-    fragment.get('type') === 'signup' ||
-    query.get('type') === 'signup' ||
-    (query.get('flow') === 'signup' && Boolean(fragment.get('access_token')));
-  const confirmed = !errorMessage && completedSignup;
+  const confirmed = !errorMessage && Boolean(user);
 
   useEffect(() => {
-    if (location.hash || location.search) {
+    if (!loading && (location.hash || location.search)) {
       window.history.replaceState(null, document.title, location.pathname);
     }
-  }, [location.hash, location.pathname, location.search]);
+  }, [loading, location.hash, location.pathname, location.search]);
+
+  const dashboardPath =
+    user?.role === 'ADMIN' || user?.role === 'AUTHENTICATOR'
+      ? '/institution/dashboard'
+      : user?.role === 'COLLECTOR'
+        ? '/collector/dashboard'
+        : '/profile';
 
   return (
     <main className="min-h-screen bg-[#0B0F17] px-4 py-12 text-slate-100">
@@ -30,16 +35,20 @@ const AuthCallbackPage: React.FC = () => {
           className={`mt-6 rounded-xl border p-4 text-sm ${
             confirmed
               ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-200'
-              : 'border-rose-500/30 bg-rose-500/10 text-rose-200'
+              : errorMessage
+                ? 'border-rose-500/30 bg-rose-500/10 text-rose-200'
+                : 'border-slate-700 bg-slate-800/50 text-slate-300'
           }`}
-          role={confirmed ? 'status' : 'alert'}
+          role={confirmed || loading ? 'status' : 'alert'}
         >
-          {confirmed
-            ? 'Your email has been verified. You can now sign in.'
-            : errorMessage || 'This verification link is invalid or expired. Request a new one from the registration page.'}
+          {loading
+            ? 'Verifying your email...'
+            : confirmed
+              ? 'Your email has been verified.'
+              : errorMessage || 'This verification link is invalid or expired. Request a new one from the registration page.'}
         </div>
-        <Link to={confirmed ? '/login' : '/register'} className="mt-5 inline-block font-semibold text-indigo-300">
-          {confirmed ? 'Continue to sign in' : 'Return to registration'}
+        <Link to={confirmed ? dashboardPath : '/register'} className="mt-5 inline-block font-semibold text-indigo-300">
+          {confirmed ? 'Continue to your account' : 'Return to registration'}
         </Link>
       </div>
     </main>

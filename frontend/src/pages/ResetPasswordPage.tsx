@@ -1,12 +1,12 @@
 import React, { useEffect, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { authApi, formatAuthError } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import { signupPasswordSchema } from '../schemas/authSchemas';
+import { updatePassword } from '../services/supabaseAuth';
 
 const ResetPasswordPage: React.FC = () => {
   const location = useLocation();
-  const { logout } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [fieldErrors, setFieldErrors] = useState<Partial<Record<'password' | 'confirmPassword', string>>>({});
@@ -14,22 +14,11 @@ const ResetPasswordPage: React.FC = () => {
   const [success, setSuccess] = useState(false);
   const [loading, setLoading] = useState(false);
 
-  const fragment = new URLSearchParams(location.hash.replace(/^#/, ''));
-  const query = new URLSearchParams(location.search);
-  const accessToken = fragment.get('access_token') || '';
-  const linkType = fragment.get('type') || query.get('type');
-  const linkMessage =
-    fragment.get('error_description') ||
-    query.get('error_description') ||
-    fragment.get('error') ||
-    query.get('error') ||
-    'This password reset link is invalid or expired. Request a new one.';
-
   useEffect(() => {
-    if (!accessToken && (location.hash || location.search)) {
+    if (!authLoading && (location.hash || location.search)) {
       window.history.replaceState(null, document.title, location.pathname);
     }
-  }, [accessToken, location.hash, location.pathname, location.search]);
+  }, [authLoading, location.hash, location.pathname, location.search]);
 
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -52,12 +41,10 @@ const ResetPasswordPage: React.FC = () => {
     setFieldErrors({});
     setLoading(true);
     try {
-      await authApi.completePasswordReset({ accessToken, password });
-      await logout();
-      window.history.replaceState(null, document.title, location.pathname);
+      await updatePassword(password);
       setSuccess(true);
     } catch (resetError: unknown) {
-      setError(formatAuthError(resetError, 'Could not update your password. Request a new reset link.'));
+      setError(resetError instanceof Error ? resetError.message : 'Could not update your password. Request a new reset link.');
     } finally {
       setLoading(false);
     }
@@ -72,11 +59,13 @@ const ResetPasswordPage: React.FC = () => {
         {success ? (
           <div className="mt-5 rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-4 text-sm text-emerald-200" role="status">
             <p>Your password has been updated.</p>
-            <Link to="/login" className="mt-3 inline-block font-semibold text-indigo-300">Continue to sign in</Link>
+            <Link to="/profile" className="mt-3 inline-block font-semibold text-indigo-300">Continue to your account</Link>
           </div>
-        ) : !accessToken || linkType !== 'recovery' ? (
+        ) : authLoading ? (
+          <p className="mt-5 text-sm text-slate-400" role="status">Checking your password reset link...</p>
+        ) : !user ? (
           <div className="mt-5 rounded-xl border border-rose-500/30 bg-rose-500/10 p-4 text-sm text-rose-200">
-            <p>{linkMessage}</p>
+            <p>This password reset link is invalid or expired. Request a new one.</p>
             <Link to="/forgot-password" className="mt-3 inline-block font-semibold text-indigo-300">Request a new reset link</Link>
           </div>
         ) : (
