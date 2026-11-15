@@ -29,8 +29,12 @@ export const Navbar: React.FC = () => {
   };
 
   const navLinks = [
-    { name: 'Collector Vault', path: '/collector/dashboard' },
-    { name: 'Institution Portal', path: '/institution/dashboard' },
+    ...(user?.role === 'COLLECTOR' || user?.role === 'ADMIN' || !user
+      ? [{ name: 'Collector Vault', path: '/collector/dashboard' }]
+      : []),
+    ...(user?.role === 'AUTHENTICATOR' || user?.role === 'ADMIN'
+      ? [{ name: 'Institution Portal', path: '/institution/dashboard' }]
+      : []),
     { name: 'Verify Artwork', path: '/verify', badge: true },
   ];
 

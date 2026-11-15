@@ -17,7 +17,10 @@ backend/prisma/*.db-journal
 # Environment variables
 .env
 .env.*
-!.env.example
+**/.env
+**/.env.*
+*.backup
+!**/.env.example
 
 # Logs
 logs/

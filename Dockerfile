@@ -25,7 +25,7 @@ FROM node:20-alpine AS runner
 WORKDIR /app
 
 ENV NODE_ENV=production
-ENV PORT=3000
+ENV PORT=5000
 
 # Copy root package
 COPY package.json ./
@@ -38,7 +38,7 @@ COPY --from=builder /app/backend/dist ./backend/dist
 # Copy built frontend
 COPY --from=builder /app/frontend/dist ./frontend/dist
 
-EXPOSE 3000
+EXPOSE 5000
 
 # Launch server
 CMD ["node", "backend/dist/index.js"]

@@ -8,6 +8,27 @@ const AdminConsole: React.FC = () => {
   const [artworksCount, setArtworksCount] = useState<number>(0);
 
   useEffect(() => {
+    try {
+      const token = localStorage.getItem('aureum_token');
+      const stored = localStorage.getItem('aureum_user');
+      if (!token || !stored) {
+        navigate('/login', { replace: true });
+        return;
+      }
+      const user = JSON.parse(stored);
+      if (user.role !== 'ADMIN') {
+        if (user.role === 'AUTHENTICATOR') {
+          navigate('/institution/dashboard', { replace: true });
+        } else {
+          navigate('/collector/dashboard', { replace: true });
+        }
+        return;
+      }
+    } catch {
+      navigate('/login', { replace: true });
+      return;
+    }
+
     const fetchData = async () => {
       try {
         const [instRes, artRes] = await Promise.allSettled([

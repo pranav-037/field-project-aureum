@@ -17,7 +17,7 @@ import { supabase, db } from './db/supabase';
 import multer from 'multer';
 
 const app = express();
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 5000;
 
 // Configure Multer for file uploads (max 50MB per file)
 const upload = multer({

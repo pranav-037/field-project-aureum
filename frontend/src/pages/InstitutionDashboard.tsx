@@ -30,9 +30,22 @@ const InstitutionDashboard: React.FC = () => {
 
   useEffect(() => {
     try {
+      const token = localStorage.getItem('aureum_token');
       const stored = localStorage.getItem('aureum_user');
-      if (stored) setCurrentUser(JSON.parse(stored));
-    } catch {}
+      if (!token || !stored) {
+        navigate('/login', { replace: true });
+        return;
+      }
+      const user = JSON.parse(stored);
+      setCurrentUser(user);
+      if (user.role === 'COLLECTOR') {
+        navigate('/collector/dashboard', { replace: true });
+        return;
+      }
+    } catch {
+      navigate('/login', { replace: true });
+      return;
+    }
 
     const fetchData = async () => {
       try {

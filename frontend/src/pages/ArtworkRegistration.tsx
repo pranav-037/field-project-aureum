@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import React, { useState, useEffect } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
 import { artworkApi, ipfsApi } from '../services/api';
 import { useWallet } from '../contexts/WalletContext';
 import Navbar from '../components/Navbar';
@@ -22,6 +22,24 @@ const ArtworkRegistration: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    try {
+      const token = localStorage.getItem('aureum_token');
+      const stored = localStorage.getItem('aureum_user');
+      if (!token || !stored) {
+        navigate('/login', { replace: true });
+        return;
+      }
+      const user = JSON.parse(stored);
+      if (user.role === 'COLLECTOR') {
+        navigate('/collector/dashboard', { replace: true });
+        return;
+      }
+    } catch {
+      navigate('/login', { replace: true });
+    }
+  }, [navigate]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const target = e.target;
