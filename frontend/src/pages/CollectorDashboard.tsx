@@ -33,12 +33,23 @@ interface TransferItem {
 const CollectorDashboard: React.FC = () => {
   const navigate = useNavigate();
   const [filter, setFilter] = useState<'ALL' | 'VERIFIED' | 'ESCROW'>('ALL');
+  const [transfersTab, setTransfersTab] = useState<'ALL' | 'INCOMING' | 'OUTGOING'>('ALL');
   const [selectedArtwork, setSelectedArtwork] = useState<Artwork | null>(null);
   const [showTransferModal, setShowTransferModal] = useState(false);
   const [transferArtwork, setTransferArtwork] = useState<Artwork | null>(null);
   const [showIncomingModal, setShowIncomingModal] = useState(false);
   const [incomingAccepted, setIncomingAccepted] = useState(false);
   const [copiedTx, setCopiedTx] = useState<string | null>(null);
+
+  const scrollToSection = (id: string) => {
+    const el = document.getElementById(id);
+    if (el) {
+      const navOffset = 80;
+      const elementPosition = el.getBoundingClientRect().top;
+      const offsetPosition = elementPosition + window.pageYOffset - navOffset;
+      window.scrollTo({ top: Math.max(0, offsetPosition), behavior: 'smooth' });
+    }
+  };
 
   // Handle direct navigation with hash e.g. /collector/dashboard#collection
   useEffect(() => {
@@ -99,6 +110,7 @@ const CollectorDashboard: React.FC = () => {
   const [transactions, setTransactions] = useState<TransferItem[]>(defaultTransactions);
 
   useEffect(() => {
+    let currentUserId = '';
     try {
       const token = localStorage.getItem('aureum_token');
       const stored = localStorage.getItem('aureum_user');
@@ -107,6 +119,7 @@ const CollectorDashboard: React.FC = () => {
         return;
       }
       const user = JSON.parse(stored);
+      currentUserId = user?.id || '';
       setCurrentUser(user);
       if (user.role === 'AUTHENTICATOR') {
         navigate('/institution/dashboard', { replace: true });
@@ -167,7 +180,9 @@ const CollectorDashboard: React.FC = () => {
         const transRes = await transferApi.getAll();
         if (transRes.data && Array.isArray(transRes.data) && transRes.data.length > 0) {
           const mappedTrans: TransferItem[] = transRes.data.map((t: any) => {
-            const isOutgoing = (currentUser?.id && t.sellerId === currentUser.id) || t.type === 'OUTGOING';
+            const isOutgoing =
+              t.type === 'OUTGOING' ||
+              (currentUserId && t.sellerId === currentUserId && t.buyerId !== currentUserId);
             const type: 'INCOMING' | 'OUTGOING' = isOutgoing ? 'OUTGOING' : 'INCOMING';
             const counterparty = isOutgoing
               ? (t.buyerName || 'MoMA Custodial Vault Escrow')
@@ -200,10 +215,12 @@ const CollectorDashboard: React.FC = () => {
     return true;
   });
 
-  const incomingCount = transactions.filter(t => t.type === 'INCOMING').length;
-  const pendingIncoming = transactions.filter(t => t.type === 'INCOMING' && t.status === 'PENDING_ACCEPTANCE');
+  const incomingTransfers = transactions.filter(t => t.type === 'INCOMING');
+  const outgoingTransfers = transactions.filter(t => t.type === 'OUTGOING');
+  const incomingCount = incomingTransfers.length;
+  const outgoingCount = outgoingTransfers.length;
+  const pendingIncoming = incomingTransfers.filter(t => t.status === 'PENDING_ACCEPTANCE');
   const incomingTransfer = pendingIncoming[0];
-  const outgoingCount = transactions.filter(t => t.type === 'OUTGOING').length;
   const verifiedCount = artworks.filter(item => item.status === 'VERIFIED').length;
 
   const handleCopyTx = (tx: string) => {
@@ -342,7 +359,14 @@ const CollectorDashboard: React.FC = () => {
           </div>
 
           {/* Stat 2: Incoming Transfers */}
-          <div className="relative group p-6 rounded-2xl bg-slate-900/70 border border-slate-800 hover:border-indigo-500/40 shadow-xl backdrop-blur-xl transition duration-300">
+          <div
+            onClick={() => {
+              setTransfersTab('INCOMING');
+              scrollToSection('incoming-transfers');
+            }}
+            className="relative group p-6 rounded-2xl bg-slate-900/70 border border-slate-800 hover:border-indigo-500/60 shadow-xl backdrop-blur-xl transition duration-300 cursor-pointer"
+            title="Click to view and interact with incoming transfers"
+          >
             <div className="flex items-center justify-between">
               <span className="text-xs font-semibold uppercase tracking-wider text-slate-400">
                 Incoming Transfers
@@ -370,7 +394,14 @@ const CollectorDashboard: React.FC = () => {
           </div>
 
           {/* Stat 3: Outgoing Transfers */}
-          <div className="relative group p-6 rounded-2xl bg-slate-900/70 border border-slate-800 hover:border-violet-500/40 shadow-xl backdrop-blur-xl transition duration-300">
+          <div
+            onClick={() => {
+              setTransfersTab('OUTGOING');
+              scrollToSection('outgoing-transfers');
+            }}
+            className="relative group p-6 rounded-2xl bg-slate-900/70 border border-slate-800 hover:border-violet-500/60 shadow-xl backdrop-blur-xl transition duration-300 cursor-pointer"
+            title="Click to view and interact with outgoing transfers"
+          >
             <div className="flex items-center justify-between">
               <span className="text-xs font-semibold uppercase tracking-wider text-slate-400">
                 Outgoing Transfers
@@ -602,132 +633,384 @@ const CollectorDashboard: React.FC = () => {
           )}
         </section>
 
-        {/* 6. Recent Transactions & Activity */}
-        <section id="transfers" className="space-y-4 scroll-mt-24">
-          <div className="flex items-center justify-between">
+        {/* 6. Custody Transfers Section */}
+        <section id="transfers" className="space-y-6 scroll-mt-24">
+          {/* Section Main Header & Tab Switcher */}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-5 rounded-2xl bg-slate-900/70 border border-slate-800 shadow-xl backdrop-blur-xl">
             <div>
-              <h2 className="text-xl sm:text-2xl font-bold text-white tracking-tight">
-                Recent Transactions & Custody Transfers
+              <div className="flex items-center gap-2">
+                <span className="w-2.5 h-2.5 rounded-full bg-gold-400 animate-pulse"></span>
+                <span className="text-xs uppercase font-mono tracking-wider text-gold-400 font-semibold">
+                  Custody & Provenance Registry
+                </span>
+              </div>
+              <h2 className="text-xl sm:text-2xl font-bold text-white tracking-tight mt-1">
+                Custody Transfers Management
               </h2>
               <p className="text-xs sm:text-sm text-slate-400 mt-0.5">
-                Immutable ledger of custody events, verification anchors, and ownership handoffs
+                Dedicated portals to review, sign, and monitor your inbound and outbound fine art transactions
               </p>
+            </div>
+
+            {/* Interaction Controls: Tabs & Initiate Transfer */}
+            <div className="flex flex-wrap items-center gap-2">
+              <div className="p-1 rounded-xl bg-slate-950/80 border border-slate-800 flex items-center gap-1">
+                <button
+                  onClick={() => setTransfersTab('ALL')}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition cursor-pointer ${
+                    transfersTab === 'ALL'
+                      ? 'bg-slate-800 text-white shadow-sm'
+                      : 'text-slate-400 hover:text-slate-200'
+                  }`}
+                >
+                  All ({transactions.length})
+                </button>
+                <button
+                  onClick={() => setTransfersTab('INCOMING')}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition cursor-pointer flex items-center gap-1.5 ${
+                    transfersTab === 'INCOMING'
+                      ? 'bg-indigo-600 text-white shadow-sm'
+                      : 'text-slate-400 hover:text-indigo-300'
+                  }`}
+                >
+                  <span>Incoming ({incomingCount})</span>
+                  {pendingIncoming.length > 0 && (
+                    <span className="w-2 h-2 rounded-full bg-amber-400 animate-ping"></span>
+                  )}
+                </button>
+                <button
+                  onClick={() => setTransfersTab('OUTGOING')}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition cursor-pointer ${
+                    transfersTab === 'OUTGOING'
+                      ? 'bg-violet-600 text-white shadow-sm'
+                      : 'text-slate-400 hover:text-violet-300'
+                  }`}
+                >
+                  Outgoing ({outgoingCount})
+                </button>
+              </div>
+
+              <button
+                onClick={() => {
+                  if (artworks.length === 0) {
+                    alert('You do not have any artworks in your vault to transfer.');
+                    return;
+                  }
+                  setTransferArtwork(artworks[0]);
+                  setShowTransferModal(true);
+                }}
+                className="px-4 py-2 rounded-xl bg-gradient-to-r from-amber-500 to-yellow-600 hover:from-amber-400 hover:to-yellow-500 text-slate-950 font-bold text-xs shadow-lg shadow-amber-500/20 transition flex items-center gap-1.5 cursor-pointer"
+              >
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 4v16m8-8H4" />
+                </svg>
+                Initiate Outgoing Transfer
+              </button>
             </div>
           </div>
 
-          <div className="rounded-2xl bg-slate-900/70 border border-slate-800 shadow-xl backdrop-blur-xl overflow-hidden">
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-xs sm:text-sm">
-                <thead className="bg-slate-950/60 border-b border-slate-800 text-slate-400 uppercase text-[10px] tracking-wider font-semibold">
-                  <tr>
-                    <th className="px-5 py-3.5">Type & Artwork</th>
-                    <th className="px-5 py-3.5">Counterparty</th>
-                    <th className="px-5 py-3.5">Tx Hash</th>
-                    <th className="px-5 py-3.5">Time</th>
-                    <th className="px-5 py-3.5">Status</th>
-                    <th className="px-5 py-3.5 text-right">Action</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-800/80">
-                  {transactions.length === 0 ? (
-                    <tr>
-                      <td colSpan={6} className="px-5 py-14 text-center text-slate-400 text-xs">
-                        <div className="w-12 h-12 mx-auto rounded-xl bg-slate-900 border border-slate-800 flex items-center justify-center text-gold-400 mb-2">
-                          <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                          </svg>
-                        </div>
-                        <span className="block font-medium text-slate-300">No Transactions Recorded</span>
-                        <span className="text-[11px] text-slate-500">Custody handoffs and ownership transfers will be logged here.</span>
-                      </td>
-                    </tr>
-                  ) : (
-                    transactions.map(tx => (
-                    <tr key={tx.id} className="hover:bg-slate-800/30 transition">
-                      <td className="px-5 py-4">
-                        <div className="flex items-center gap-3">
-                          <div className={`w-8 h-8 rounded-lg flex items-center justify-center text-xs font-bold ${
-                            tx.type === 'INCOMING' ? 'bg-indigo-500/20 text-indigo-400' :
-                            tx.type === 'OUTGOING' ? 'bg-amber-500/20 text-amber-400' :
-                            'bg-emerald-500/20 text-emerald-400'
-                          }`}>
-                            {tx.type === 'INCOMING' ? (
-                              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 14l-7 7m0 0l-7-7m7 7V3" />
-                              </svg>
-                            ) : tx.type === 'OUTGOING' ? (
-                              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 10l7-7m0 0l7 7m-7-7v18" />
-                              </svg>
-                            ) : (
-                              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
-                              </svg>
-                            )}
-                          </div>
-                          <div>
-                            <span className="font-semibold text-white block">{tx.title}</span>
-                            <span className="text-[11px] text-slate-400">{tx.artist}</span>
-                          </div>
-                        </div>
-                      </td>
-                      <td className="px-5 py-4 text-slate-300 font-medium">
-                        {tx.counterparty}
-                      </td>
-                      <td className="px-5 py-4">
-                        <button
-                          onClick={() => handleCopyTx(tx.txHash)}
-                          className="font-mono text-xs text-indigo-400 hover:text-indigo-300 flex items-center gap-1.5 transition cursor-pointer"
-                          title="Click to copy hash"
-                        >
-                          {tx.txHash.slice(0, 8)}...{tx.txHash.slice(-6)}
-                          <svg className="w-3.5 h-3.5 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
-                          </svg>
-                        </button>
-                        {copiedTx === tx.txHash && (
-                          <span className="text-[10px] text-emerald-400 block mt-0.5">Copied!</span>
-                        )}
-                      </td>
-                      <td className="px-5 py-4 text-slate-400 text-xs">
-                        {tx.date}
-                      </td>
-                      <td className="px-5 py-4">
-                        {tx.status === 'PENDING_ACCEPTANCE' ? (
-                          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-amber-500/10 text-amber-300 border border-amber-500/20 text-xs font-semibold">
-                            <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse"></span>
-                            Pending Review
-                          </span>
-                        ) : (
-                          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-500/10 text-emerald-300 border border-emerald-500/20 text-xs font-semibold">
-                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
-                            Verified Anchor
-                          </span>
-                        )}
-                      </td>
-                      <td className="px-5 py-4 text-right">
-                        {tx.status === 'PENDING_ACCEPTANCE' ? (
-                          <button
-                            onClick={() => setShowIncomingModal(true)}
-                            className="px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold shadow-sm transition cursor-pointer"
-                          >
-                            Review
-                          </button>
-                        ) : (
-                          <Link
-                            to="/verify"
-                            className="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white text-xs font-semibold transition"
-                          >
-                            View Record
-                          </Link>
-                        )}
-                      </td>
-                    </tr>
-                  )))}
-                </tbody>
-              </table>
+          {/* SECTION A: INCOMING TRANSFERS */}
+          {(transfersTab === 'ALL' || transfersTab === 'INCOMING') && (
+            <div id="incoming-transfers" className="space-y-4 scroll-mt-28">
+              {/* Incoming Header */}
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="w-9 h-9 rounded-xl bg-indigo-500/20 border border-indigo-500/30 flex items-center justify-center text-indigo-400">
+                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 14l-7 7m0 0l-7-7m7 7V3" />
+                    </svg>
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-bold text-white flex items-center gap-2">
+                      Incoming Transfers
+                      <span className="text-xs px-2.5 py-0.5 rounded-full bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 font-semibold">
+                        {incomingTransfers.length} Inbound
+                      </span>
+                    </h3>
+                    <p className="text-xs text-slate-400">
+                      Fine art custody handoffs and museum consignments transferred to your vault
+                    </p>
+                  </div>
+                </div>
+
+                {pendingIncoming.length > 0 && (
+                  <span className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-500/10 text-amber-300 border border-amber-500/30 text-xs font-semibold">
+                    <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse"></span>
+                    {pendingIncoming.length} Requires Your Signature
+                  </span>
+                )}
+              </div>
+
+              {/* Dedicated Card for Pending Acceptance (Interactive) */}
+              {pendingIncoming.length > 0 && (
+                <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-indigo-950/70 via-slate-900/90 to-slate-900 border border-indigo-500/40 p-5 shadow-2xl backdrop-blur-xl">
+                  <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                    <div className="space-y-1">
+                      <div className="flex items-center gap-2">
+                        <span className="px-2 py-0.5 rounded-full bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 text-[10px] font-bold uppercase tracking-wider">
+                          Ready for Sign-off
+                        </span>
+                        <span className="text-xs text-slate-400">{incomingTransfer?.date}</span>
+                      </div>
+                      <h4 className="text-base font-bold text-white">
+                        Incoming Custody Transfer: "{incomingTransfer?.title}" by {incomingTransfer?.artist}
+                      </h4>
+                      <p className="text-xs text-slate-300">
+                        Origin Custodian: <span className="text-indigo-300 font-semibold">{incomingTransfer?.counterparty}</span>. Cryptographic custody acceptance required to anchor physical transfer.
+                      </p>
+                    </div>
+
+                    <div className="flex items-center gap-2 flex-shrink-0">
+                      <button
+                        onClick={() => setShowIncomingModal(true)}
+                        className="px-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold shadow-lg shadow-indigo-600/30 transition cursor-pointer flex items-center gap-1.5"
+                      >
+                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" />
+                        </svg>
+                        Review & Accept Custody
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Incoming Transfers Table */}
+              <div className="rounded-2xl bg-slate-900/70 border border-slate-800 shadow-xl backdrop-blur-xl overflow-hidden">
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-xs sm:text-sm">
+                    <thead className="bg-slate-950/60 border-b border-slate-800 text-slate-400 uppercase text-[10px] tracking-wider font-semibold">
+                      <tr>
+                        <th className="px-5 py-3.5">Inbound Artwork</th>
+                        <th className="px-5 py-3.5">Origin Custodian</th>
+                        <th className="px-5 py-3.5">Tx Hash</th>
+                        <th className="px-5 py-3.5">Date</th>
+                        <th className="px-5 py-3.5">Custody Status</th>
+                        <th className="px-5 py-3.5 text-right">Interaction</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-800/80">
+                      {incomingTransfers.length === 0 ? (
+                        <tr>
+                          <td colSpan={6} className="px-5 py-8 text-center text-slate-400 text-xs">
+                            No incoming transfers currently recorded.
+                          </td>
+                        </tr>
+                      ) : (
+                        incomingTransfers.map(tx => (
+                          <tr key={tx.id} className="hover:bg-slate-800/30 transition">
+                            <td className="px-5 py-4">
+                              <div className="flex items-center gap-3">
+                                <div className="w-8 h-8 rounded-lg bg-indigo-500/20 text-indigo-400 flex items-center justify-center text-xs font-bold">
+                                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 14l-7 7m0 0l-7-7m7 7V3" />
+                                  </svg>
+                                </div>
+                                <div>
+                                  <span className="font-semibold text-white block">{tx.title}</span>
+                                  <span className="text-[11px] text-slate-400">{tx.artist}</span>
+                                </div>
+                              </div>
+                            </td>
+                            <td className="px-5 py-4 text-slate-300 font-medium">
+                              {tx.counterparty}
+                            </td>
+                            <td className="px-5 py-4">
+                              <button
+                                onClick={() => handleCopyTx(tx.txHash)}
+                                className="font-mono text-xs text-indigo-400 hover:text-indigo-300 flex items-center gap-1.5 transition cursor-pointer"
+                                title="Click to copy hash"
+                              >
+                                {tx.txHash.slice(0, 8)}...{tx.txHash.slice(-6)}
+                                <svg className="w-3.5 h-3.5 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                                </svg>
+                              </button>
+                              {copiedTx === tx.txHash && (
+                                <span className="text-[10px] text-emerald-400 block mt-0.5">Copied!</span>
+                              )}
+                            </td>
+                            <td className="px-5 py-4 text-slate-400 text-xs">
+                              {tx.date}
+                            </td>
+                            <td className="px-5 py-4">
+                              {tx.status === 'PENDING_ACCEPTANCE' ? (
+                                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-amber-500/10 text-amber-300 border border-amber-500/20 text-xs font-semibold">
+                                  <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse"></span>
+                                  Pending Review
+                                </span>
+                              ) : (
+                                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-500/10 text-emerald-300 border border-emerald-500/20 text-xs font-semibold">
+                                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
+                                  Verified Anchor
+                                </span>
+                              )}
+                            </td>
+                            <td className="px-5 py-4 text-right">
+                              {tx.status === 'PENDING_ACCEPTANCE' ? (
+                                <button
+                                  onClick={() => setShowIncomingModal(true)}
+                                  className="px-3.5 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold shadow-sm transition cursor-pointer"
+                                >
+                                  Sign & Accept
+                                </button>
+                              ) : (
+                                <Link
+                                  to="/verify"
+                                  className="px-3.5 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white text-xs font-semibold transition"
+                                >
+                                  View Audit Trail
+                                </Link>
+                              )}
+                            </td>
+                          </tr>
+                        ))
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
             </div>
-          </div>
+          )}
+
+          {/* SECTION B: OUTGOING TRANSFERS */}
+          {(transfersTab === 'ALL' || transfersTab === 'OUTGOING') && (
+            <div id="outgoing-transfers" className="space-y-4 scroll-mt-28">
+              {/* Outgoing Header */}
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="w-9 h-9 rounded-xl bg-violet-500/20 border border-violet-500/30 flex items-center justify-center text-violet-400">
+                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 10l7-7m0 0l7 7m-7-7v18" />
+                    </svg>
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-bold text-white flex items-center gap-2">
+                      Outgoing Transfers
+                      <span className="text-xs px-2.5 py-0.5 rounded-full bg-violet-500/20 text-violet-300 border border-violet-500/30 font-semibold">
+                        {outgoingTransfers.length} Outbound
+                      </span>
+                    </h3>
+                    <p className="text-xs text-slate-400">
+                      Custodial escrows, consignments, and ownership transfers initiated from your vault
+                    </p>
+                  </div>
+                </div>
+
+                <button
+                  onClick={() => {
+                    if (artworks.length === 0) {
+                      alert('You do not have any artworks in your vault to transfer.');
+                      return;
+                    }
+                    setTransferArtwork(artworks[0]);
+                    setShowTransferModal(true);
+                  }}
+                  className="px-3.5 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white border border-slate-700 text-xs font-semibold transition flex items-center gap-1.5 cursor-pointer"
+                >
+                  <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4" />
+                  </svg>
+                  New Outgoing Transfer
+                </button>
+              </div>
+
+              {/* Outgoing Transfers Table */}
+              <div className="rounded-2xl bg-slate-900/70 border border-slate-800 shadow-xl backdrop-blur-xl overflow-hidden">
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-xs sm:text-sm">
+                    <thead className="bg-slate-950/60 border-b border-slate-800 text-slate-400 uppercase text-[10px] tracking-wider font-semibold">
+                      <tr>
+                        <th className="px-5 py-3.5">Outbound Artwork</th>
+                        <th className="px-5 py-3.5">Destination / Recipient</th>
+                        <th className="px-5 py-3.5">Tx Hash</th>
+                        <th className="px-5 py-3.5">Date</th>
+                        <th className="px-5 py-3.5">Escrow Status</th>
+                        <th className="px-5 py-3.5 text-right">Interaction</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-800/80">
+                      {outgoingTransfers.length === 0 ? (
+                        <tr>
+                          <td colSpan={6} className="px-5 py-8 text-center text-slate-400 text-xs">
+                            No outgoing transfers recorded.
+                          </td>
+                        </tr>
+                      ) : (
+                        outgoingTransfers.map(tx => (
+                          <tr key={tx.id} className="hover:bg-slate-800/30 transition">
+                            <td className="px-5 py-4">
+                              <div className="flex items-center gap-3">
+                                <div className="w-8 h-8 rounded-lg bg-amber-500/20 text-amber-400 flex items-center justify-center text-xs font-bold">
+                                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 10l7-7m0 0l7 7m-7-7v18" />
+                                  </svg>
+                                </div>
+                                <div>
+                                  <span className="font-semibold text-white block">{tx.title}</span>
+                                  <span className="text-[11px] text-slate-400">{tx.artist}</span>
+                                </div>
+                              </div>
+                            </td>
+                            <td className="px-5 py-4 text-slate-300 font-medium">
+                              {tx.counterparty}
+                            </td>
+                            <td className="px-5 py-4">
+                              <button
+                                onClick={() => handleCopyTx(tx.txHash)}
+                                className="font-mono text-xs text-indigo-400 hover:text-indigo-300 flex items-center gap-1.5 transition cursor-pointer"
+                                title="Click to copy hash"
+                              >
+                                {tx.txHash.slice(0, 8)}...{tx.txHash.slice(-6)}
+                                <svg className="w-3.5 h-3.5 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                                </svg>
+                              </button>
+                              {copiedTx === tx.txHash && (
+                                <span className="text-[10px] text-emerald-400 block mt-0.5">Copied!</span>
+                              )}
+                            </td>
+                            <td className="px-5 py-4 text-slate-400 text-xs">
+                              {tx.date}
+                            </td>
+                            <td className="px-5 py-4">
+                              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-violet-500/10 text-violet-300 border border-violet-500/20 text-xs font-semibold">
+                                <span className="w-1.5 h-1.5 rounded-full bg-violet-400"></span>
+                                {tx.status === 'COMPLETED' ? 'Custody Anchored' : 'In Escrow'}
+                              </span>
+                            </td>
+                            <td className="px-5 py-4 text-right">
+                              <div className="flex items-center justify-end gap-2">
+                                <button
+                                  onClick={() => {
+                                    const matchingArt = artworks.find(a => a.title === tx.title);
+                                    if (matchingArt) {
+                                      setSelectedArtwork(matchingArt);
+                                    } else {
+                                      navigate('/verify');
+                                    }
+                                  }}
+                                  className="px-3.5 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white text-xs font-semibold transition cursor-pointer"
+                                >
+                                  Certificate
+                                </button>
+                                <Link
+                                  to="/verify"
+                                  className="px-3.5 py-1.5 rounded-lg bg-indigo-600/20 hover:bg-indigo-600/30 text-indigo-300 border border-indigo-500/30 text-xs font-semibold transition"
+                                >
+                                  Audit Trail
+                                </Link>
+                              </div>
+                            </td>
+                          </tr>
+                        ))
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          )}
         </section>
 
         {/* 7. Quick Actions Cards Grid */}
