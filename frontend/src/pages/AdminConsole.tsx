@@ -1,10 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
-import WalletButton from '../components/WalletButton';
+import Navbar from '../components/Navbar';
 import { institutionApi, artworkApi } from '../services/api';
 
 const AdminConsole: React.FC = () => {
-  const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState<'institutions' | 'users' | 'flags' | 'audit' | 'settings'>('institutions');
   const [institutions, setInstitutions] = useState<any[]>([]);
   const [artworksCount, setArtworksCount] = useState<number>(0);
@@ -40,49 +38,7 @@ const AdminConsole: React.FC = () => {
       <div className="absolute top-16 left-1/2 -translate-x-1/2 w-[750px] h-[360px] bg-gradient-to-tr from-indigo-600/15 via-violet-600/10 to-amber-500/10 blur-[140px] rounded-full pointer-events-none -z-10"></div>
 
       {/* Navigation */}
-      <nav className="sticky top-0 z-40 backdrop-blur-xl bg-[#0B0F17]/85 border-b border-slate-800/80">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-20 flex items-center justify-between">
-          <Link to="/institution/dashboard" className="flex items-center gap-3 group">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-amber-500 via-indigo-600 to-violet-500 p-[1.5px] shadow-lg shadow-indigo-500/20 group-hover:shadow-indigo-500/40 transition">
-              <div className="w-full h-full bg-[#0B0F17] rounded-[10px] flex items-center justify-center">
-                <svg className="w-5 h-5 text-amber-400 group-hover:scale-110 transition" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <polygon points="12 2 2 7 12 12 22 7 12 2" />
-                  <polyline points="2 17 12 22 22 17" />
-                  <polyline points="2 12 12 17 22 12" />
-                </svg>
-              </div>
-            </div>
-            <div>
-              <span className="text-xl font-bold tracking-tight text-white flex items-center gap-1.5 font-sans">
-                Aureum
-                <span className="text-[10px] uppercase tracking-wider font-semibold px-2 py-0.5 rounded-full bg-gradient-to-r from-amber-500/20 to-indigo-500/20 text-amber-300 border border-amber-500/30">
-                  Artchain
-                </span>
-              </span>
-              <p className="text-[11px] text-slate-400 -mt-0.5 hidden sm:block">Admin Console</p>
-            </div>
-          </Link>
-
-          <div className="flex items-center gap-4">
-            <WalletButton />
-            <Link to="/collector/dashboard" className="text-xs font-semibold px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300">
-              Collector Dashboard
-            </Link>
-            <Link to="/institution/dashboard" className="text-xs font-semibold px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300">
-              Institution Dashboard
-            </Link>
-            <button
-              onClick={() => navigate('/login')}
-              className="p-2 rounded-lg text-slate-400 hover:text-rose-400 transition"
-              title="Sign Out"
-            >
-              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
-              </svg>
-            </button>
-          </div>
-        </div>
-      </nav>
+      <Navbar />
 
       {/* Main Workspace */}
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-12 space-y-8">

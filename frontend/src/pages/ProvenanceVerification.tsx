@@ -1,22 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
 import { artworkApi } from '../services/api';
-import WalletButton from '../components/WalletButton';
+import Navbar from '../components/Navbar';
 import { useArtchainContract } from '../hooks/useArtchainContract';
-
-function getLoggedInDashboard(): string | null {
-  try {
-    const token = localStorage.getItem('aureum_token');
-    const userRaw = localStorage.getItem('aureum_user');
-    if (!token || !userRaw) return null;
-    const user = JSON.parse(userRaw) as { role?: string };
-    const role = user?.role || '';
-    if (role === 'ADMIN' || role === 'AUTHENTICATOR') return '/institution/dashboard';
-    return '/collector/dashboard';
-  } catch {
-    return null;
-  }
-}
 
 interface TransferRecord {
   id: string;
@@ -180,58 +165,7 @@ const ProvenanceVerification: React.FC = () => {
   return (
     <div className="min-h-screen bg-[#0B0F17] text-slate-100 flex flex-col selection:bg-indigo-500/30 selection:text-indigo-200">
       {/* 1. Consistent Navigation Bar */}
-      <nav className="sticky top-0 z-50 backdrop-blur-xl bg-[#0B0F17]/85 border-b border-slate-800/80">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-18 flex items-center justify-between">
-          <Link to={getLoggedInDashboard() ?? '/'} className="flex items-center gap-2.5 group">
-            <div className="w-8 h-8 rounded-lg bg-gradient-to-tr from-amber-500 via-indigo-600 to-violet-500 p-[1.5px] shadow-md shadow-indigo-500/20 group-hover:shadow-indigo-500/40 transition">
-              <div className="w-full h-full bg-[#0B0F17] rounded-[6px] flex items-center justify-center">
-                <svg className="w-4 h-4 text-amber-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <polygon points="12 2 2 7 12 12 22 7 12 2" />
-                  <polyline points="2 17 12 22 22 17" />
-                  <polyline points="2 12 12 17 22 12" />
-                </svg>
-              </div>
-            </div>
-            <span className="text-lg font-bold tracking-tight text-white font-sans flex items-center gap-1.5">
-              Aureum
-              <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-300 border border-amber-500/20 uppercase tracking-wide">
-                Artchain
-              </span>
-            </span>
-          </Link>
-
-          <div className="flex items-center gap-6 text-sm font-medium">
-            <Link to="/" className="text-slate-400 hover:text-slate-200 transition">
-              Home
-            </Link>
-            <Link to="/verify" className="text-amber-300 transition flex items-center gap-1.5 font-semibold">
-              Verify
-              <span className="w-1.5 h-1.5 rounded-full bg-amber-400"></span>
-            </Link>
-            {getLoggedInDashboard() ? (
-              <Link
-                to={getLoggedInDashboard()!}
-                className="text-xs font-semibold px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white shadow-md transition"
-              >
-                Dashboard
-              </Link>
-            ) : (
-              <>
-                <Link to="/login" className="text-slate-400 hover:text-slate-200 transition">
-                  Sign In
-                </Link>
-                <Link
-                  to="/register"
-                  className="hidden sm:inline-flex px-3.5 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold shadow-md transition"
-                >
-                  Get Started
-                </Link>
-              </>
-            )}
-            <WalletButton />
-          </div>
-        </div>
-      </nav>
+      <Navbar />
 
       {/* Main Verification Workspace */}
       <main className="flex-1 max-w-5xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-10 sm:py-16 space-y-12">

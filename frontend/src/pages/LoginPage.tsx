@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { authApi, formatAuthError } from '../services/api';
 import { useGoogleAuth } from '../hooks/useGoogleAuth';
+import { useAuth } from '../context/AuthContext';
 
 /** Returns the dashboard path for the stored user, or null if not logged in */
 function getLoggedInDashboard(): string | null {
@@ -20,6 +21,7 @@ function getLoggedInDashboard(): string | null {
 
 const LoginPage: React.FC = () => {
   const navigate = useNavigate();
+  const { login } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isInstitution, setIsInstitution] = useState(true);
@@ -33,12 +35,10 @@ const LoginPage: React.FC = () => {
   const { isConfigured, renderButton } = useGoogleAuth({
     role: currentRole,
     onSuccess: (data) => {
-      const role = (data.user as { role?: string })?.role || '';
-      if (role === 'AUTHENTICATOR' || role === 'ADMIN') {
-        navigate('/institution/dashboard');
-      } else {
-        navigate('/collector/dashboard');
+      if (data.token && data.user) {
+        login(data.token, data.user as any);
       }
+      navigate('/profile');
     },
     onError: (msg) => setError(msg),
   });
@@ -71,15 +71,8 @@ const LoginPage: React.FC = () => {
     try {
       const response = await authApi.login({ email: trimmedEmail, password });
       if (response.data && response.data.token) {
-        localStorage.setItem('aureum_token', response.data.token);
-        localStorage.setItem('aureum_user', JSON.stringify(response.data.user));
-
-        const userRole = response.data.user?.role || (isInstitution ? 'AUTHENTICATOR' : 'COLLECTOR');
-        if (userRole === 'ADMIN' || userRole === 'AUTHENTICATOR') {
-          navigate('/institution/dashboard');
-        } else {
-          navigate('/collector/dashboard');
-        }
+        login(response.data.token, response.data.user);
+        navigate('/profile');
       } else {
         throw new Error('Authentication response did not return a valid session token.');
       }

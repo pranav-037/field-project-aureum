@@ -1,10 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
+import Navbar from '../components/Navbar';
 
 const LandingPage: React.FC = () => {
-  const [walletConnected, setWalletConnected] = useState(false);
-  const [walletAddress, setWalletAddress] = useState('');
-  const [currentUser, setCurrentUser] = useState<{ email?: string; role?: string; name?: string } | null>(() => {
+  const [currentUser] = useState<{ email?: string; role?: string; name?: string } | null>(() => {
     try {
       const token = localStorage.getItem('aureum_token');
       const userRaw = localStorage.getItem('aureum_user');
@@ -63,124 +62,10 @@ const LandingPage: React.FC = () => {
     }
   }, []);
 
-  const handleConnectWallet = () => {
-    if (!walletConnected) {
-      setWalletAddress('0x71C...49A2');
-      setWalletConnected(true);
-    } else {
-      setWalletConnected(false);
-      setWalletAddress('');
-    }
-  };
-
-  const handleSignOut = () => {
-    localStorage.removeItem('aureum_token');
-    localStorage.removeItem('aureum_user');
-    setCurrentUser(null);
-  };
-
   return (
     <div className="min-h-screen bg-[#0B0F17] text-slate-100 flex flex-col selection:bg-indigo-500/30 selection:text-indigo-200">
       {/* 1. Professional Navigation Bar */}
-      <nav className="sticky top-0 z-50 backdrop-blur-xl bg-[#0B0F17]/80 border-b border-slate-800/80 transition-all duration-300">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-20 flex items-center justify-between">
-          {/* Brand Logo */}
-          <Link
-            to={currentUser ? dashboardUrl : "/"}
-            onClick={scrollToTop}
-            className="flex items-center gap-3 group"
-          >
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-amber-500 via-indigo-600 to-violet-500 p-[1.5px] shadow-lg shadow-indigo-500/20 group-hover:shadow-indigo-500/40 transition duration-300">
-              <div className="w-full h-full bg-[#0B0F17] rounded-[10px] flex items-center justify-center">
-                <svg className="w-5 h-5 text-amber-400 group-hover:scale-110 transition duration-300" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <polygon points="12 2 2 7 12 12 22 7 12 2" />
-                  <polyline points="2 17 12 22 22 17" />
-                  <polyline points="2 12 12 17 22 12" />
-                </svg>
-              </div>
-            </div>
-            <div>
-              <span className="text-xl font-bold tracking-tight text-white flex items-center gap-2 font-display">
-                Aureum
-                <span className="text-[10px] uppercase tracking-widest font-semibold px-2 py-0.5 rounded-full bg-gold-500/10 text-gold-300 border border-gold-500/30 font-sans">
-                  Artchain
-                </span>
-              </span>
-              <p className="text-[10px] text-slate-400 font-mono tracking-wider uppercase -mt-0.5 hidden sm:block">Sovereign Provenance Trail</p>
-            </div>
-          </Link>
-
-          {/* Navigation Links with Smooth Scrolling */}
-          <div className="hidden md:flex items-center gap-8 text-sm font-medium text-slate-300">
-            <a
-              href="#features"
-              onClick={(e) => handleNavScroll(e, 'features')}
-              className="hover:text-amber-300 transition duration-200 cursor-pointer"
-            >
-              Features
-            </a>
-            <a
-              href="#how-it-works"
-              onClick={(e) => handleNavScroll(e, 'how-it-works')}
-              className="hover:text-indigo-300 transition duration-200 cursor-pointer"
-            >
-              How It Works
-            </a>
-            <Link to="/verify" className="hover:text-indigo-300 transition duration-200 flex items-center gap-1">
-              Verify Artwork
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
-            </Link>
-            <a
-              href="#about"
-              onClick={(e) => handleNavScroll(e, 'about')}
-              className="hover:text-amber-300 transition duration-200 cursor-pointer"
-            >
-              About
-            </a>
-          </div>
-
-          {/* Action Buttons */}
-          <div className="flex items-center gap-3">
-            {currentUser ? (
-              <div className="flex items-center gap-3">
-                <Link
-                  to={dashboardUrl}
-                  className="text-xs sm:text-sm font-semibold px-3.5 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white shadow-md shadow-indigo-600/30 transition flex items-center gap-2"
-                >
-                  <span>Dashboard</span>
-                  <span className="text-[10px] px-1.5 py-0.5 rounded bg-indigo-950 text-indigo-300 border border-indigo-500/40 uppercase font-bold">
-                    {currentUser.role === 'AUTHENTICATOR' || currentUser.role === 'ADMIN' ? 'Institution' : 'Collector'}
-                  </span>
-                </Link>
-                <button
-                  type="button"
-                  onClick={handleSignOut}
-                  className="text-xs text-slate-400 hover:text-rose-400 px-2 py-1.5 rounded transition cursor-pointer"
-                  title="Sign Out"
-                >
-                  Sign Out
-                </button>
-              </div>
-            ) : (
-              <Link
-                to="/login"
-                className="text-sm font-medium px-4 py-2 text-slate-300 hover:text-white hover:bg-slate-800/60 rounded-lg transition duration-200"
-              >
-                Sign In
-              </Link>
-            )}
-            <button
-              onClick={handleConnectWallet}
-              className="text-sm font-semibold px-4 py-2.5 rounded-lg bg-gradient-to-r from-indigo-600 via-indigo-500 to-violet-600 hover:from-indigo-500 hover:to-violet-500 text-white shadow-lg shadow-indigo-600/30 hover:shadow-indigo-600/50 hover:-translate-y-0.5 transition duration-200 flex items-center gap-2 cursor-pointer"
-            >
-              <svg className="w-4 h-4 text-indigo-200" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z" />
-              </svg>
-              {walletConnected ? walletAddress : 'Connect Wallet'}
-            </button>
-          </div>
-        </div>
-      </nav>
+      <Navbar />
 
       {/* 2. Hero Section */}
       <section id="hero" className="relative overflow-hidden pt-12 pb-24 md:pt-20 md:pb-32 scroll-mt-24">

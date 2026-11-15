@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
-import WalletButton from '../components/WalletButton';
+import { Link } from 'react-router-dom';
+import Navbar from '../components/Navbar';
 import { activityApi, artworkApi, transferApi } from '../services/api';
 
 function formatTimeAgo(dateStr?: string): string {
@@ -21,7 +21,6 @@ function formatTimeAgo(dateStr?: string): string {
 }
 
 const InstitutionDashboard: React.FC = () => {
-  const navigate = useNavigate();
   const [copiedTx, setCopiedTx] = useState<string | null>(null);
   const [currentUser, setCurrentUser] = useState<any>(null);
   const [activities, setActivities] = useState<any[]>([]);
@@ -81,28 +80,6 @@ const InstitutionDashboard: React.FC = () => {
     setTimeout(() => setCopiedTx(null), 2000);
   };
 
-  const handleNavScroll = (e: React.MouseEvent<HTMLAnchorElement>, targetId: string) => {
-    e.preventDefault();
-    const element = document.getElementById(targetId);
-    if (element) {
-      const navOffset = 80;
-      const elementPosition = element.getBoundingClientRect().top;
-      const offsetPosition = elementPosition + window.pageYOffset - navOffset;
-
-      window.scrollTo({
-        top: Math.max(0, offsetPosition),
-        behavior: 'smooth'
-      });
-      window.history.pushState(null, '', `#${targetId}`);
-    }
-  };
-
-  const scrollToTop = (e: React.MouseEvent) => {
-    e.preventDefault();
-    window.scrollTo({ top: 0, behavior: 'smooth' });
-    window.history.pushState(null, '', window.location.pathname);
-  };
-
   return (
     <div className="min-h-screen bg-[#0B0F17] text-slate-100 flex flex-col selection:bg-indigo-500/30 selection:text-indigo-200">
       {/* Ambient Gradient Glows */}
@@ -110,89 +87,7 @@ const InstitutionDashboard: React.FC = () => {
       <div className="absolute top-80 left-10 w-96 h-96 bg-indigo-500/5 blur-[120px] rounded-full pointer-events-none -z-10"></div>
 
       {/* Navigation Bar */}
-      <nav className="sticky top-0 z-40 backdrop-blur-xl bg-[#0B0F17]/85 border-b border-slate-800/80 transition-all duration-300">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-20 flex items-center justify-between">
-          {/* Brand Logo */}
-          <Link
-            to="/institution/dashboard"
-            onClick={scrollToTop}
-            className="flex items-center gap-3 group"
-          >
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-amber-500 via-indigo-600 to-violet-500 p-[1.5px] shadow-lg shadow-indigo-500/20 group-hover:shadow-indigo-500/40 transition duration-300">
-              <div className="w-full h-full bg-[#0B0F17] rounded-[10px] flex items-center justify-center">
-                <svg className="w-5 h-5 text-amber-400 group-hover:scale-110 transition duration-300" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <polygon points="12 2 2 7 12 12 22 7 12 2" />
-                  <polyline points="2 17 12 22 22 17" />
-                  <polyline points="2 12 12 17 22 12" />
-                </svg>
-              </div>
-            </div>
-            <div>
-              <span className="text-xl font-bold tracking-tight text-white flex items-center gap-1.5 font-sans">
-                Aureum
-                <span className="text-[10px] uppercase tracking-wider font-semibold px-2 py-0.5 rounded-full bg-gradient-to-r from-amber-500/20 to-indigo-500/20 text-amber-300 border border-amber-500/30">
-                  Artchain
-                </span>
-              </span>
-              <p className="text-[11px] text-slate-400 -mt-0.5 hidden sm:block">Institution Portal</p>
-            </div>
-          </Link>
-
-          {/* Navigation Links */}
-          <div className="hidden md:flex items-center gap-8 text-sm font-medium">
-            <a
-              href="#overview"
-              onClick={(e) => handleNavScroll(e, 'overview')}
-              className="text-white font-semibold flex items-center gap-2 border-b-2 border-indigo-500 pb-1 pt-1 cursor-pointer"
-            >
-              <span className="w-2 h-2 rounded-full bg-indigo-400"></span>
-              Overview
-            </a>
-            <Link to="/artwork/register" className="text-slate-400 hover:text-slate-200 transition">
-              Register Artwork
-            </Link>
-            <Link to="/verify" className="text-slate-400 hover:text-amber-300 transition flex items-center gap-1.5">
-              Verify
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
-            </Link>
-            <Link to="/admin" className="text-slate-400 hover:text-slate-200 transition">
-              Admin Console
-            </Link>
-          </div>
-
-          {/* Right Action Area */}
-          <div className="flex items-center gap-3">
-            {/* Web3 Connected Wallet */}
-            <WalletButton />
-
-            <div className="hidden sm:inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-slate-900/90 border border-slate-700/80 text-xs font-medium text-slate-300">
-              <span className="w-2 h-2 rounded-full bg-indigo-400 shadow-[0_0_8px_#6366f1]"></span>
-              <span className="text-indigo-200 font-semibold">Metropolitan Guild</span>
-              <span className="text-slate-500">•</span>
-              <span className="font-mono text-slate-400 text-[11px]">INST-8841</span>
-            </div>
-
-            <Link
-              to="/collector/dashboard"
-              className="text-xs font-semibold px-3 py-2 rounded-lg bg-slate-800/80 hover:bg-slate-700/90 text-slate-300 hover:text-white border border-slate-700/60 transition"
-              title="Switch to Collector View"
-            >
-              Collector Mode
-            </Link>
-
-            <button
-              onClick={() => navigate('/login')}
-              className="p-2 rounded-lg text-slate-400 hover:text-rose-400 hover:bg-rose-500/10 transition"
-              title="Sign Out"
-              aria-label="Sign out"
-            >
-              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
-              </svg>
-            </button>
-          </div>
-        </div>
-      </nav>
+      <Navbar />
 
       {/* Main Container */}
       <main id="overview" className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-12 space-y-10 scroll-mt-24">

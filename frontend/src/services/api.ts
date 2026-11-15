@@ -23,6 +23,8 @@ export const userApi = {
   getAll: () => api.get('/users'),
   create: (data: { email: string; name: string; role?: string }) =>
     api.post('/users', data),
+  updateProfile: (data: any) =>
+    api.put('/users/profile', data),
 };
 
 // Institution API

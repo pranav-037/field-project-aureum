@@ -142,6 +142,47 @@ app.get('/api/auth/me', requireAuth, async (req: Request, res: Response) => {
   }
 });
 
+// Update user profile
+app.put(['/api/users/profile', '/api/auth/profile', '/api/users/:id'], async (req: Request, res: Response) => {
+  try {
+    const { name, role, walletAddress, institution } = req.body;
+    let userId = req.params.id;
+    const authHeader = req.headers.authorization;
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+      try {
+        const token = authHeader.split(' ')[1];
+        const payload: any = AuthService.verifyToken(token);
+        if (payload?.id) userId = payload.id;
+      } catch {}
+    }
+    let updatedUser: any = {
+      id: userId || 'user-current',
+      name,
+      role,
+      walletAddress,
+      institution,
+    };
+    if (userId) {
+      try {
+        const existing = await db.users.findUnique(userId);
+        if (existing) {
+          const updateData: any = {};
+          if (name) updateData.name = name;
+          if (role) updateData.role = role;
+          if (walletAddress !== undefined) updateData.walletAddress = walletAddress;
+          const { data } = await supabase.from('User').update(updateData).eq('id', userId).select().single();
+          if (data) {
+            updatedUser = { ...data, institution };
+          }
+        }
+      } catch {}
+    }
+    res.json({ message: 'Profile updated successfully', user: updatedUser });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message || 'Failed to update profile' });
+  }
+});
+
 // Activities history
 app.get('/api/activities', async (req: Request, res: Response) => {
   try {

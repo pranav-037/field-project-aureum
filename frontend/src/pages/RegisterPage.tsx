@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useGoogleAuth } from '../hooks/useGoogleAuth';
 import { authApi, formatAuthError } from '../services/api';
+import { useAuth } from '../context/AuthContext';
 
 /** Returns the dashboard path for the stored user, or null if not logged in */
 function getLoggedInDashboard(): string | null {
@@ -20,6 +21,7 @@ function getLoggedInDashboard(): string | null {
 
 const RegisterPage: React.FC = () => {
   const navigate = useNavigate();
+  const { login } = useAuth();
   const [formData, setFormData] = useState({
     fullName: '',
     email: '',
@@ -41,12 +43,10 @@ const RegisterPage: React.FC = () => {
   const { isConfigured, renderButton } = useGoogleAuth({
     role: currentRole,
     onSuccess: (data) => {
-      const role = (data.user as { role?: string })?.role || '';
-      if (role === 'AUTHENTICATOR' || role === 'ADMIN') {
-        navigate('/institution/dashboard');
-      } else {
-        navigate('/collector/dashboard');
+      if (data.token && data.user) {
+        login(data.token, data.user as any);
       }
+      navigate('/profile');
     },
     onError: (msg) => setError(msg),
   });
@@ -142,13 +142,8 @@ const RegisterPage: React.FC = () => {
       });
 
       if (res.data?.token) {
-        localStorage.setItem('aureum_token', res.data.token);
-        localStorage.setItem('aureum_user', JSON.stringify(res.data.user));
-        if (formData.userType === 'institution') {
-          navigate('/institution/dashboard');
-        } else {
-          navigate('/collector/dashboard');
-        }
+        login(res.data.token, res.data.user);
+        navigate('/profile');
       } else {
         navigate('/login');
       }
