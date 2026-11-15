@@ -386,9 +386,7 @@ app.get('/api/ipfs/:cid', async (req: Request, res: Response) => {
 // Get all artworks
 app.get('/api/artworks', async (req: Request, res: Response) => {
   try {
-    const artworks = await db.artworks.findMany(
-      'id, blockchainArtworkId, txHash, title, artist, status, createdAt'
-    );
+    const artworks = await db.artworks.findMany('*');
     res.json(artworks);
   } catch (error) {
     res.status(500).json({ error: 'Failed to fetch artworks' });

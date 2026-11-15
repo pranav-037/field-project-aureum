@@ -16,6 +16,7 @@ interface Artwork {
   thumbnailGradient: string;
   nfcTag: string;
   authenticator: string;
+  imageUrl?: string;
 }
 
 interface TransferItem {
@@ -93,18 +94,35 @@ const CollectorDashboard: React.FC = () => {
             'from-blue-800/60 via-amber-700/40 to-slate-900',
             'from-amber-600/60 via-yellow-700/40 to-slate-900'
           ];
-          const mapped: Artwork[] = res.data.map((a: any, idx: number) => ({
-            id: a.blockchainArtworkId ? `AUR-${a.blockchainArtworkId}` : (a.id || `AUR-${idx}`),
-            title: a.title,
-            artist: a.artist,
-            year: a.year || 'Modern',
-            medium: a.medium || 'Fine Art',
-            dimensions: a.dimensions || 'Variable',
-            status: a.status === 'VERIFIED' ? 'VERIFIED' : (a.status === 'IN_ESCROW' ? 'IN_ESCROW' : 'PENDING'),
-            thumbnailGradient: gradients[idx % gradients.length],
-            nfcTag: a.bindingReference || `NFC-BOUND-${idx}`,
-            authenticator: 'Aureum Authentication Guild',
-          }));
+          const mapped: Artwork[] = res.data.map((a: any, idx: number) => {
+            let imgUrl = '';
+            if (a.imageCids) {
+              try {
+                const parsed = JSON.parse(a.imageCids);
+                if (Array.isArray(parsed) && parsed.length > 0) {
+                  imgUrl = parsed[0];
+                } else if (typeof a.imageCids === 'string') {
+                  imgUrl = a.imageCids;
+                }
+              } catch {
+                if (typeof a.imageCids === 'string') imgUrl = a.imageCids;
+              }
+            }
+
+            return {
+              id: a.blockchainArtworkId ? `AUR-${a.blockchainArtworkId}` : (a.id ? `AUR-${a.id.slice(0, 8)}` : `AUR-${idx}`),
+              title: a.title,
+              artist: a.artist,
+              year: a.year || 'Modern',
+              medium: a.medium || 'Fine Art',
+              dimensions: a.dimensions || 'Variable',
+              status: a.status === 'VERIFIED' ? 'VERIFIED' : (a.status === 'IN_ESCROW' ? 'IN_ESCROW' : 'PENDING'),
+              thumbnailGradient: gradients[idx % gradients.length],
+              nfcTag: a.bindingReference || `NFC-BOUND-${idx}`,
+              authenticator: 'Aureum Authentication Guild',
+              imageUrl: imgUrl || undefined,
+            };
+          });
           setArtworks(mapped);
         }
       } catch (err) {
@@ -454,10 +472,23 @@ const CollectorDashboard: React.FC = () => {
                 className="group rounded-2xl bg-slate-900/70 border border-slate-800 hover:border-gold-500/40 shadow-xl backdrop-blur-xl overflow-hidden transition-all duration-300 hover:-translate-y-1 flex flex-col justify-between"
               >
                 {/* Visual Canvas Representation */}
-                <div className={`relative h-44 w-full bg-gradient-to-br ${artwork.thumbnailGradient} p-4 flex flex-col justify-between border-b border-slate-800/80 overflow-hidden`}>
-                  {/* Subtle Grid / Texture effect */}
-                  <div className="absolute inset-0 opacity-20 bg-[radial-gradient(#cbd5e1_1px,transparent_1px)] [background-size:16px_16px]"></div>
-                  
+                <div className="relative h-52 w-full bg-slate-950 p-4 flex flex-col justify-between border-b border-slate-800/80 overflow-hidden">
+                  {artwork.imageUrl ? (
+                    <img
+                      src={artwork.imageUrl}
+                      alt={artwork.title}
+                      className="absolute inset-0 w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+                      loading="lazy"
+                    />
+                  ) : (
+                    <div className={`absolute inset-0 bg-gradient-to-br ${artwork.thumbnailGradient}`}>
+                      <div className="absolute inset-0 opacity-20 bg-[radial-gradient(#cbd5e1_1px,transparent_1px)] [background-size:16px_16px]"></div>
+                    </div>
+                  )}
+
+                  {/* Dark gradient overlay for optimal readability */}
+                  <div className="absolute inset-0 bg-gradient-to-t from-slate-950/90 via-slate-950/20 to-black/60 pointer-events-none"></div>
+
                   {/* Top Badges */}
                   <div className="relative z-10 flex items-center justify-between">
                     <span className="font-mono text-[10px] font-semibold px-2 py-0.5 rounded-md bg-black/60 text-gold-300 border border-gold-500/30 backdrop-blur-md">
@@ -469,21 +500,10 @@ const CollectorDashboard: React.FC = () => {
                     </span>
                   </div>
 
-                  {/* Canvas Centerpiece Mock */}
-                  <div className="relative z-10 my-auto text-center">
-                    <div className="w-12 h-12 mx-auto rounded-xl bg-black/40 border border-white/10 flex items-center justify-center text-gold-300 group-hover:scale-110 transition duration-300">
-                      <svg className="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-                        <polygon points="12 2 2 7 12 12 22 7 12 2" />
-                        <polyline points="2 17 12 22 22 17" />
-                        <polyline points="2 12 12 17 22 12" />
-                      </svg>
-                    </div>
-                  </div>
-
                   {/* Bottom Art Specifications */}
-                  <div className="relative z-10 flex items-center justify-between text-[11px] text-slate-300/90 font-medium">
-                    <span>{artwork.medium}</span>
-                    <span className="font-mono text-[10px] text-slate-400">{artwork.nfcTag}</span>
+                  <div className="relative z-10 flex items-center justify-between text-[11px] text-slate-200 font-medium">
+                    <span className="bg-black/50 px-2 py-0.5 rounded backdrop-blur-sm border border-white/10">{artwork.medium}</span>
+                    <span className="font-mono text-[10px] text-slate-300 bg-black/50 px-2 py-0.5 rounded backdrop-blur-sm border border-white/10">{artwork.nfcTag}</span>
                   </div>
                 </div>
 
@@ -768,6 +788,16 @@ const CollectorDashboard: React.FC = () => {
               <h2 className="text-2xl font-bold text-white">{selectedArtwork.title}</h2>
               <p className="text-xs text-slate-400">By {selectedArtwork.artist} • {selectedArtwork.year}</p>
             </div>
+
+            {selectedArtwork.imageUrl && (
+              <div className="relative h-48 w-full rounded-xl overflow-hidden border border-slate-700/80 shadow-inner">
+                <img
+                  src={selectedArtwork.imageUrl}
+                  alt={selectedArtwork.title}
+                  className="w-full h-full object-cover"
+                />
+              </div>
+            )}
 
             <div className="p-4 rounded-xl bg-slate-950/80 border border-slate-800 space-y-3 text-xs">
               <div className="flex justify-between">
