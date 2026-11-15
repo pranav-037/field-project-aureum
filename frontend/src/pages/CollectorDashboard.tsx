@@ -479,6 +479,8 @@ const CollectorDashboard: React.FC = () => {
                       alt={artwork.title}
                       className="absolute inset-0 w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
                       loading="lazy"
+                      referrerPolicy="no-referrer"
+                      crossOrigin="anonymous"
                     />
                   ) : (
                     <div className={`absolute inset-0 bg-gradient-to-br ${artwork.thumbnailGradient}`}>
@@ -795,6 +797,8 @@ const CollectorDashboard: React.FC = () => {
                   src={selectedArtwork.imageUrl}
                   alt={selectedArtwork.title}
                   className="w-full h-full object-cover"
+                  referrerPolicy="no-referrer"
+                  crossOrigin="anonymous"
                 />
               </div>
             )}
