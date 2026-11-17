@@ -19,7 +19,7 @@ export const SUPPORTED_NETWORKS: Record<number, NetworkConfig> = {
   80002: {
     chainId: 80002,
     name: 'Polygon Amoy Testnet',
-    rpcUrl: 'https://rpc-amoy.polygon.technology',
+    rpcUrl: 'https://polygon-amoy-bor-rpc.publicnode.com',
     currencySymbol: 'POL',
     blockExplorerUrl: 'https://amoy.polygonscan.com',
   },
