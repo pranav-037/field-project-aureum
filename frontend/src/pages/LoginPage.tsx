@@ -3,7 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { useGoogleAuth } from '../hooks/useGoogleAuth';
 import { useAuth } from '../context/AuthContext';
 import { emailSchema, loginPasswordSchema } from '../schemas/authSchemas';
-import { signInWithEmail } from '../services/supabaseAuth';
+import { resendSignupVerification, signInWithEmail } from '../services/supabaseAuth';
 
 function getDashboardPath(role?: string): string {
   if (role === 'ADMIN' || role === 'AUTHENTICATOR') return '/institution/dashboard';
@@ -19,7 +19,10 @@ const LoginPage: React.FC = () => {
   const [fieldErrors, setFieldErrors] = useState<Partial<Record<'email' | 'password', string>>>({});
   const [isInstitution, setIsInstitution] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
+  const [needsEmailVerification, setNeedsEmailVerification] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [resendingVerification, setResendingVerification] = useState(false);
   const googleBtnRef = useRef<HTMLDivElement>(null);
 
   const currentRole = isInstitution ? 'AUTHENTICATOR' : 'COLLECTOR';
@@ -48,6 +51,8 @@ const LoginPage: React.FC = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
+    setNotice(null);
+    setNeedsEmailVerification(false);
     const emailValidation = emailSchema.safeParse(email);
     const passwordValidation = loginPasswordSchema.safeParse(password);
     if (!emailValidation.success || !passwordValidation.success) {
@@ -65,18 +70,39 @@ const LoginPage: React.FC = () => {
       navigate(getDashboardPath(data.user.user_metadata.role), { replace: true });
     } catch (requestError: unknown) {
       const message = requestError instanceof Error ? requestError.message : 'Unable to sign in.';
-      setError(
-        /email not confirmed/i.test(message)
-          ? 'Verify your email using the link we sent before signing in.'
-          : message,
-      );
+      const emailNotConfirmed = /email not confirmed|email_not_confirmed/i.test(message);
+      setNeedsEmailVerification(emailNotConfirmed);
+      setError(emailNotConfirmed
+        ? 'Verify your email before signing in. You can send a new verification link below.'
+        : message);
     } finally {
       setLoading(false);
     }
   };
 
+  const handleResendVerification = async () => {
+    const emailValidation = emailSchema.safeParse(email);
+    if (!emailValidation.success) {
+      setError(emailValidation.error.issues[0]?.message || 'Enter a valid email address.');
+      return;
+    }
+
+    setResendingVerification(true);
+    setError(null);
+    setNotice(null);
+    try {
+      await resendSignupVerification(emailValidation.data);
+      setNeedsEmailVerification(false);
+      setNotice(`A verification link was sent to ${emailValidation.data}. Check your inbox and spam folder.`);
+    } catch (requestError: unknown) {
+      setError(requestError instanceof Error ? requestError.message : 'Could not resend the verification email.');
+    } finally {
+      setResendingVerification(false);
+    }
+  };
+
   return (
-    <div className="min-h-screen bg-[#0B0F17] text-slate-100 flex flex-col selection:bg-indigo-500/30 selection:text-indigo-200">
+    <div className="aureum-theme min-h-screen bg-[#FAF9F6] text-[#18181B] flex flex-col selection:bg-orange-100 selection:text-[#1E3A2F]">
       {/* Top Minimal Navigation */}
       <header className="w-full border-b border-slate-800/80 bg-[#0B0F17]/80 backdrop-blur-md">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
@@ -98,11 +124,11 @@ const LoginPage: React.FC = () => {
             </span>
           </Link>
 
-          <div className="flex items-center gap-4 text-sm">
-            <Link to="/verify" className="text-slate-400 hover:text-gold-300 transition text-xs sm:text-sm">
+          <div className="flex items-center gap-2 text-sm sm:gap-4">
+            <Link to="/verify" className="hidden text-slate-400 transition hover:text-gold-300 sm:inline text-xs sm:text-sm">
               Public Ledger
             </Link>
-            <span className="text-slate-700">|</span>
+            <span className="hidden text-slate-700 sm:inline">|</span>
             <Link to="/register" className="text-gold-400 hover:text-gold-300 font-medium text-xs sm:text-sm">
               Create Account
             </Link>
@@ -167,6 +193,21 @@ const LoginPage: React.FC = () => {
                   <span>{error}</span>
                 </div>
               )}
+              {notice && (
+                <div className="mb-6 rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-3.5 text-sm text-emerald-200" role="status">
+                  {notice}
+                </div>
+              )}
+              {needsEmailVerification && (
+                <button
+                  type="button"
+                  onClick={handleResendVerification}
+                  disabled={resendingVerification}
+                  className="mb-6 min-h-11 w-full rounded-xl border border-amber-500/40 bg-amber-500/10 px-4 py-2.5 text-sm font-semibold text-amber-200 transition hover:bg-amber-500/20 disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  {resendingVerification ? 'Sending verification email...' : 'Resend verification email'}
+                </button>
+              )}
 
               {/* Google Sign-In */}
               {isConfigured && (
@@ -181,7 +222,7 @@ const LoginPage: React.FC = () => {
               )}
 
               {/* Login Form */}
-              <form onSubmit={handleSubmit} noValidate autoComplete="off" className="space-y-4 text-left">
+              <form onSubmit={handleSubmit} noValidate autoComplete="on" className="space-y-4 text-left">
                 {/* Email Field */}
                 <div>
                   <label htmlFor="email" className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1.5">
@@ -201,6 +242,8 @@ const LoginPage: React.FC = () => {
                         setEmail(e.target.value);
                         setFieldErrors((previous) => ({ ...previous, email: undefined }));
                         setError(null);
+                        setNotice(null);
+                        setNeedsEmailVerification(false);
                       }}
                       onBlur={() => {
                         const result = emailSchema.safeParse(email);

@@ -5,6 +5,7 @@ import { useWallet } from '../contexts/WalletContext';
 import Navbar from '../components/Navbar';
 import EditProfileModal from '../components/EditProfileModal';
 import { userApi } from '../services/api';
+import { Fingerprint } from 'lucide-react';
 
 const REGISTRY_CONTRACT_ADDRESS =
   import.meta.env.VITE_REGISTRY_CONTRACT_ADDRESS ||
@@ -39,7 +40,6 @@ export const ProfileDashboard: React.FC = () => {
     showNotification('Sovereign profile & institutional credentials updated successfully.');
   };
 
-  const userInitial = user?.name ? user.name.trim()[0].toUpperCase() : 'U';
   const roleName = user?.role || 'COLLECTOR';
 
   // Role badge color scheme
@@ -55,7 +55,7 @@ export const ProfileDashboard: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-[#0B0F17] text-slate-100 flex flex-col selection:bg-indigo-500/30 selection:text-indigo-200">
+    <div className="aureum-theme min-h-screen bg-[#FAF9F6] text-[#18181B] flex flex-col selection:bg-orange-100 selection:text-[#1E3A2F]">
       {/* Unified Global Navbar */}
       <Navbar />
 
@@ -86,15 +86,10 @@ export const ProfileDashboard: React.FC = () => {
           <div className="absolute -bottom-10 left-10 w-72 h-72 bg-amber-500/10 blur-[90px] pointer-events-none rounded-full" />
 
           <div className="relative flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
-            {/* User Avatar + Identity Info */}
+            {/* Registry identity and account details */}
             <div className="flex items-center gap-5">
-              {/* Avatar Initial */}
-              <div className="w-20 h-20 rounded-2xl bg-gradient-to-tr from-amber-500 via-indigo-600 to-violet-600 p-0.5 shadow-xl shadow-indigo-500/20 flex-shrink-0">
-                <div className="w-full h-full bg-[#0B0F17] rounded-[14px] flex items-center justify-center">
-                  <span className="text-3xl font-extrabold text-white tracking-wider">
-                    {userInitial}
-                  </span>
-                </div>
+              <div className="grid h-20 w-20 flex-shrink-0 place-items-center rounded-2xl border border-[#DCD6CC] bg-[#FDF6EC] text-[#9C3D00] dark:border-[#24302C] dark:bg-[#1A2420] dark:text-[#F27A24]">
+                <Fingerprint className="h-9 w-9" aria-hidden="true" />
               </div>
 
               {/* Text Meta */}
@@ -146,7 +141,7 @@ export const ProfileDashboard: React.FC = () => {
               <button
                 type="button"
                 onClick={() => navigate('/collector/dashboard#transfers')}
-                className="flex-1 md:flex-initial px-4 py-2.5 rounded-xl bg-gradient-to-r from-indigo-600 via-indigo-500 to-violet-600 hover:from-indigo-500 hover:to-violet-500 text-white text-xs sm:text-sm font-semibold shadow-lg shadow-indigo-600/30 hover:shadow-indigo-600/50 transition duration-200 flex items-center justify-center gap-2"
+                className="aureum-primary flex-1 md:flex-initial px-4 py-2.5 rounded-full bg-gradient-to-r from-indigo-600 via-indigo-500 to-violet-600 hover:from-indigo-500 hover:to-violet-500 text-white text-xs sm:text-sm font-semibold shadow-lg shadow-indigo-600/30 hover:shadow-indigo-600/50 transition duration-200 flex items-center justify-center gap-2"
               >
                 <svg className="w-4 h-4 text-indigo-200" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4" />

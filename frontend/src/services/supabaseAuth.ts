@@ -1,7 +1,8 @@
 import { getSupabaseClient } from './supabase';
 
 function getRedirectUrl(path: string): string {
-  return new URL(path, window.location.origin).toString();
+  const siteUrl = import.meta.env.VITE_SITE_URL?.trim() || window.location.origin;
+  return new URL(path, siteUrl).toString();
 }
 
 export async function signInWithEmail(email: string, password: string) {
@@ -13,7 +14,7 @@ export async function signInWithEmail(email: string, password: string) {
 export async function signUpWithEmail(
   email: string,
   password: string,
-  metadata: Record<string, string>,
+  metadata: Record<string, unknown>,
 ) {
   const { data, error } = await getSupabaseClient().auth.signUp({
     email,
@@ -25,6 +26,17 @@ export async function signUpWithEmail(
   });
   if (error) throw error;
   return data;
+}
+
+export async function resendSignupVerification(email: string): Promise<void> {
+  const { error } = await getSupabaseClient().auth.resend({
+    type: 'signup',
+    email,
+    options: {
+      emailRedirectTo: getRedirectUrl('/auth/callback?flow=signup'),
+    },
+  });
+  if (error) throw error;
 }
 
 export async function requestPasswordReset(email: string): Promise<void> {

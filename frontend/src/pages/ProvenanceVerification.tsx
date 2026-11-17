@@ -163,7 +163,7 @@ const ProvenanceVerification: React.FC = () => {
   }, [artworkData, getPreviousOwners]);
 
   return (
-    <div className="min-h-screen bg-[#0B0F17] text-slate-100 flex flex-col selection:bg-indigo-500/30 selection:text-indigo-200">
+    <div className="aureum-theme min-h-screen bg-[#FAF9F6] text-[#18181B] flex flex-col selection:bg-orange-100 selection:text-[#1E3A2F]">
       {/* 1. Consistent Navigation Bar */}
       <Navbar />
 

@@ -11,6 +11,8 @@ interface EditProfileModalProps {
   onSave: (updatedData: Partial<User>) => Promise<void> | void;
 }
 
+const AVAILABLE_COUNTRIES = Object.keys(REGIONS_AND_INSTITUTIONS);
+
 export const EditProfileModal: React.FC<EditProfileModalProps> = ({
   isOpen,
   onClose,
@@ -18,11 +20,10 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({
   onSave,
 }) => {
   const { account } = useWallet();
-  const availableCountries = Object.keys(REGIONS_AND_INSTITUTIONS);
 
   // Determine initial country
   const initialCountry =
-    user.institution?.jurisdiction && availableCountries.includes(user.institution.jurisdiction)
+    user.institution?.jurisdiction && AVAILABLE_COUNTRIES.includes(user.institution.jurisdiction)
       ? user.institution.jurisdiction
       : 'India';
 
@@ -52,7 +53,7 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({
     if (isOpen) {
       setName(user.name || '');
       const country =
-        user.institution?.jurisdiction && availableCountries.includes(user.institution.jurisdiction)
+        user.institution?.jurisdiction && AVAILABLE_COUNTRIES.includes(user.institution.jurisdiction)
           ? user.institution.jurisdiction
           : 'India';
       setSelectedCountry(country);
@@ -80,6 +81,22 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({
       setError(null);
     }
   }, [isOpen, user]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') onClose();
+    };
+    document.addEventListener('keydown', handleKeyDown);
+
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [isOpen, onClose]);
 
   if (!isOpen) return null;
 
@@ -179,10 +196,15 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({
   const currentInstitutionOptions = REGIONS_AND_INSTITUTIONS[selectedCountry] || [];
 
   return (
-    <div className="fixed inset-0 z-50 overflow-y-auto bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
-      <div className="relative w-full max-w-2xl bg-[#0F172A] border border-slate-700/80 rounded-2xl shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+    <div className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-black/75 p-2 backdrop-blur-sm sm:p-4">
+      <section
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="edit-profile-title"
+        className="relative w-[95vw] max-w-lg max-h-[90vh] overflow-y-auto overscroll-contain rounded-2xl border border-slate-700/80 bg-[#0F172A] shadow-2xl animate-in fade-in zoom-in-95 duration-200"
+      >
         {/* Header Bar */}
-        <div className="flex items-center justify-between px-6 py-5 border-b border-slate-800 bg-[#0B0F17]/70">
+        <div className="sticky top-0 z-10 flex items-center justify-between gap-3 border-b border-slate-800 bg-[#0B0F17]/95 px-4 py-4 backdrop-blur sm:px-6 sm:py-5">
           <div className="flex items-center gap-3">
             <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-amber-500/20 via-indigo-600/30 to-violet-600/20 border border-amber-500/30 flex items-center justify-center text-amber-300">
               <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -195,10 +217,10 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({
               </svg>
             </div>
             <div>
-              <h2 className="text-lg font-bold text-white tracking-tight">
+              <h2 id="edit-profile-title" className="text-base font-bold tracking-tight text-white sm:text-lg">
                 Edit Profile & Institutional Credentials
               </h2>
-              <p className="text-xs text-slate-400">
+              <p className="hidden text-xs text-slate-400 sm:block">
                 Update legal identity, jurisdiction, and verified art registry affiliations.
               </p>
             </div>
@@ -206,7 +228,8 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({
           <button
             type="button"
             onClick={onClose}
-            className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition"
+            aria-label="Close edit profile dialog"
+            className="inline-flex min-h-11 min-w-11 items-center justify-center rounded-full text-slate-400 transition hover:bg-slate-800 hover:text-white"
           >
             <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
@@ -215,7 +238,7 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({
         </div>
 
         {/* Form Body */}
-        <form onSubmit={handleSubmit} className="p-6 space-y-5">
+        <form onSubmit={handleSubmit} className="space-y-5 p-4 sm:p-6">
           {error && (
             <div className="p-3 text-xs bg-rose-500/10 border border-rose-500/30 text-rose-300 rounded-xl flex items-center gap-2">
               <svg className="w-4 h-4 text-rose-400 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
@@ -243,7 +266,7 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 placeholder="e.g. Elena Rostova"
-                className="w-full px-3.5 py-2.5 rounded-xl bg-slate-950/70 border border-slate-700/80 text-white placeholder-slate-500 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition"
+                className="min-h-11 w-full rounded-xl border border-slate-700/80 bg-slate-950/70 px-3.5 py-2.5 text-sm text-white placeholder-slate-500 transition focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
               />
             </div>
 
@@ -255,7 +278,7 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({
                 type="email"
                 disabled
                 value={email}
-                className="w-full px-3.5 py-2.5 rounded-xl bg-slate-900/60 border border-slate-800 text-slate-400 text-sm cursor-not-allowed"
+                className="min-h-11 w-full cursor-not-allowed rounded-xl border border-slate-800 bg-slate-900/60 px-3.5 py-2.5 text-sm text-slate-400"
               />
             </div>
           </div>
@@ -291,7 +314,7 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({
                     ? 'VIEWER (Public Read-Only Auditor)'
                     : 'COLLECTOR (Private Art Custodian)'
                 }
-                className="w-full px-3.5 py-2.5 rounded-xl bg-slate-900/70 border border-slate-800 text-slate-300 text-sm cursor-not-allowed select-none font-medium"
+                className="min-h-11 w-full cursor-not-allowed select-none rounded-xl border border-slate-800 bg-slate-900/70 px-3.5 py-2.5 text-sm font-medium text-slate-300"
               />
               <p className="text-[10px] text-slate-500 mt-1">
                 Roles are bound to your verified cryptographic identity and cannot be altered directly.
@@ -305,9 +328,9 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({
               <select
                 value={selectedCountry}
                 onChange={(e) => handleCountryChange(e.target.value)}
-                className="w-full px-3.5 py-2.5 rounded-xl bg-slate-950/70 border border-slate-700/80 text-white text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition"
+                className="min-h-11 w-full rounded-xl border border-slate-700/80 bg-slate-950/70 px-3.5 py-2.5 text-sm text-white transition focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
               >
-                {availableCountries.map((c) => (
+                {AVAILABLE_COUNTRIES.map((c) => (
                   <option key={c} value={c}>
                     {c} {c === 'India' ? '🇮🇳' : ''}
                   </option>
@@ -331,7 +354,7 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({
               <select
                 value={selectedInstitutionName}
                 onChange={(e) => handleInstitutionSelect(e.target.value)}
-                className="w-full px-3.5 py-2.5 rounded-xl bg-slate-900 border border-slate-700/80 text-white text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition"
+                className="min-h-11 w-full rounded-xl border border-slate-700/80 bg-slate-900 px-3.5 py-2.5 text-sm text-white transition focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
               >
                 <option value="">-- Select Institution in {selectedCountry} --</option>
                 {currentInstitutionOptions.map((opt) => (
@@ -355,7 +378,7 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({
                   value={customInstitutionName}
                   onChange={(e) => setCustomInstitutionName(e.target.value)}
                   placeholder="e.g. Metropolitan Art Conservation Bureau"
-                  className="w-full px-3.5 py-2.5 rounded-xl bg-slate-900 border border-slate-700/80 text-white placeholder-slate-500 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 transition"
+                  className="min-h-11 w-full rounded-xl border border-slate-700/80 bg-slate-900 px-3.5 py-2.5 text-sm text-white placeholder-slate-500 transition focus:outline-none focus:ring-2 focus:ring-indigo-500"
                 />
               </div>
             )}
@@ -381,7 +404,7 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({
                 value={registrationNumber}
                 onChange={(e) => setRegistrationNumber(e.target.value)}
                 placeholder="e.g. REG-IND-2026-8812"
-                className="w-full px-3.5 py-2.5 rounded-xl bg-slate-950/70 border border-slate-700/80 text-white placeholder-slate-500 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 transition font-mono"
+                className="min-h-11 w-full rounded-xl border border-slate-700/80 bg-slate-950/70 px-3.5 py-2.5 font-mono text-sm text-white placeholder-slate-500 transition focus:outline-none focus:ring-2 focus:ring-indigo-500"
               />
             </div>
 
@@ -406,25 +429,25 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({
                 value={institutionWallet}
                 onChange={(e) => setInstitutionWallet(e.target.value)}
                 placeholder="0x..."
-                className="w-full px-3.5 py-2.5 rounded-xl bg-slate-950/70 border border-slate-700/80 text-white placeholder-slate-500 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500 transition font-mono"
+                className="min-h-11 w-full rounded-xl border border-slate-700/80 bg-slate-950/70 px-3.5 py-2.5 font-mono text-xs text-white placeholder-slate-500 transition focus:outline-none focus:ring-2 focus:ring-indigo-500"
               />
             </div>
           </div>
 
           {/* Footer Actions */}
-          <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-800">
+          <div className="flex flex-col-reverse justify-end gap-3 border-t border-slate-800 pt-4 sm:flex-row">
             <button
               type="button"
               onClick={onClose}
               disabled={saving}
-              className="px-4 py-2.5 rounded-xl border border-slate-700 text-slate-300 hover:bg-slate-800 text-sm font-medium transition"
+              className="min-h-11 rounded-xl border border-slate-700 px-4 py-2.5 text-sm font-medium text-slate-300 transition hover:bg-slate-800"
             >
               Cancel
             </button>
             <button
               type="submit"
               disabled={saving}
-              className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-amber-500 via-indigo-600 to-violet-600 hover:from-amber-400 hover:to-violet-500 text-white text-sm font-semibold shadow-lg shadow-indigo-600/30 transition flex items-center gap-2"
+              className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-amber-500 via-indigo-600 to-violet-600 px-5 py-2.5 text-sm font-bold text-[#09090B] shadow-lg transition hover:from-amber-400 hover:to-violet-500"
             >
               {saving ? (
                 <>
@@ -442,7 +465,7 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({
             </button>
           </div>
         </form>
-      </div>
+      </section>
     </div>
   );
 };
