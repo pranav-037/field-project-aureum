@@ -116,16 +116,13 @@ export const artworkApi = {
 // Transfer API
 export const transferApi = {
   getAll: () => api.get('/transfers'),
+  getIncoming: () => api.get('/transfers/incoming'),
   create: (data: {
     artworkId: string;
-    sellerId: string;
-    buyerId?: string;
-    buyerAddress: string;
-    transferDate?: string;
-    priceVisibility?: string;
-    priceCommitment?: string;
-    supportingDocCids?: string[];
+    recipientEmail: string;
   }) => api.post('/transfers', data),
+  approve: (transferId: string) => api.post(`/transfers/${transferId}/approve`),
+  reject: (transferId: string) => api.post(`/transfers/${transferId}/reject`),
   accept: (transferId: string) => api.post(`/transfers/${transferId}/accept`),
   cancel: (transferId: string, reason?: string) =>
     api.post(`/transfers/${transferId}/cancel`, { reason }),

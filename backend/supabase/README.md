@@ -10,6 +10,7 @@ This directory contains the database migration assets to replace the legacy Pris
 |------|---------|
 | [`schema.sql`](./schema.sql) | Complete SQL migration script (Tables, Indexes, RLS Policies, Functions & Triggers). |
 | [`migrations/20261109000000_init_schema.sql`](./migrations/20261109000000_init_schema.sql) | Versioned migration file for Supabase CLI (`supabase db push`). |
+| [`migrations/20261118000000_email_artwork_transfers.sql`](./migrations/20261118000000_email_artwork_transfers.sql) | Adds email-addressed transfers, recipient indexes, foreign keys, and atomic approval. |
 | [`../scripts/migrate-to-supabase.ts`](../scripts/migrate-to-supabase.ts) | Automated Node.js / TypeScript data migration pipeline (extracts existing SQLite data and upserts into Supabase). |
 | [`../src/db/supabase.ts`](../src/db/supabase.ts) | Supabase client singleton and TypeScript interfaces. |
 
@@ -100,4 +101,12 @@ The script will:
    - `SyncState`
    - `Activity`
 3. Verify RLS is enabled on all tables with full access granted for `service_role`.
+
+### Email-based artwork custody transfers
+
+For an existing database, apply `migrations/20261118000000_email_artwork_transfers.sql` after the initial schema migration (or run `npx supabase db push`). It adds `senderUserId` and `recipientUserId` references to `User`, a foreign key from each transfer to `Artwork`, pending-recipient indexes, and the `approve_user_artwork_transfer` PostgreSQL function. Foreign keys are added `NOT VALID` to avoid blocking on older transfer history; new writes are still checked.
+
+The authenticated API supports `POST /api/transfers` with `{ "artworkId": "...", "recipientEmail": "..." }`, `GET /api/transfers/incoming`, and recipient-only `POST /api/transfers/:id/approve` or `/reject`. Approval runs in one database function/transaction and moves `Artwork.ownerId` together with the transfer status. The dashboard polls every 15 seconds for sender-side status changes. Existing wallet/on-chain transfer routes remain available.
+
+Run the backend service tests with `cd backend && npm test`; they cover request validation, duplicate requests, recipient listing, approval, rejection, and custody changes.
 
