@@ -425,11 +425,40 @@ app.get('/api/ipfs/:cid', async (req: Request, res: Response) => {
   }
 });
 
+// Helper to resolve an image CID or path to a displayable URL
+const resolveArtworkImageUrl = (imageCids: string | null | undefined): string | null => {
+  if (!imageCids) return null;
+  try {
+    let parsed: any = imageCids;
+    if (typeof imageCids === 'string') {
+      try {
+        parsed = JSON.parse(imageCids);
+      } catch {
+        parsed = imageCids;
+      }
+    }
+    const firstItem = Array.isArray(parsed) ? parsed[0] : parsed;
+    if (!firstItem || typeof firstItem !== 'string') return null;
+    const trimmed = firstItem.trim();
+    if (!trimmed) return null;
+    if (trimmed.startsWith('http://') || trimmed.startsWith('https://') || trimmed.startsWith('/')) {
+      return trimmed;
+    }
+    return IPFSService.getGatewayUrl(trimmed);
+  } catch {
+    return null;
+  }
+};
+
 // Get all artworks
 app.get('/api/artworks', async (req: Request, res: Response) => {
   try {
     const artworks = await db.artworks.findMany('*');
-    res.json(artworks);
+    const enriched = (artworks || []).map((a: any) => ({
+      ...a,
+      imageUrl: resolveArtworkImageUrl(a.imageCids),
+    }));
+    res.json(enriched);
   } catch (error) {
     res.status(500).json({ error: 'Failed to fetch artworks' });
   }
@@ -870,7 +899,10 @@ app.get('/api/artworks/:id', async (req: Request, res: Response) => {
       return res.status(404).json({ error: 'Artwork not found' });
     }
 
-    res.json(artwork);
+    res.json({
+      ...artwork,
+      imageUrl: resolveArtworkImageUrl(artwork.imageCids),
+    });
   } catch (error) {
     res.status(500).json({ error: 'Failed to fetch artwork' });
   }

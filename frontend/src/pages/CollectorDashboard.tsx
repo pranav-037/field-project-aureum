@@ -97,6 +97,18 @@ const parseArtworkList = (value: string | string[] | null | undefined): string[]
   return [value];
 };
 
+const IPFS_GATEWAY = import.meta.env.VITE_IPFS_GATEWAY || 'https://gateway.pinata.cloud/ipfs/';
+
+const toGatewayUrl = (cidOrUrl: string): string => {
+  if (!cidOrUrl || typeof cidOrUrl !== 'string') return '';
+  const trimmed = cidOrUrl.trim();
+  if (!trimmed) return '';
+  if (trimmed.startsWith('http://') || trimmed.startsWith('https://') || trimmed.startsWith('/')) {
+    return trimmed;
+  }
+  return `${IPFS_GATEWAY.replace(/\/+$/, '')}/${trimmed}`;
+};
+
 const CollectorDashboard: React.FC = () => {
   const navigate = useNavigate();
   const { user: currentUser, loading: authLoading } = useAuth();
@@ -274,16 +286,18 @@ const CollectorDashboard: React.FC = () => {
           .map((ownerId) => ownerId.toLowerCase());
         const mapped: Artwork[] = res.data.map((a: any, idx: number) => {
           let imgUrl = '';
-          if (a.imageCids) {
+          if (a.imageUrl && typeof a.imageUrl === 'string') {
+            imgUrl = toGatewayUrl(a.imageUrl);
+          } else if (a.imageCids) {
             try {
               const parsed = JSON.parse(a.imageCids);
               if (Array.isArray(parsed) && parsed.length > 0) {
-                imgUrl = parsed[0];
+                imgUrl = toGatewayUrl(parsed[0]);
               } else if (typeof a.imageCids === 'string') {
-                imgUrl = a.imageCids;
+                imgUrl = toGatewayUrl(a.imageCids);
               }
             } catch {
-              if (typeof a.imageCids === 'string') imgUrl = a.imageCids;
+              if (typeof a.imageCids === 'string') imgUrl = toGatewayUrl(a.imageCids);
             }
           }
 
@@ -853,7 +867,9 @@ const CollectorDashboard: React.FC = () => {
                       className="absolute inset-0 w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
                       loading="eager"
                       onError={(e) => {
-                        (e.currentTarget as HTMLElement).style.display = 'none';
+                        const img = e.currentTarget as HTMLElement;
+                        img.style.display = 'none';
+                        console.warn(`Failed to load artwork image: ${artwork.imageUrl}`);
                       }}
                     />
                   )}
