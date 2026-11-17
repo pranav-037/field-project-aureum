@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useWallet } from '../contexts/WalletContext';
 import { useArtchainContract } from '../hooks/useArtchainContract';
@@ -69,11 +69,13 @@ interface TransferItem {
   artist: string;
   counterparty: string;
   date: string;
-  status: 'PENDING_ACCEPTANCE' | 'COMPLETED' | 'IN_PROGRESS' | 'CANCELLED' | 'EXPIRED';
+  status: 'PENDING_ACCEPTANCE' | 'COMPLETED' | 'IN_PROGRESS' | 'CANCELLED' | 'EXPIRED' | 'REJECTED';
   txHash: string;
   sellerId?: string;
   buyerId?: string;
   buyerAddress?: string;
+  imageUrl?: string;
+  isEmailTransfer?: boolean;
 }
 
 interface ArtworkProvenance {
@@ -105,9 +107,12 @@ const CollectorDashboard: React.FC = () => {
   const [selectedArtwork, setSelectedArtwork] = useState<Artwork | null>(null);
   const [showTransferModal, setShowTransferModal] = useState(false);
   const [transferArtwork, setTransferArtwork] = useState<Artwork | null>(null);
-  const [recipientWallet, setRecipientWallet] = useState('');
+  const [recipientEmail, setRecipientEmail] = useState('');
   const [transferError, setTransferError] = useState<string | null>(null);
   const [isCreatingTransfer, setIsCreatingTransfer] = useState(false);
+  const [transferToast, setTransferToast] = useState<string | null>(null);
+  const [transferActionError, setTransferActionError] = useState<string | null>(null);
+  const [respondingTransferId, setRespondingTransferId] = useState<string | null>(null);
   const [showIncomingModal, setShowIncomingModal] = useState(false);
   const [selectedIncomingTransfer, setSelectedIncomingTransfer] = useState<TransferItem | null>(null);
   const [incomingAccepted, setIncomingAccepted] = useState(false);
@@ -258,7 +263,7 @@ const CollectorDashboard: React.FC = () => {
   const [artworks, setArtworks] = useState<Artwork[]>(defaultMasterpieces);
   const [transactions, setTransactions] = useState<TransferItem[]>(defaultTransactions);
 
-  const loadData = async (uid: string) => {
+  const loadData = useCallback(async (uid: string) => {
     try {
       const res = await artworkApi.getAll();
       if (Array.isArray(res.data)) {
@@ -320,9 +325,26 @@ const CollectorDashboard: React.FC = () => {
     }
 
     try {
-      const transRes = await transferApi.getAll();
+      const [transfersResult, incomingResult] = await Promise.allSettled([
+        transferApi.getAll(),
+        transferApi.getIncoming(),
+      ]);
+      if (transfersResult.status === 'rejected') throw transfersResult.reason;
+      const transRes = transfersResult.value;
+      const incomingData = incomingResult.status === 'fulfilled' && Array.isArray(incomingResult.value.data)
+        ? incomingResult.value.data
+        : [];
+      if (incomingResult.status === 'rejected') {
+        console.warn('Could not fetch pending incoming transfers:', incomingResult.reason);
+      }
       if (Array.isArray(transRes.data)) {
-        const mappedTrans: TransferItem[] = transRes.data.map((t: any) => {
+        const transfersById = new Map<string, any>(
+          transRes.data.map((transfer: any) => [transfer.id, transfer])
+        );
+        incomingData.forEach((transfer: any) => {
+          transfersById.set(transfer.id, { ...transfersById.get(transfer.id), ...transfer });
+        });
+        const mappedTrans: TransferItem[] = [...transfersById.values()].map((t: any) => {
           const type: 'INCOMING' | 'OUTGOING' = t.type === 'OUTGOING' ? 'OUTGOING' : 'INCOMING';
           const isOutgoing = type === 'OUTGOING';
           const counterparty = isOutgoing
@@ -336,19 +358,23 @@ const CollectorDashboard: React.FC = () => {
             type,
             title: t.artworkTitle || `Artwork #${t.artworkId?.slice(0, 8)}`,
             artist: t.artworkArtist || 'Fine Art Masterpiece',
+            imageUrl: t.artworkImage || undefined,
             counterparty,
             date: new Date(t.transferDate || t.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
-            status: t.status === 'FINALIZED'
+            status: t.status === 'FINALIZED' || t.status === 'accepted'
               ? 'COMPLETED'
-              : t.status === 'PENDING'
+              : t.status === 'PENDING' || t.status === 'pending'
                 ? 'PENDING_ACCEPTANCE'
-                : t.status === 'CANCELLED' || t.status === 'EXPIRED'
+                : t.status === 'rejected'
+                  ? 'REJECTED'
+                  : t.status === 'CANCELLED' || t.status === 'EXPIRED'
                   ? t.status
                   : 'IN_PROGRESS',
             txHash: t.txHash || '0x' + '0'.repeat(64),
             sellerId: t.sellerId,
             buyerId: t.buyerId,
             buyerAddress: t.buyerAddress,
+            isEmailTransfer: Boolean(t.senderUserId && t.recipientUserId),
           };
         });
         setTransactions(mappedTrans);
@@ -356,7 +382,7 @@ const CollectorDashboard: React.FC = () => {
     } catch (transErr) {
       console.warn('Could not fetch transfers:', transErr);
     }
-  };
+  }, [account, currentUser]);
 
   useEffect(() => {
     if (authLoading) return;
@@ -364,8 +390,12 @@ const CollectorDashboard: React.FC = () => {
       navigate('/login', { replace: true });
       return;
     }
-    loadData(currentUser.id);
-  }, [account, authLoading, currentUser, navigate]);
+    void loadData(currentUser.id);
+    const refreshTimer = window.setInterval(() => {
+      void loadData(currentUser.id);
+    }, 15000);
+    return () => window.clearInterval(refreshTimer);
+  }, [account, authLoading, currentUser, loadData, navigate]);
 
   const ownedArtworks = artworks.filter((artwork) => artwork.ownershipStatus === 'OWNED');
   const transferableArtworks = ownedArtworks.filter((artwork) => Boolean(artwork.ownerId));
@@ -462,8 +492,8 @@ const CollectorDashboard: React.FC = () => {
       setTransferError('The selected artwork has no recorded owner.');
       return;
     }
-    if (!/^0x[a-fA-F0-9]{40}$/.test(recipientWallet.trim())) {
-      setTransferError('Enter a valid recipient wallet address.');
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(recipientEmail.trim())) {
+      setTransferError('Enter a valid recipient email address.');
       return;
     }
 
@@ -471,26 +501,29 @@ const CollectorDashboard: React.FC = () => {
       setIsCreatingTransfer(true);
       const response = await transferApi.create({
         artworkId: transferArtwork.databaseId,
-        sellerId: transferArtwork.ownerId,
-        buyerAddress: recipientWallet.trim(),
+        recipientEmail: recipientEmail.trim(),
       });
       const transfer = response.data;
       setTransactions(prev => [{
         id: transfer.id,
         artworkId: transferArtwork.databaseId,
-        blockchainTransferId: transfer.blockchainTransferId,
         type: 'OUTGOING',
         title: transferArtwork.title,
         artist: transferArtwork.artist,
-        counterparty: recipientWallet.trim(),
+        counterparty: recipientEmail.trim(),
         date: new Date(transfer.transferDate || transfer.createdAt).toLocaleDateString(),
         status: 'PENDING_ACCEPTANCE',
-        txHash: transfer.txHash,
+        txHash: transfer.txHash || `0x${'0'.repeat(64)}`,
         sellerId: transferArtwork.ownerId,
-        buyerAddress: recipientWallet.trim(),
+        buyerId: transfer.recipientUserId,
+        imageUrl: transferArtwork.imageUrl,
+        isEmailTransfer: true,
       }, ...prev]);
-      setRecipientWallet('');
+      setRecipientEmail('');
       setShowTransferModal(false);
+      setTransferToast('Transfer request sent');
+      window.setTimeout(() => setTransferToast(null), 4000);
+      if (currentUser?.id) await loadData(currentUser.id);
     } catch (err: any) {
       setTransferError(err?.response?.data?.error || err?.message || 'Could not initiate the transfer.');
     } finally {
@@ -498,9 +531,10 @@ const CollectorDashboard: React.FC = () => {
     }
   };
 
-  const handleAcceptTransfer = async () => {
+  const handleAcceptTransfer = async (transferOverride?: TransferItem) => {
     setSigningError(null);
-    const targetTransfer = selectedIncomingTransfer || incomingTransfer;
+    if (transferOverride) setTransferActionError(null);
+    const targetTransfer = transferOverride || selectedIncomingTransfer || incomingTransfer;
     const currentUserId = currentUser?.id;
 
     if (!targetTransfer?.id) {
@@ -510,7 +544,10 @@ const CollectorDashboard: React.FC = () => {
 
     try {
       setIsSigningTx(true);
-      if (targetTransfer.blockchainTransferId) {
+      if (targetTransfer.isEmailTransfer) {
+        await transferApi.approve(targetTransfer.id);
+        setConfirmedTx(targetTransfer.txHash);
+      } else if (targetTransfer.blockchainTransferId) {
         if (!isConnected) {
           throw new Error('Connect the recipient wallet to accept this on-chain transfer.');
         }
@@ -532,9 +569,24 @@ const CollectorDashboard: React.FC = () => {
       setShowIncomingModal(false);
     } catch (err: any) {
       console.warn('Transfer acceptance failed:', err);
-      setSigningError(err?.response?.data?.error || err?.message || 'Could not accept this transfer.');
+      const message = err?.response?.data?.error || err?.message || 'Could not accept this transfer.';
+      setSigningError(message);
+      if (transferOverride) setTransferActionError(message);
     } finally {
       setIsSigningTx(false);
+    }
+  };
+
+  const handleRejectTransfer = async (transfer: TransferItem) => {
+    setTransferActionError(null);
+    try {
+      setRespondingTransferId(transfer.id);
+      await transferApi.reject(transfer.id);
+      if (currentUser?.id) await loadData(currentUser.id);
+    } catch (err: any) {
+      setTransferActionError(err?.response?.data?.error || err?.message || 'Could not reject this transfer.');
+    } finally {
+      setRespondingTransferId(null);
     }
   };
 
@@ -543,6 +595,11 @@ const CollectorDashboard: React.FC = () => {
       {/* Ambient Gradient Glows */}
       <div className="absolute top-16 left-1/2 -translate-x-1/2 w-[750px] h-[360px] bg-gradient-to-tr from-indigo-600/15 via-violet-600/10 to-amber-500/10 blur-[140px] rounded-full pointer-events-none -z-10"></div>
       <div className="absolute top-80 right-10 w-96 h-96 bg-amber-500/5 blur-[120px] rounded-full pointer-events-none -z-10"></div>
+      {transferToast && (
+        <div role="status" aria-live="polite" className="fixed right-4 top-4 z-[70] rounded-xl border border-emerald-500/30 bg-emerald-950 px-4 py-3 text-sm font-semibold text-emerald-200 shadow-xl">
+          {transferToast}
+        </div>
+      )}
 
       {/* 1. Standard Aureum Navigation Bar */}
       <Navbar />
@@ -1099,6 +1156,12 @@ const CollectorDashboard: React.FC = () => {
                 </div>
               )}
 
+              {transferActionError && (
+                <p role="alert" className="rounded-lg border border-red-500/30 bg-red-950/40 px-4 py-2 text-xs text-red-200">
+                  {transferActionError}
+                </p>
+              )}
+
               {/* Incoming Transfers Table */}
               <div className="rounded-2xl bg-slate-900/70 border border-slate-800 shadow-xl backdrop-blur-xl overflow-hidden">
                 <div className="overflow-x-auto">
@@ -1125,11 +1188,15 @@ const CollectorDashboard: React.FC = () => {
                           <tr key={tx.id} className="hover:bg-slate-800/30 transition">
                             <td className="px-5 py-4">
                               <div className="flex items-center gap-3">
-                                <div className="w-8 h-8 rounded-lg bg-indigo-500/20 text-indigo-400 flex items-center justify-center text-xs font-bold">
-                                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 14l-7 7m0 0l-7-7m7 7V3" />
-                                  </svg>
-                                </div>
+                                {tx.imageUrl ? (
+                                  <img src={tx.imageUrl} alt="" className="h-10 w-10 rounded-lg object-cover" />
+                                ) : (
+                                  <div className="w-8 h-8 rounded-lg bg-indigo-500/20 text-indigo-400 flex items-center justify-center text-xs font-bold">
+                                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 14l-7 7m0 0l-7-7m7 7V3" />
+                                    </svg>
+                                  </div>
+                                )}
                                 <div>
                                     <button
                                       type="button"
@@ -1182,15 +1249,36 @@ const CollectorDashboard: React.FC = () => {
                             </td>
                             <td className="px-5 py-4 text-right">
                               {tx.status === 'PENDING_ACCEPTANCE' ? (
-                                <button
-                                  onClick={() => {
-                                    setSelectedIncomingTransfer(tx);
-                                    setShowIncomingModal(true);
-                                  }}
-                                  className="px-3.5 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold shadow-sm transition cursor-pointer"
-                                >
-                                  Sign & Accept
-                                </button>
+                                tx.isEmailTransfer ? (
+                                  <div className="flex justify-end gap-2">
+                                    <button
+                                      type="button"
+                                      disabled={respondingTransferId === tx.id || isSigningTx}
+                                      onClick={() => void handleAcceptTransfer(tx)}
+                                      className="rounded-lg bg-emerald-700 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-emerald-600 disabled:opacity-50"
+                                    >
+                                      {respondingTransferId === tx.id || isSigningTx ? 'Processing…' : 'Approve'}
+                                    </button>
+                                    <button
+                                      type="button"
+                                      disabled={respondingTransferId === tx.id || isSigningTx}
+                                      onClick={() => void handleRejectTransfer(tx)}
+                                      className="rounded-lg bg-slate-800 px-3 py-1.5 text-xs font-semibold text-slate-200 transition hover:bg-red-900 disabled:opacity-50"
+                                    >
+                                      Reject
+                                    </button>
+                                  </div>
+                                ) : (
+                                  <button
+                                    onClick={() => {
+                                      setSelectedIncomingTransfer(tx);
+                                      setShowIncomingModal(true);
+                                    }}
+                                    className="px-3.5 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold shadow-sm transition cursor-pointer"
+                                  >
+                                    Sign & Accept
+                                  </button>
+                                )
                               ) : (
                                 <Link
                                   to="/verify"
@@ -1535,6 +1623,19 @@ const CollectorDashboard: React.FC = () => {
               </dl>
             </section>
 
+            {selectedArtwork.ownershipStatus === 'OWNED' && selectedArtwork.ownerId && (
+              <button
+                type="button"
+                onClick={() => {
+                  setTransferArtwork(selectedArtwork);
+                  setShowTransferModal(true);
+                }}
+                className="w-full rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm font-semibold text-amber-200 transition hover:bg-amber-500/20"
+              >
+                Transfer Artwork
+              </button>
+            )}
+
             <section className="rounded-xl border border-slate-800 bg-slate-950/80 p-4">
               <h3 className="mb-3 text-sm font-semibold text-white">Custody and transfer history</h3>
               {artworkTransfers.length === 0 ? (
@@ -1655,7 +1756,7 @@ const CollectorDashboard: React.FC = () => {
             <div className="flex flex-col gap-3 sm:flex-row">
               <button
                 type="button"
-                onClick={handleAcceptTransfer}
+                onClick={() => void handleAcceptTransfer()}
                 disabled={isSigningTx}
                 className={`min-h-11 flex-1 rounded-xl py-3 ${
                   isSigningTx
@@ -1734,18 +1835,19 @@ const CollectorDashboard: React.FC = () => {
               </div>
 
               <div>
-                <label className="block text-slate-300 font-semibold mb-1">Recipient wallet address</label>
+                <label className="block text-slate-300 font-semibold mb-1">Recipient email address</label>
                 <input
-                  type="text"
-                  value={recipientWallet}
-                  onChange={(e) => setRecipientWallet(e.target.value)}
-                  maxLength={42}
+                  type="email"
+                  value={recipientEmail}
+                  onChange={(e) => setRecipientEmail(e.target.value)}
+                  maxLength={254}
+                  autoComplete="email"
                   aria-invalid={Boolean(transferError)}
-                  placeholder="0x… (linked to the recipient’s Aureum account)"
+                  placeholder="name@example.com"
                   className="min-h-11 w-full rounded-xl border border-slate-700 bg-slate-950/80 px-3.5 py-2.5 text-xs text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
                 />
                 <p className="mt-1 text-[11px] text-slate-500">
-                  The recipient must link this wallet in their Aureum profile to receive and accept the transfer.
+                  The email must belong to a registered collector or institution account.
                 </p>
               </div>
 

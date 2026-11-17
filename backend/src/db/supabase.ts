@@ -77,6 +77,8 @@ export interface DbTransfer {
   sellerId: string;
   buyerId?: string | null;
   buyerAddress?: string | null;
+  senderUserId?: string | null;
+  recipientUserId?: string | null;
   transferDate: string;
   priceVisibility: string;
   txHash: string;
@@ -388,6 +390,54 @@ export const db = {
         .order('transferDate', { ascending: false });
       if (error) throw error;
       return data || [];
+    },
+    async findPendingUserTransferByArtworkId(artworkId: string): Promise<DbTransfer | null> {
+      const { data, error } = await supabase
+        .from('Transfer')
+        .select('*')
+        .eq('artworkId', artworkId)
+        .in('status', ['pending', 'PENDING'])
+        .limit(1)
+        .maybeSingle();
+      if (error) throw error;
+      return data;
+    },
+    async findIncomingUserTransfers(recipientUserId: string): Promise<DbTransfer[]> {
+      const { data, error } = await supabase
+        .from('Transfer')
+        .select('*')
+        .eq('recipientUserId', recipientUserId)
+        .eq('status', 'pending')
+        .order('createdAt', { ascending: false });
+      if (error) throw error;
+      return data || [];
+    },
+    async approveUserTransferAtomically(input: {
+      transferId: string;
+      recipientUserId: string;
+      senderUserId: string;
+      senderWalletAddress?: string | null;
+    }): Promise<DbTransfer | null> {
+      const { data, error } = await supabase.rpc('approve_user_artwork_transfer', {
+        p_transfer_id: input.transferId,
+        p_recipient_user_id: input.recipientUserId,
+        p_sender_user_id: input.senderUserId,
+        p_sender_wallet_address: input.senderWalletAddress || null,
+      });
+      if (error) throw error;
+      return (data as DbTransfer | null) || null;
+    },
+    async rejectUserTransfer(transferId: string, recipientUserId: string): Promise<DbTransfer | null> {
+      const { data, error } = await supabase
+        .from('Transfer')
+        .update({ status: 'rejected', updatedAt: new Date().toISOString() })
+        .eq('id', transferId)
+        .eq('recipientUserId', recipientUserId)
+        .eq('status', 'pending')
+        .select()
+        .maybeSingle();
+      if (error) throw error;
+      return data;
     },
     async create(transferData: Partial<DbTransfer>): Promise<DbTransfer> {
       const id = transferData.id || crypto.randomUUID();

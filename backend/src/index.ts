@@ -15,6 +15,14 @@ import { IndexerService } from './services/indexer.service';
 import { requireAuth, requireRole } from './middleware/auth';
 import { supabase, db } from './db/supabase';
 import multer from 'multer';
+import {
+  approveUserTransfer,
+  initiateUserTransfer,
+  listIncomingUserTransfers,
+  rejectUserTransfer,
+  UserTransferError,
+  UserTransferRepository,
+} from './services/user-transfer.service';
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -24,6 +32,59 @@ const upload = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: 50 * 1024 * 1024 },
 });
+
+const userTransferRepository: UserTransferRepository = {
+  async findArtwork(id) {
+    const artwork = await db.artworks.findUnique(id);
+    return artwork ? { id: artwork.id, title: artwork.title, ownerId: artwork.ownerId } : null;
+  },
+  async findUser(id) {
+    const user = await db.users.findUnique(id);
+    return user
+      ? { id: user.id, email: user.email, name: user.name, role: user.role, walletAddress: user.walletAddress }
+      : null;
+  },
+  async findUserByEmail(email) {
+    const user = await db.users.findByEmail(email);
+    return user
+      ? { id: user.id, email: user.email, name: user.name, role: user.role, walletAddress: user.walletAddress }
+      : null;
+  },
+  async findPendingTransferForArtwork(artworkId) {
+    return db.transfers.findPendingUserTransferByArtworkId(artworkId);
+  },
+  async createTransfer(data) {
+    return await db.transfers.create({
+      ...data,
+      txHash: `0x${'0'.repeat(64)}`,
+      blockNumber: 0,
+      priceVisibility: 'PARTIES_AND_AUTHORISED',
+    });
+  },
+  async listIncomingTransfers(recipientUserId) {
+    return db.transfers.findIncomingUserTransfers(recipientUserId);
+  },
+  async findTransfer(id) {
+    return db.transfers.findUnique(id);
+  },
+  async approveTransferAtomically(input) {
+    return db.transfers.approveUserTransferAtomically(input);
+  },
+  async rejectTransfer(transferId, recipientUserId) {
+    return db.transfers.rejectUserTransfer(transferId, recipientUserId);
+  },
+};
+
+const artworkImageUrl = (imageCids: unknown): string | undefined => {
+  if (typeof imageCids !== 'string' || !imageCids) return undefined;
+  try {
+    const parsed: unknown = JSON.parse(imageCids);
+    if (Array.isArray(parsed) && typeof parsed[0] === 'string') return parsed[0];
+  } catch {
+    return imageCids;
+  }
+  return imageCids;
+};
 
 // Initialize blockchain service and start indexer
 BlockchainService.initialize();
@@ -584,6 +645,43 @@ app.post('/api/artworks', async (req: Request, res: Response) => {
   }
 });
 
+// List pending email-based transfers for the authenticated recipient.
+app.get(
+  '/api/transfers/incoming',
+  requireAuth,
+  requireRole(['COLLECTOR', 'AUTHENTICATOR']),
+  async (req: Request, res: Response) => {
+    try {
+      if (!req.user) return res.status(401).json({ error: 'User not authenticated' });
+      const transfers = await listIncomingUserTransfers(req.user.id, userTransferRepository);
+      const [artworks, users] = await Promise.all([
+        db.artworks.findMany('*'),
+        db.users.findMany('id, name'),
+      ]);
+      const artworkById = new Map((artworks || []).map((artwork: any) => [artwork.id, artwork]));
+      const userById = new Map((users || []).map((user: any) => [user.id, user]));
+      res.json(transfers.map((transfer) => {
+        const artwork = artworkById.get(transfer.artworkId);
+        const sender = userById.get(transfer.senderUserId || '');
+        return {
+          ...transfer,
+          type: 'INCOMING',
+          artworkTitle: artwork?.title || 'Artwork',
+          artworkArtist: artwork?.artist || 'Unknown artist',
+          artworkImage: artworkImageUrl(artwork?.imageCids),
+          sellerName: sender?.name || 'Artwork custodian',
+        };
+      }));
+    } catch (error) {
+      if (error instanceof UserTransferError) {
+        return res.status(error.statusCode).json({ error: error.message });
+      }
+      console.error('Failed to fetch incoming transfers:', error);
+      return res.status(500).json({ error: 'Failed to fetch incoming transfers.' });
+    }
+  },
+);
+
 // Get transfers involving the authenticated user
 app.get('/api/transfers', requireAuth, async (req: Request, res: Response) => {
   try {
@@ -630,6 +728,7 @@ app.get('/api/transfers', requireAuth, async (req: Request, res: Response) => {
         type: isOutgoing ? 'OUTGOING' : 'INCOMING',
         artworkTitle: art?.title || `Artwork #${t.artworkId?.slice(0, 8)}`,
         artworkArtist: art?.artist || 'Fine Art Masterpiece',
+        artworkImage: artworkImageUrl(art?.imageCids),
         sellerName: seller?.name || 'Artwork custodian',
         buyerName: buyer?.name || (recipientAddress ? `${recipientAddress.slice(0, 6)}...${recipientAddress.slice(-4)}` : 'Recipient'),
       };
@@ -645,6 +744,15 @@ app.post('/api/transfers', requireAuth, requireRole(['COLLECTOR', 'AUTHENTICATOR
   try {
     if (!req.user) {
       return res.status(401).json({ error: 'User not authenticated' });
+    }
+
+    if (typeof req.body.recipientEmail === 'string') {
+      const transfer = await initiateUserTransfer({
+        senderUserId: req.user.id,
+        artworkId: typeof req.body.artworkId === 'string' ? req.body.artworkId : '',
+        recipientEmail: req.body.recipientEmail,
+      }, userTransferRepository);
+      return res.status(201).json(transfer);
     }
 
     const { artworkId, buyerAddress, transferDate, priceVisibility, priceCommitment, supportingDocCids } = req.body;
@@ -677,7 +785,7 @@ app.post('/api/transfers', requireAuth, requireRole(['COLLECTOR', 'AUTHENTICATOR
     }
 
     const existingTransfers = await db.transfers.findByArtworkId(artworkId);
-    if (existingTransfers.some((transfer) => transfer.status === 'PENDING')) {
+    if (existingTransfers.some((transfer) => transfer.status === 'PENDING' || transfer.status === 'pending')) {
       return res.status(409).json({ error: 'This artwork already has a pending transfer.' });
     }
 
@@ -754,9 +862,56 @@ app.post('/api/transfers', requireAuth, requireRole(['COLLECTOR', 'AUTHENTICATOR
       onChainSynced: Boolean(onChainTransferId),
     });
   } catch (error) {
+    if (error instanceof UserTransferError) {
+      return res.status(error.statusCode).json({ error: error.message });
+    }
     res.status(500).json({ error: (error as Error).message || 'Failed to create transfer' });
   }
 });
+
+// Approve or reject an email-based transfer.
+app.post(
+  '/api/transfers/:id/approve',
+  requireAuth,
+  requireRole(['COLLECTOR', 'AUTHENTICATOR']),
+  async (req: Request, res: Response) => {
+    try {
+      if (!req.user) return res.status(401).json({ error: 'User not authenticated' });
+      const transfer = await approveUserTransfer(req.params.id, req.user.id, userTransferRepository);
+      res.json(transfer);
+    } catch (error) {
+      if (error instanceof UserTransferError) {
+        return res.status(error.statusCode).json({ error: error.message });
+      }
+      const message = (error as Error).message || 'Failed to approve transfer.';
+      const status = message.includes('TRANSFER_NOT_FOUND') ? 404
+        : message.includes('RECIPIENT_MISMATCH') ? 403
+          : message.includes('TRANSFER_NOT_PENDING') || message.includes('ARTWORK_CUSTODY_MISMATCH') ? 409
+            : 500;
+      if (status === 500) console.error('Failed to approve transfer:', error);
+      return res.status(status).json({ error: status === 500 ? 'Failed to approve transfer.' : message });
+    }
+  },
+);
+
+app.post(
+  '/api/transfers/:id/reject',
+  requireAuth,
+  requireRole(['COLLECTOR', 'AUTHENTICATOR']),
+  async (req: Request, res: Response) => {
+    try {
+      if (!req.user) return res.status(401).json({ error: 'User not authenticated' });
+      const transfer = await rejectUserTransfer(req.params.id, req.user.id, userTransferRepository);
+      res.json(transfer);
+    } catch (error) {
+      if (error instanceof UserTransferError) {
+        return res.status(error.statusCode).json({ error: error.message });
+      }
+      console.error('Failed to reject transfer:', error);
+      return res.status(500).json({ error: 'Failed to reject transfer.' });
+    }
+  },
+);
 
 // Accept a pending transfer
 app.post('/api/transfers/:id/accept', requireAuth, requireRole(['COLLECTOR', 'AUTHENTICATOR']), async (req: Request, res: Response) => {

@@ -9,7 +9,8 @@
     "dev": "ts-node-dev --respawn --transpile-only src/index.ts",
     "auth:send-resets": "ts-node --project tsconfig.json scripts/send-reset-emails.ts",
     "test:auth": "ts-node --project tsconfig.json scripts/test-auth.ts",
-    "test": "echo \"Error: no test specified\" && exit 1", "seed:demo": "ts-node --project tsconfig.json scripts/seed-demo-artworks.ts"
+    "test": "ts-node --project tsconfig.json src/services/user-transfer.service.test.ts",
+    "seed:demo": "ts-node --project tsconfig.json scripts/seed-demo-artworks.ts"
   },
   "keywords": [],
   "author": "",
