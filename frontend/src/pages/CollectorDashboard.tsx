@@ -52,6 +52,26 @@ const CollectorDashboard: React.FC = () => {
   const [copiedTx, setCopiedTx] = useState<string | null>(null);
   const { isConnected, account } = useWallet();
 
+  useEffect(() => {
+    if (!selectedArtwork && !showIncomingModal && !showTransferModal) return;
+
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setSelectedArtwork(null);
+        setShowIncomingModal(false);
+        setShowTransferModal(false);
+      }
+    };
+    document.addEventListener('keydown', handleKeyDown);
+
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [selectedArtwork, showIncomingModal, showTransferModal]);
+
   const scrollToSection = (id: string) => {
     const el = document.getElementById(id);
     if (el) {
@@ -334,7 +354,7 @@ const CollectorDashboard: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-[#0B0F17] text-slate-100 flex flex-col selection:bg-indigo-500/30 selection:text-indigo-200">
+    <div className="aureum-theme min-h-screen bg-[#FAF9F6] text-[#18181B] flex flex-col selection:bg-orange-100 selection:text-[#1E3A2F]">
       {/* Ambient Gradient Glows */}
       <div className="absolute top-16 left-1/2 -translate-x-1/2 w-[750px] h-[360px] bg-gradient-to-tr from-indigo-600/15 via-violet-600/10 to-amber-500/10 blur-[140px] rounded-full pointer-events-none -z-10"></div>
       <div className="absolute top-80 right-10 w-96 h-96 bg-amber-500/5 blur-[120px] rounded-full pointer-events-none -z-10"></div>
@@ -863,7 +883,7 @@ const CollectorDashboard: React.FC = () => {
               {/* Incoming Transfers Table */}
               <div className="rounded-2xl bg-slate-900/70 border border-slate-800 shadow-xl backdrop-blur-xl overflow-hidden">
                 <div className="overflow-x-auto">
-                  <table className="w-full text-left text-xs sm:text-sm">
+                  <table className="w-full min-w-[48rem] text-left text-xs sm:text-sm">
                     <thead className="bg-slate-950/60 border-b border-slate-800 text-slate-400 uppercase text-[10px] tracking-wider font-semibold">
                       <tr>
                         <th className="px-5 py-3.5">Inbound Artwork</th>
@@ -1006,7 +1026,7 @@ const CollectorDashboard: React.FC = () => {
               {/* Outgoing Transfers Table */}
               <div className="rounded-2xl bg-slate-900/70 border border-slate-800 shadow-xl backdrop-blur-xl overflow-hidden">
                 <div className="overflow-x-auto">
-                  <table className="w-full text-left text-xs sm:text-sm">
+                  <table className="w-full min-w-[48rem] text-left text-xs sm:text-sm">
                     <thead className="bg-slate-950/60 border-b border-slate-800 text-slate-400 uppercase text-[10px] tracking-wider font-semibold">
                       <tr>
                         <th className="px-5 py-3.5">Outbound Artwork</th>
@@ -1188,20 +1208,22 @@ const CollectorDashboard: React.FC = () => {
 
       {/* 8. Certificate Modal */}
       {selectedArtwork && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md">
-          <div className="relative w-full max-w-lg rounded-2xl bg-slate-900 border border-slate-700 shadow-2xl p-6 sm:p-8 space-y-6">
+        <div className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-black/75 p-2 backdrop-blur-md sm:p-4">
+          <section role="dialog" aria-modal="true" aria-labelledby="certificate-title" className="relative max-h-[90vh] w-[95vw] max-w-lg space-y-6 overflow-y-auto overscroll-contain rounded-2xl border border-slate-700 bg-slate-900 p-4 shadow-2xl sm:p-8">
             <button
+              type="button"
               onClick={() => setSelectedArtwork(null)}
-              className="absolute top-4 right-4 text-slate-400 hover:text-white p-1"
+              aria-label="Close certificate"
+              className="absolute right-3 top-3 inline-flex min-h-11 min-w-11 items-center justify-center rounded-full text-slate-400 hover:bg-slate-800 hover:text-white"
             >
               ✕
             </button>
 
-            <div className="text-center space-y-2">
+            <div className="space-y-2 px-7 text-center">
               <span className="text-xs font-semibold uppercase tracking-wider text-amber-400">
                 Digital Certificate of Authenticity
               </span>
-              <h2 className="text-2xl font-bold text-white">{selectedArtwork.title}</h2>
+              <h2 id="certificate-title" className="text-2xl font-bold text-white">{selectedArtwork.title}</h2>
               <p className="text-xs text-slate-400">By {selectedArtwork.artist} • {selectedArtwork.year}</p>
             </div>
 
@@ -1238,40 +1260,43 @@ const CollectorDashboard: React.FC = () => {
               </div>
             </div>
 
-            <div className="flex items-center gap-3">
+            <div className="flex flex-col gap-3 sm:flex-row">
               <Link
                 to="/verify"
-                className="flex-1 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-semibold text-xs text-center shadow-md transition"
+                className="flex min-h-11 flex-1 items-center justify-center rounded-xl bg-indigo-600 py-2.5 text-center text-xs font-semibold text-white shadow-md transition hover:bg-indigo-500"
               >
                 Inspect Public Blockchain Proof
               </Link>
               <button
+                type="button"
                 onClick={() => setSelectedArtwork(null)}
-                className="px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold text-xs transition"
+                className="min-h-11 rounded-xl bg-slate-800 px-4 py-2.5 text-xs font-semibold text-slate-300 transition hover:bg-slate-700"
               >
                 Close
               </button>
             </div>
-          </div>
+          </section>
         </div>
       )}
 
       {/* 9. Incoming Transfer Review Modal */}
       {showIncomingModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md">
-          <div className="relative w-full max-w-lg rounded-2xl bg-slate-900 border border-slate-700 shadow-2xl p-6 sm:p-8 space-y-6">
+        <div className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-black/75 p-2 backdrop-blur-md sm:p-4">
+          <section role="dialog" aria-modal="true" aria-labelledby="incoming-transfer-title" className="relative max-h-[90vh] w-[95vw] max-w-lg space-y-6 overflow-y-auto overscroll-contain rounded-2xl border border-slate-700 bg-slate-900 p-4 shadow-2xl sm:p-8">
             <button
+              type="button"
               onClick={() => setShowIncomingModal(false)}
-              className="absolute top-4 right-4 text-slate-400 hover:text-white p-1"
+              aria-label="Close incoming transfer dialog"
+              className="absolute right-3 top-3 inline-flex min-h-11 min-w-11 items-center justify-center rounded-full text-slate-400 hover:bg-slate-800 hover:text-white"
             >
               ✕
             </button>
 
-            <div className="text-center space-y-1">
+            <div className="space-y-1 px-7 text-center">
               <span className="px-2.5 py-0.5 rounded-full bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 text-[10px] font-bold uppercase tracking-wider">
                 Custody Handoff Protocol
               </span>
-              <h2 className="text-xl font-bold text-white mt-2">Incoming Custody Transfer</h2>
+              <h2 id="incoming-transfer-title" className="mt-2 text-xl font-bold text-white">Incoming Custody Transfer</h2>
               <p className="text-xs text-slate-400">Review signatures and verify NFC binding before acceptance</p>
             </div>
 
@@ -1315,11 +1340,12 @@ const CollectorDashboard: React.FC = () => {
               </div>
             )}
 
-            <div className="flex items-center gap-3">
+            <div className="flex flex-col gap-3 sm:flex-row">
               <button
+                type="button"
                 onClick={handleAcceptTransfer}
                 disabled={isSigningTx}
-                className={`flex-1 py-3 rounded-xl ${
+                className={`min-h-11 flex-1 rounded-xl py-3 ${
                   isSigningTx
                     ? 'bg-emerald-800 text-slate-300 cursor-wait'
                     : 'bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white cursor-pointer'
@@ -1343,33 +1369,36 @@ const CollectorDashboard: React.FC = () => {
                 )}
               </button>
               <button
+                type="button"
                 onClick={() => setShowIncomingModal(false)}
                 disabled={isSigningTx}
-                className="px-4 py-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold text-xs transition cursor-pointer"
+                className="min-h-11 rounded-xl bg-slate-800 px-4 py-3 text-xs font-semibold text-slate-300 transition hover:bg-slate-700"
               >
                 Decline
               </button>
             </div>
-          </div>
+          </section>
         </div>
       )}
 
       {/* 10. Initiate Transfer Modal */}
       {showTransferModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md">
-          <div className="relative w-full max-w-lg rounded-2xl bg-slate-900 border border-slate-700 shadow-2xl p-6 sm:p-8 space-y-6">
+        <div className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-black/75 p-2 backdrop-blur-md sm:p-4">
+          <section role="dialog" aria-modal="true" aria-labelledby="initiate-transfer-title" className="relative max-h-[90vh] w-[95vw] max-w-lg space-y-6 overflow-y-auto overscroll-contain rounded-2xl border border-slate-700 bg-slate-900 p-4 shadow-2xl sm:p-8">
             <button
+              type="button"
               onClick={() => setShowTransferModal(false)}
-              className="absolute top-4 right-4 text-slate-400 hover:text-white p-1"
+              aria-label="Close initiate transfer dialog"
+              className="absolute right-3 top-3 inline-flex min-h-11 min-w-11 items-center justify-center rounded-full text-slate-400 hover:bg-slate-800 hover:text-white"
             >
               ✕
             </button>
 
-            <div className="text-center space-y-1">
+            <div className="space-y-1 px-7 text-center">
               <span className="px-2.5 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/30 text-[10px] font-bold uppercase tracking-wider">
                 Peer-To-Peer Custody Transfer
               </span>
-              <h2 className="text-xl font-bold text-white mt-2">Initiate Custody Transfer</h2>
+              <h2 id="initiate-transfer-title" className="mt-2 text-xl font-bold text-white">Initiate Custody Transfer</h2>
               <p className="text-xs text-slate-400">Hand over physical artwork provenance to a verified recipient</p>
             </div>
 
@@ -1382,7 +1411,7 @@ const CollectorDashboard: React.FC = () => {
                     const found = artworks.find(a => a.databaseId === e.target.value);
                     if (found) setTransferArtwork(found);
                   }}
-                  className="w-full px-3.5 py-2.5 rounded-xl bg-slate-950/80 border border-slate-700 text-white text-xs focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                  className="min-h-11 w-full rounded-xl border border-slate-700 bg-slate-950/80 px-3.5 py-2.5 text-xs text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
                 >
                   {artworks.map(art => (
                     <option key={art.id} value={art.databaseId}>
@@ -1401,13 +1430,13 @@ const CollectorDashboard: React.FC = () => {
                   maxLength={42}
                   aria-invalid={Boolean(transferError)}
                   placeholder="0x recipient wallet address"
-                  className="w-full px-3.5 py-2.5 rounded-xl bg-slate-950/80 border border-slate-700 text-white text-xs focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                  className="min-h-11 w-full rounded-xl border border-slate-700 bg-slate-950/80 px-3.5 py-2.5 text-xs text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
                 />
               </div>
 
               <div>
                 <label className="block text-slate-300 font-semibold mb-1">Transfer Price Visibility</label>
-                <select className="w-full px-3.5 py-2.5 rounded-xl bg-slate-950/80 border border-slate-700 text-white text-xs focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+                <select className="min-h-11 w-full rounded-xl border border-slate-700 bg-slate-950/80 px-3.5 py-2.5 text-xs text-white focus:outline-none focus:ring-2 focus:ring-indigo-500">
                   <option>Transacting Parties Only (Encrypted)</option>
                   <option>Public Chain of Custody</option>
                 </select>
@@ -1418,22 +1447,24 @@ const CollectorDashboard: React.FC = () => {
               <p role="alert" className="text-xs text-red-300">{transferError}</p>
             )}
 
-            <div className="flex items-center gap-3">
+            <div className="flex flex-col gap-3 sm:flex-row">
               <button
+                type="button"
                 onClick={handleInitiateTransfer}
                 disabled={isCreatingTransfer}
-                className="flex-1 py-3 rounded-xl bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-500 hover:to-violet-500 text-white font-semibold text-xs shadow-lg shadow-indigo-600/30 transition cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                className="min-h-11 flex-1 rounded-xl bg-gradient-to-r from-indigo-600 to-violet-600 py-3 text-xs font-semibold text-white shadow-lg transition hover:from-indigo-500 hover:to-violet-500 disabled:cursor-not-allowed disabled:opacity-50"
               >
                 {isCreatingTransfer ? 'Initiating...' : 'Initiate Secure Escrow'}
               </button>
               <button
+                type="button"
                 onClick={() => setShowTransferModal(false)}
-                className="px-4 py-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold text-xs transition cursor-pointer"
+                className="min-h-11 rounded-xl bg-slate-800 px-4 py-3 text-xs font-semibold text-slate-300 transition hover:bg-slate-700"
               >
                 Cancel
               </button>
             </div>
-          </div>
+          </section>
         </div>
       )}
 

@@ -1,4 +1,7 @@
 import { z } from 'zod';
+import { REGIONS_AND_INSTITUTIONS } from '../constants/institutionsByRegion';
+
+const availableJurisdictions = Object.keys(REGIONS_AND_INSTITUTIONS);
 
 export const emailSchema = z
   .string()
@@ -65,6 +68,8 @@ export const registrationSchema = z
     confirmPassword: z.string().min(1, 'Confirm your password.'),
     userType: z.enum(['institution', 'collector']),
     institutionName: z.string().optional(),
+    jurisdiction: z.string().optional(),
+    registrationNumber: z.string().trim().max(100, 'Registration number must be 100 characters or fewer.').optional(),
   })
   .superRefine((form, context) => {
     if (form.confirmPassword && form.password !== form.confirmPassword) {
@@ -76,15 +81,21 @@ export const registrationSchema = z
     }
 
     if (form.userType === 'institution') {
-      const result = institutionNameSchema.safeParse(form.institutionName ?? '');
-      if (!result.success) {
-        for (const issue of result.error.issues) {
-          context.addIssue({
-            code: 'custom',
-            path: ['institutionName'],
-            message: issue.message,
-          });
-        }
+      if (!availableJurisdictions.includes(form.jurisdiction ?? '')) {
+        context.addIssue({
+          code: 'custom',
+          path: ['jurisdiction'],
+          message: 'Select a jurisdiction country.',
+        });
+      }
+
+      const countryInstitutions = REGIONS_AND_INSTITUTIONS[form.jurisdiction ?? ''] || [];
+      if (!countryInstitutions.some((institution) => institution.name === form.institutionName)) {
+        context.addIssue({
+          code: 'custom',
+          path: ['institutionName'],
+          message: 'Select an institution listed for the selected country.',
+        });
       }
     }
   });

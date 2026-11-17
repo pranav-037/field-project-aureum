@@ -1,594 +1,266 @@
 import React, { useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+import {
+  ArrowRight,
+  ArrowUpRight,
+  BadgeCheck,
+  Boxes,
+  Fingerprint,
+  Landmark,
+  Link2,
+  LockKeyhole,
+  SearchCheck,
+  ShieldCheck,
+  Sparkles,
+} from 'lucide-react';
 import Navbar from '../components/Navbar';
 import { useAuth } from '../context/AuthContext';
 
 const LandingPage: React.FC = () => {
   const navigate = useNavigate();
-  const { user: currentUser, loading } = useAuth();
+  const { user, loading } = useAuth();
 
-  const dashboardUrl = currentUser?.role === 'ADMIN' || currentUser?.role === 'AUTHENTICATOR'
-    ? '/institution/dashboard'
-    : '/collector/dashboard';
+  const dashboardUrl =
+    user?.role === 'ADMIN' || user?.role === 'AUTHENTICATOR'
+      ? '/institution/dashboard'
+      : '/collector/dashboard';
 
   useEffect(() => {
-    if (!loading && currentUser) {
-      navigate(dashboardUrl, { replace: true });
-    }
-  }, [currentUser, dashboardUrl, loading, navigate]);
+    if (!loading && user) navigate(dashboardUrl, { replace: true });
+  }, [dashboardUrl, loading, navigate, user]);
 
-  // Smooth scroll handler for tabs on the same page
-  const handleNavScroll = (e: React.MouseEvent<HTMLAnchorElement>, targetId: string) => {
-    e.preventDefault();
-    const element = document.getElementById(targetId);
-    if (element) {
-      const navOffset = 80; // height of sticky navbar
-      const elementPosition = element.getBoundingClientRect().top;
-      const offsetPosition = elementPosition + window.pageYOffset - navOffset;
-
-      window.scrollTo({
-        top: Math.max(0, offsetPosition),
-        behavior: 'smooth'
-      });
-      window.history.pushState(null, '', `#${targetId}`);
-    }
-  };
-
-  const scrollToTop = (e: React.MouseEvent) => {
-    if (!currentUser) {
-      e.preventDefault();
-      window.scrollTo({ top: 0, behavior: 'smooth' });
-      window.history.pushState(null, '', window.location.pathname);
-    }
-  };
-
-  // Handle direct navigation with hash e.g. /#features or /#how-it-works
   useEffect(() => {
-    if (window.location.hash) {
-      const id = window.location.hash.replace('#', '');
-      const element = document.getElementById(id);
-      if (element) {
-        setTimeout(() => {
-          const navOffset = 80;
-          const elementPosition = element.getBoundingClientRect().top;
-          const offsetPosition = elementPosition + window.pageYOffset - navOffset;
-          window.scrollTo({
-            top: Math.max(0, offsetPosition),
-            behavior: 'smooth'
-          });
-        }, 150);
-      }
-    }
+    const id = window.location.hash.slice(1);
+    if (!id) return;
+    const timer = window.setTimeout(() => {
+      document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, 100);
+    return () => window.clearTimeout(timer);
   }, []);
 
-  if (loading || currentUser) {
-    return null;
-  }
+  if (loading || user) return null;
 
   return (
-    <div className="min-h-screen bg-[#0B0F17] text-slate-100 flex flex-col selection:bg-indigo-500/30 selection:text-indigo-200">
-      {/* 1. Professional Navigation Bar */}
+    <div className="landing-page min-h-screen text-[#09090B] dark:text-[#F8FAFC]">
       <Navbar />
 
-      {/* 2. Hero Section */}
-      <section id="hero" className="relative overflow-hidden pt-12 pb-24 md:pt-20 md:pb-32 scroll-mt-24">
-        {/* Ambient Gradient Glows */}
-        <div className="absolute top-1/4 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[700px] h-[380px] bg-gradient-to-tr from-amber-500/10 via-indigo-600/15 to-gold-500/10 blur-[140px] rounded-full pointer-events-none -z-10"></div>
-        <div className="absolute top-10 right-10 w-96 h-96 bg-gold-500/5 blur-[120px] rounded-full pointer-events-none -z-10"></div>
-
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 lg:gap-8 items-center">
-            {/* Left Content Column */}
-            <div className="lg:col-span-7 space-y-8 text-left">
-              {/* Badge */}
-              <div className="inline-flex items-center gap-2.5 px-3.5 py-1.5 rounded-full bg-slate-900/90 border border-gold-500/30 text-xs font-medium text-slate-300 shadow-sm backdrop-blur-md">
-                <span className="flex h-2 w-2 rounded-full bg-gold-400 shadow-[0_0_10px_#D4AF37]"></span>
-                <span className="text-gold-300 font-display tracking-widest uppercase text-[10px]">Sovereign Fine Art Registry</span>
-                <span className="text-slate-600">•</span>
-                <span className="text-slate-400 text-[11px]">Decentralized Merkle Custody</span>
-              </div>
-
-              {/* Main Headline */}
-              <h1 className="text-4xl sm:text-6xl lg:text-[4.2rem] font-serif font-light text-white leading-[1.08] tracking-tight">
-                The Sovereign Standard for{' '}
-                <span className="font-serif italic text-gold-gradient font-normal block sm:inline">
-                  Fine Art Provenance
+      <main>
+        <section id="hero" className="landing-hero scroll-mt-24 px-5 pb-20 pt-16 sm:px-8 sm:pt-24 lg:pb-28">
+          <div className="mx-auto grid max-w-7xl grid-cols-1 items-center gap-14 lg:grid-cols-12">
+            <div className="relative z-10 min-w-0 lg:col-span-7">
+              <span className="inline-flex items-center gap-2 rounded-full border border-[#EAE6DF] bg-white/80 px-3.5 py-2 text-xs font-semibold tracking-wide text-[#52525B] shadow-sm">
+                <Landmark className="h-4 w-4 text-[#E06D1B]" aria-hidden="true" />
+                Institutional Art Provenance
+              </span>
+              <h1 className="mt-7 max-w-3xl text-4xl font-bold leading-[1.04] tracking-[-0.06em] text-[#09090B] sm:text-5xl lg:text-6xl dark:text-[#F8FAFC]">
+                Art provenance for
+                <span className="mt-2 block font-serif font-medium italic tracking-[-0.035em] text-[#9C3D00] dark:text-[#F27A24]">
+                  institutions &amp; collectors.
                 </span>
               </h1>
-
-              {/* Body Text */}
-              <p className="text-base sm:text-lg text-slate-300/80 leading-relaxed max-w-2xl font-light">
-                Aureum permanently anchors physical museum masterpieces to decentralized cryptographic consensus.
-                Tamper-evident NFC cryptoseals and multi-signature attestations unite physical conservation reports with immutable on-chain custody.
+              <p className="mt-6 max-w-xl text-base leading-7 text-[#52525B] sm:text-lg">
+                A considered record for art institutions and collectors to register, authenticate, and follow each work through custody.
               </p>
-
-              {/* Distinct Well-Spaced Hero Action Buttons */}
-              <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-4 pt-2">
+              <div className="mt-8 flex flex-col gap-3 sm:flex-row">
                 <Link
-                  to={currentUser ? dashboardUrl : "/register"}
-                  className="px-7 py-3.5 rounded-xl bg-gradient-to-r from-gold-500 via-amber-500 to-gold-600 hover:from-gold-400 hover:to-amber-500 text-slate-950 font-bold text-center shadow-lg shadow-gold-500/20 hover:shadow-gold-500/40 hover:-translate-y-0.5 transition duration-200 flex items-center justify-center gap-2"
+                  to="/register"
+                  className="group inline-flex min-h-11 items-center justify-between gap-5 rounded-full bg-[#D95D0B] py-1.5 pl-6 pr-2 text-sm font-bold text-[#09090B] shadow-sm transition hover:bg-[#bd4d08] hover:shadow-md dark:bg-[#F27A24] dark:hover:bg-[#ff9445]"
                 >
-                  <span>{currentUser ? 'Go to Dashboard' : 'Enter Sovereign Vault'}</span>
-                  <svg className="w-4 h-4 text-slate-950" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M14 5l7 7m0 0l-7 7m7-7H3" />
-                  </svg>
+                  Create an account
+                  <span className="grid h-9 w-9 place-items-center rounded-full bg-white text-[#9C3D00] transition group-hover:translate-x-0.5 dark:text-[#9C3D00]">
+                    <ArrowRight className="h-4 w-4" aria-hidden="true" />
+                  </span>
                 </Link>
-
                 <Link
                   to="/verify"
-                  className="px-7 py-3.5 rounded-xl border border-slate-700/90 hover:border-gold-500/50 bg-slate-900/60 hover:bg-slate-800/80 text-slate-200 font-semibold text-center backdrop-blur-sm transition duration-200 flex items-center justify-center gap-2 group"
+                  className="inline-flex min-h-11 items-center justify-center gap-2 rounded-full border border-[#09090B] px-6 py-3.5 text-sm font-semibold text-[#09090B] transition hover:border-[#9C3D00] hover:text-[#9C3D00] dark:border-[#F8FAFC] dark:text-[#F8FAFC] dark:hover:border-[#F27A24] dark:hover:text-[#F27A24]"
                 >
-                  <svg className="w-4 h-4 text-gold-400 group-hover:scale-110 transition" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                  </svg>
-                  <span>Verify an Artwork</span>
+                  Verify an artwork
+                  <ArrowUpRight className="h-4 w-4" aria-hidden="true" />
                 </Link>
               </div>
-
-              {/* Trust Metrics / Micro Badges */}
-              <div className="pt-6 border-t border-slate-800/80 grid grid-cols-3 gap-6 max-w-lg">
-                <div>
-                  <p className="text-2xl font-display font-bold text-white tracking-tight">100%</p>
-                  <p className="text-[11px] uppercase tracking-wider text-slate-400 mt-1">Dual-Key Custody</p>
-                </div>
-                <div>
-                  <p className="text-2xl font-display font-bold text-gold-400 tracking-tight">$45M+</p>
-                  <p className="text-[11px] uppercase tracking-wider text-slate-400 mt-1">Fine Art Anchored</p>
-                </div>
-                <div>
-                  <p className="text-2xl font-display font-bold text-indigo-300 tracking-tight">0 Fraud</p>
-                  <p className="text-[11px] uppercase tracking-wider text-slate-400 mt-1">Cryptoseal Ledger</p>
-                </div>
+              <div className="mt-10 flex flex-wrap items-center gap-x-8 gap-y-3 border-t border-[#EAE6DF] pt-6 text-xs font-medium text-[#52525B]">
+                <span className="inline-flex items-center gap-2"><ShieldCheck className="h-4 w-4 text-[#1E3A2F]" />Institutional review</span>
+                <span className="inline-flex items-center gap-2"><Fingerprint className="h-4 w-4 text-[#1E3A2F]" />Tamper-evident records</span>
               </div>
             </div>
 
-            {/* Right Abstract Web3 / Fine Art Graphic Column */}
-            <div className="lg:col-span-5 relative">
-              {/* Outer Glow & Glass Frame */}
-              <div className="relative mx-auto max-w-md rounded-2xl bg-gradient-to-b from-gold-500/30 via-slate-800/40 to-slate-900/80 p-[1px] shadow-2xl shadow-black/80">
-                <div className="rounded-[15px] bg-[#0A0D15]/95 backdrop-blur-xl p-5 overflow-hidden border border-slate-800/60">
-                  {/* Top Bar with Token Header */}
-                  <div className="flex items-center justify-between pb-4 border-b border-slate-800/80">
-                    <div className="flex items-center gap-2">
-                      <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 shadow-[0_0_8px_#34d399]"></span>
-                      <span className="text-xs font-mono font-semibold text-slate-200">GENESIS #0842</span>
+            <div className="relative mx-auto w-full min-w-0 max-w-[31rem] lg:col-span-5">
+              <div className="absolute -right-4 top-8 z-20 hidden rounded-full bg-[#1E3A2F] px-4 py-2.5 text-xs font-semibold text-white shadow-lg sm:flex sm:items-center sm:gap-2">
+                <BadgeCheck className="h-4 w-4 text-[#F4A922]" /> Verification interface preview
+              </div>
+              <div className="absolute -bottom-4 left-0 z-20 rounded-full border border-[#EAE6DF] bg-white px-4 py-2.5 text-xs font-semibold text-[#09090B] shadow-md dark:text-[#F8FAFC] sm:-left-5">
+                <span className="mr-2 inline-block h-2 w-2 rounded-full bg-[#F4A922]" /> Immutable ledger
+              </div>
+              <div className="rotate-0 rounded-[2rem] border border-[#EAE6DF] bg-[#FDF6EC] p-3 shadow-[0_30px_90px_-40px_rgba(20,43,34,.25)] sm:rotate-2">
+                <article className="relative overflow-hidden rounded-[1.5rem] border border-[#EAE6DF] bg-white p-6 sm:p-8">
+                  <div className="flex items-center justify-between border-b border-dashed border-[#D4CFC7] pb-5">
+                    <div className="flex items-center gap-3">
+                      <div className="grid h-10 w-10 place-items-center rounded-xl bg-[#1E3A2F] text-[#F4A922]">
+                        <Landmark className="h-5 w-5" aria-hidden="true" />
+                      </div>
+                      <div>
+                        <p className="text-[10px] font-bold uppercase tracking-[.18em] text-[#52525B]">Aureum registry</p>
+                        <p className="mt-0.5 text-sm font-semibold">Provenance certificate</p>
+                      </div>
                     </div>
-                    <span className="text-[10px] font-display uppercase tracking-widest px-2.5 py-0.5 rounded bg-gold-500/10 text-gold-300 border border-gold-500/30 font-semibold">
-                      ARCHIVAL PROVENANCE
-                    </span>
+                    <span className="rounded-full bg-[#EEF4F0] px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-[#1E3A2F]">Preview</span>
                   </div>
 
-                  {/* Artwork Showcase Image / Graphic Canvas */}
-                  <div className="relative my-4 rounded-xl overflow-hidden aspect-[4/3] bg-gradient-to-br from-slate-950 via-[#121626] to-[#1c1428] border border-slate-800 group">
-                    {/* Archival Fine Art Canvas Effect */}
-                    <div className="absolute inset-0 flex items-center justify-center opacity-90">
-                      <div className="relative w-44 h-44">
-                        <div className="absolute inset-0 rounded-full bg-gradient-to-tr from-gold-500/30 via-indigo-600/30 to-violet-500/30 blur-2xl animate-pulse"></div>
-                        <div className="absolute inset-2 rounded-2xl rotate-6 border border-gold-500/40 bg-gradient-to-br from-gold-500/10 to-transparent backdrop-blur-sm"></div>
-                        <div className="absolute inset-6 rounded-full -rotate-6 border border-indigo-400/50 bg-gradient-to-tl from-indigo-500/10 to-transparent backdrop-blur-sm"></div>
-                        <div className="absolute inset-12 rounded-xl rotate-12 border border-gold-400/60 bg-slate-950/70 backdrop-blur-md flex flex-col items-center justify-center shadow-inner">
-                          <svg className="w-8 h-8 text-gold-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-                            <polygon points="12 2 2 7 12 12 22 7 12 2" />
-                            <polyline points="2 17 12 22 22 17" />
-                            <polyline points="2 12 12 17 22 12" />
-                          </svg>
-                          <span className="text-[9px] font-mono tracking-widest text-gold-300 uppercase mt-1">SEALED</span>
-                        </div>
-                      </div>
+                  <div className="archive-grid relative my-6 flex aspect-[1.55] items-center justify-center overflow-hidden rounded-2xl border border-[#EAE6DF]">
+                    <div className="absolute h-44 w-44 rounded-full border border-[#1E3A2F]/15" />
+                    <div className="absolute h-32 w-32 rotate-45 rounded-3xl border border-[#E06D1B]/30 bg-white/40" />
+                    <div className="absolute h-20 w-20 -rotate-12 rounded-2xl border border-[#1E3A2F]/30 bg-[#FDF6EC]/80" />
+                    <div className="relative grid h-12 w-12 place-items-center rounded-xl bg-[#1E3A2F] text-[#F4A922] shadow-lg">
+                      <Fingerprint className="h-6 w-6" aria-hidden="true" />
                     </div>
-
-                    {/* Artwork Title Overlay */}
-                    <div className="absolute bottom-0 inset-x-0 p-4 bg-gradient-to-t from-black via-black/85 to-transparent">
-                      <div className="flex items-center justify-between text-[11px] font-mono text-gold-300 mb-0.5">
-                        <span>Oil on Linen • 1889</span>
-                        <span className="text-slate-400">Verifiable</span>
-                      </div>
-                      <h4 className="text-base font-serif font-normal text-white tracking-wide">
-                        Symphony in Gold & Obsidian
-                      </h4>
-                      <p className="text-[11px] text-slate-400 mt-0.5 font-mono">
-                        Registry CID: <span className="text-slate-300">0x9F4b...39E1</span>
-                      </p>
-                    </div>
+                    <div className="absolute bottom-3 left-4 text-[10px] font-semibold uppercase tracking-[.16em] text-[#52525B]">Archival record / specimen preview</div>
                   </div>
 
-                  {/* Verification Status Ledger Cards */}
-                  <div className="space-y-2 pt-1">
-                    <div className="flex items-center justify-between p-2.5 rounded-lg bg-slate-900/80 border border-slate-800 text-xs">
-                      <div className="flex items-center gap-2">
-                        <svg className="w-4 h-4 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                        </svg>
-                        <span className="text-slate-300 font-medium">Physical Cryptoseal Tag</span>
+                  <div className="space-y-4">
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <p className="font-serif text-2xl font-semibold leading-tight">Masterwork record</p>
+                        <p className="mt-1 text-xs text-[#52525B]">Institutional custody certificate</p>
                       </div>
-                      <span className="font-mono text-gold-300 text-[11px]">NFC-SECURE-902</span>
+                      <Sparkles className="mt-1 h-5 w-5 text-[#E06D1B]" aria-hidden="true" />
                     </div>
-
-                    <div className="flex items-center justify-between p-2.5 rounded-lg bg-slate-900/80 border border-slate-800 text-xs">
-                      <div className="flex items-center gap-2">
-                        <svg className="w-4 h-4 text-indigo-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
-                        </svg>
-                        <span className="text-slate-300 font-medium">Consensus Block Height</span>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="rounded-xl bg-[#FDF6EC] p-3">
+                        <p className="text-[9px] font-bold uppercase tracking-wider text-[#3F3F46]">Record hash · preview</p>
+                        <p className="mt-1 font-mono text-[11px] font-semibold">0x7f3a…91c2</p>
                       </div>
-                      <span className="font-mono text-indigo-300 text-[11px]">#19,842,109</span>
+                      <div className="rounded-xl bg-[#FDF6EC] p-3">
+                        <p className="text-[9px] font-bold uppercase tracking-wider text-[#3F3F46]">Verification timestamp</p>
+                        <p className="mt-1 text-[11px] font-semibold">Recorded on verification</p>
+                      </div>
                     </div>
-
-                    <div className="flex items-center justify-between p-2.5 rounded-lg bg-slate-900/80 border border-slate-800 text-xs">
-                      <div className="flex items-center gap-2">
-                        <svg className="w-4 h-4 text-gold-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
-                        </svg>
-                        <span className="text-slate-300 font-medium">Custodial Protocol</span>
-                      </div>
-                      <span className="text-gold-300 font-medium text-[11px]">Metropolitan Museum Guild Escrow</span>
+                    <div className="flex items-center gap-2 border-t border-dashed border-[#D4CFC7] pt-4 text-[11px] text-[#52525B]">
+                      <span className="h-2 w-2 rounded-full bg-[#1E3A2F]" /> Institutional signature status
+                      <span className="ml-auto font-mono">CERT. PREVIEW</span>
                     </div>
                   </div>
-                </div>
+                </article>
               </div>
             </div>
+          </div>
+        </section>
+
+        <div className="bg-[#F4A922] py-4 text-[#09090B]" role="region" aria-label="Platform capabilities">
+          <div className="mx-auto grid max-w-7xl grid-cols-2 gap-x-3 gap-y-3 px-5 text-center text-[11px] font-extrabold uppercase tracking-[.12em] sm:grid-cols-4 sm:px-8 sm:text-xs">
+            {['Provenance tracking', 'Institutional custody', 'Ownership transfers', 'Audit trails'].map((item) => (
+              <span key={item} className="flex min-h-10 items-center justify-center gap-2"><Sparkles className="h-4 w-4 shrink-0" aria-hidden="true" />{item}</span>
+            ))}
           </div>
         </div>
-      </section>
 
-      {/* 3. Features Section */}
-      <section id="features" className="py-24 relative border-t border-slate-800/60 bg-[#090D15] scroll-mt-20">
-        <div className="absolute top-1/3 right-1/4 w-96 h-96 bg-amber-500/5 blur-[140px] rounded-full pointer-events-none -z-10"></div>
-        <div className="absolute bottom-10 left-10 w-80 h-80 bg-indigo-600/5 blur-[120px] rounded-full pointer-events-none -z-10"></div>
-
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
-          <div className="max-w-3xl mx-auto text-center space-y-4 mb-16">
-            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-gold-500/10 border border-gold-500/20 text-xs font-semibold text-gold-300 uppercase tracking-widest font-display">
-              Core Protocol Capabilities
-            </div>
-            <h2 className="text-3xl sm:text-4xl lg:text-5xl font-serif font-light text-white tracking-tight">
-              Enterprise Features for{' '}
-              <span className="font-serif italic text-gold-gradient font-normal">
-                Fine Art Custody
-              </span>
-            </h2>
-            <p className="text-base sm:text-lg text-slate-300/80 font-light max-w-2xl mx-auto">
-              Built on Ethereum smart contracts, decentralized IPFS storage, and physical NFC tamper-evident cryptoseals.
-            </p>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-            {/* Feature 1 */}
-            <div className="group rounded-2xl bg-slate-900/40 backdrop-blur-md border border-slate-800/80 p-7 hover:border-amber-500/40 hover:bg-slate-900/60 transition duration-300">
-              <div className="w-12 h-12 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-400 mb-5 group-hover:scale-110 transition duration-300">
-                <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 11c0 3.517-1.009 6.799-2.753 9.571m-3.44-2.04l.054-.09A13.916 13.916 0 008 11a4 4 0 118 0c0 1.017-.07 2.019-.203 3m-2.118 6.844A21.88 21.88 0 0015.171 17m3.839 1.132c.645-2.266.99-4.659.99-7.132A8 8 0 004 11m0 0a8 8 0 001.243 4.293" />
-                </svg>
-              </div>
-              <h3 className="text-lg font-bold text-white mb-2 group-hover:text-amber-300 transition">
-                Physical NFC Binding
-              </h3>
-              <p className="text-sm text-slate-400 leading-relaxed">
-                Tamper-evident cryptoseals permanently bind each physical artwork's canvas or sculpture directly to its on-chain Genesis certificate.
-              </p>
-            </div>
-
-            {/* Feature 2 */}
-            <div className="group rounded-2xl bg-slate-900/40 backdrop-blur-md border border-slate-800/80 p-7 hover:border-indigo-500/40 hover:bg-slate-900/60 transition duration-300">
-              <div className="w-12 h-12 rounded-xl bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center text-indigo-400 mb-5 group-hover:scale-110 transition duration-300">
-                <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
-                </svg>
-              </div>
-              <h3 className="text-lg font-bold text-white mb-2 group-hover:text-indigo-300 transition">
-                Dual-Signature Escrow
-              </h3>
-              <p className="text-sm text-slate-400 leading-relaxed">
-                Custody transitions require multi-party cryptographic authorization, preventing unilateral transfers and eliminating counterfeit re-entry.
-              </p>
-            </div>
-
-            {/* Feature 3 */}
-            <div className="group rounded-2xl bg-slate-900/40 backdrop-blur-md border border-slate-800/80 p-7 hover:border-violet-500/40 hover:bg-slate-900/60 transition duration-300">
-              <div className="w-12 h-12 rounded-xl bg-violet-500/10 border border-violet-500/20 flex items-center justify-center text-violet-400 mb-5 group-hover:scale-110 transition duration-300">
-                <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
-                </svg>
-              </div>
-              <h3 className="text-lg font-bold text-white mb-2 group-hover:text-violet-300 transition">
-                IPFS Decentralized Vault
-              </h3>
-              <p className="text-sm text-slate-400 leading-relaxed">
-                Preserve archival appraisal documents, multispectral imaging, and restoration histories permanently across immutable decentralized storage.
-              </p>
-            </div>
-
-            {/* Feature 4 */}
-            <div className="group rounded-2xl bg-slate-900/40 backdrop-blur-md border border-slate-800/80 p-7 hover:border-emerald-500/40 hover:bg-slate-900/60 transition duration-300">
-              <div className="w-12 h-12 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400 mb-5 group-hover:scale-110 transition duration-300">
-                <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                </svg>
-              </div>
-              <h3 className="text-lg font-bold text-white mb-2 group-hover:text-emerald-300 transition">
-                Instant Public Verification
-              </h3>
-              <p className="text-sm text-slate-400 leading-relaxed">
-                Prospective buyers, auction houses, and insurers can audit complete historical chains of custody instantly without specialized software.
-              </p>
-            </div>
-
-            {/* Feature 5 */}
-            <div className="group rounded-2xl bg-slate-900/40 backdrop-blur-md border border-slate-800/80 p-7 hover:border-amber-500/40 hover:bg-slate-900/60 transition duration-300">
-              <div className="w-12 h-12 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-400 mb-5 group-hover:scale-110 transition duration-300">
-                <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
-                </svg>
-              </div>
-              <h3 className="text-lg font-bold text-white mb-2 group-hover:text-amber-300 transition">
-                Institutional Guild RBAC
-              </h3>
-              <p className="text-sm text-slate-400 leading-relaxed">
-                Role-based on-chain authorization tailored for accredited museum curators, independent appraisers, and sovereign art galleries.
-              </p>
-            </div>
-
-            {/* Feature 6 */}
-            <div className="group rounded-2xl bg-slate-900/40 backdrop-blur-md border border-slate-800/80 p-7 hover:border-indigo-500/40 hover:bg-slate-900/60 transition duration-300">
-              <div className="w-12 h-12 rounded-xl bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center text-indigo-400 mb-5 group-hover:scale-110 transition duration-300">
-                <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
-                </svg>
-              </div>
-              <h3 className="text-lg font-bold text-white mb-2 group-hover:text-indigo-300 transition">
-                Zero-Knowledge Privacy
-              </h3>
-              <p className="text-sm text-slate-400 leading-relaxed">
-                Preserve confidential valuation records and collector identities while allowing cryptographic proof of authenticity and provenance.
-              </p>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* 4. "How It Works" Section Redesign (Modern 3-Column Glass Card Layout) */}
-      <section id="how-it-works" className="py-24 relative border-t border-slate-800/60 bg-[#0B0F17] scroll-mt-20">
-        {/* Subtle Ambient Glow */}
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-3/4 h-80 bg-indigo-600/5 blur-[120px] rounded-full pointer-events-none"></div>
-
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10 text-center">
-          {/* Section Heading */}
-          <div className="max-w-3xl mx-auto space-y-4 mb-16">
-            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-indigo-500/10 border border-indigo-500/20 text-xs font-semibold text-indigo-300 uppercase tracking-widest font-display">
-              Architecture & Custody
-            </div>
-            <h2 className="text-3xl sm:text-4xl lg:text-5xl font-serif font-light text-white tracking-tight">
-              How Aureum Secures{' '}
-              <span className="font-serif italic text-gold-gradient font-normal">
-                Artwork Provenance
-              </span>
-            </h2>
-            <p className="text-base sm:text-lg text-slate-300/80 font-light max-w-2xl mx-auto">
-              A physical-to-digital chain of custody engineered for international galleries, authenticators, and private sovereign collectors.
-            </p>
-          </div>
-
-          {/* 3-Column Grid Card Layout */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-            {/* Step 1 Card */}
-            <div className="group relative rounded-2xl bg-slate-900/40 backdrop-blur-md border border-slate-800/80 p-8 hover:border-amber-500/50 hover:bg-slate-900/70 hover:shadow-2xl hover:shadow-amber-500/5 transition-all duration-300 flex flex-col text-left">
-              {/* Badge & Number */}
-              <div className="flex items-center justify-between mb-6">
-                <div className="w-12 h-12 rounded-xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-center text-amber-400 group-hover:scale-110 group-hover:bg-amber-500/20 transition duration-300">
-                  <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
-                  </svg>
-                </div>
-                <span className="font-mono text-3xl font-extrabold text-slate-700 group-hover:text-amber-400/40 transition duration-300">
-                  01
-                </span>
-              </div>
-
-              <h3 className="text-xl font-bold text-white mb-3 tracking-tight group-hover:text-amber-300 transition duration-200">
-                Artwork Authentication
-              </h3>
-              <p className="text-sm text-slate-400 leading-relaxed mb-6 flex-1">
-                Accredited authenticators inspect physical mediums, bind cryptographic NFC seals, and anchor Genesis records to IPFS metadata and the blockchain.
-              </p>
-
-              <div className="pt-4 border-t border-slate-800/80 flex items-center gap-2 text-xs font-mono text-slate-400">
-                <span className="w-1.5 h-1.5 rounded-full bg-amber-400"></span>
-                <span>Physical Genesis Binding</span>
-              </div>
-            </div>
-
-            {/* Step 2 Card */}
-            <div className="group relative rounded-2xl bg-slate-900/40 backdrop-blur-md border border-slate-800/80 p-8 hover:border-indigo-500/50 hover:bg-slate-900/70 hover:shadow-2xl hover:shadow-indigo-500/5 transition-all duration-300 flex flex-col text-left">
-              {/* Badge & Number */}
-              <div className="flex items-center justify-between mb-6">
-                <div className="w-12 h-12 rounded-xl bg-indigo-500/10 border border-indigo-500/30 flex items-center justify-center text-indigo-400 group-hover:scale-110 group-hover:bg-indigo-500/20 transition duration-300">
-                  <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
-                  </svg>
-                </div>
-                <span className="font-mono text-3xl font-extrabold text-slate-700 group-hover:text-indigo-400/40 transition duration-300">
-                  02
-                </span>
-              </div>
-
-              <h3 className="text-xl font-bold text-white mb-3 tracking-tight group-hover:text-indigo-300 transition duration-200">
-                Ownership Transfer
-              </h3>
-              <p className="text-sm text-slate-400 leading-relaxed mb-6 flex-1">
-                Every sale, auction consignment, or gallery transfer requires dual-signature verification, permanently logging historical custody while respecting privacy.
-              </p>
-
-              <div className="pt-4 border-t border-slate-800/80 flex items-center gap-2 text-xs font-mono text-slate-400">
-                <span className="w-1.5 h-1.5 rounded-full bg-indigo-400"></span>
-                <span>Dual-Signature Custody</span>
-              </div>
-            </div>
-
-            {/* Step 3 Card */}
-            <div className="group relative rounded-2xl bg-slate-900/40 backdrop-blur-md border border-slate-800/80 p-8 hover:border-violet-500/50 hover:bg-slate-900/70 hover:shadow-2xl hover:shadow-violet-500/5 transition-all duration-300 flex flex-col text-left">
-              {/* Badge & Number */}
-              <div className="flex items-center justify-between mb-6">
-                <div className="w-12 h-12 rounded-xl bg-violet-500/10 border border-violet-500/30 flex items-center justify-center text-violet-400 group-hover:scale-110 group-hover:bg-violet-500/20 transition duration-300">
-                  <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
-                  </svg>
-                </div>
-                <span className="font-mono text-3xl font-extrabold text-slate-700 group-hover:text-violet-400/40 transition duration-300">
-                  03
-                </span>
-              </div>
-
-              <h3 className="text-xl font-bold text-white mb-3 tracking-tight group-hover:text-violet-300 transition duration-200">
-                Provenance Verification
-              </h3>
-              <p className="text-sm text-slate-400 leading-relaxed mb-6 flex-1">
-                Collectors, insurers, and museum registrars instantly verify the full chronological pedigree of an artwork through public or permissioned queries.
-              </p>
-
-              <div className="pt-4 border-t border-slate-800/80 flex items-center gap-2 text-xs font-mono text-slate-400">
-                <span className="w-1.5 h-1.5 rounded-full bg-violet-400"></span>
-                <span>Instant Verifiability</span>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* 5. About Section */}
-      <section id="about" className="py-24 relative border-t border-slate-800/60 bg-[#090D15] scroll-mt-20">
-        <div className="absolute top-1/2 left-1/3 -translate-x-1/2 -translate-y-1/2 w-[550px] h-[300px] bg-indigo-600/10 blur-[130px] rounded-full pointer-events-none -z-10"></div>
-
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 items-center">
-            <div className="lg:col-span-6 space-y-6">
-              <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-violet-500/10 border border-violet-500/20 text-xs font-semibold text-violet-300 uppercase tracking-widest font-display">
-                About The Protocol
-              </div>
-              <h2 className="text-3xl sm:text-4xl font-serif font-light text-white tracking-tight">
-                Restoring Trust & Authenticity to{' '}
-                <span className="font-serif italic text-gold-gradient font-normal">
-                  Global Fine Art
-                </span>
+        <section id="features" className="scroll-mt-24 px-5 py-20 sm:px-8 sm:py-28">
+          <div className="mx-auto max-w-7xl">
+            <div className="mb-12 max-w-2xl">
+              <p className="text-xs font-bold uppercase tracking-[.18em] text-[#E06D1B]">One record, every chapter</p>
+              <h2 className="mt-4 text-4xl font-semibold tracking-[-.05em] sm:text-5xl">
+                Verified <span className="font-serif italic font-medium text-[#E06D1B]">provenance</span>, made legible.
               </h2>
-              <p className="text-base text-slate-300 leading-relaxed">
-                For centuries, the international fine art market has suffered from forged paper certificates, opaque provenance trails, and unverified custodial transfers. Aureum Artchain bridges this divide by bonding physical masterworks with cryptographic certainty.
-              </p>
-              <p className="text-sm text-slate-400 leading-relaxed">
-                Engineered in collaboration with certified art conservators and Web3 cryptography specialists, our platform empowers museums, private collectors, and reputable auction houses with permanent provenance verifiability.
-              </p>
-
-              <div className="grid grid-cols-2 gap-4 pt-4 border-t border-slate-800/80">
-                <div className="p-4 rounded-xl bg-slate-900/60 border border-slate-800">
-                  <p className="text-sm font-bold text-white">Trustless Provenance</p>
-                  <p className="text-xs text-slate-400 mt-1">Immutable on-chain history that cannot be manipulated or backdated.</p>
-                </div>
-                <div className="p-4 rounded-xl bg-slate-900/60 border border-slate-800">
-                  <p className="text-sm font-bold text-white">Museum Standards</p>
-                  <p className="text-xs text-slate-400 mt-1">Fully compatible with international museum registrar cataloging norms.</p>
-                </div>
-              </div>
+              <p className="mt-4 max-w-xl leading-7 text-[#52525B]">Purpose-built tools bring authentication, custody, and public verification into one clear archival workflow.</p>
             </div>
 
-            <div className="lg:col-span-6">
-              <div className="p-8 rounded-2xl bg-gradient-to-tr from-slate-900/90 via-indigo-950/40 to-slate-900/90 border border-slate-800 shadow-2xl space-y-6">
-                <h3 className="text-xl font-bold text-white">The Aureum Guarantee</h3>
-                <div className="space-y-4 text-sm text-slate-300">
-                  <div className="flex items-start gap-3">
-                    <span className="flex-shrink-0 w-6 h-6 rounded-full bg-emerald-500/20 text-emerald-400 flex items-center justify-center text-xs font-bold">✓</span>
-                    <p><strong className="text-white">Tamper Detection:</strong> Any physical removal or disruption of the NFC cryptoseal invalidates downstream verification status.</p>
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+              {[
+                { icon: Fingerprint, title: 'Physical-to-digital binding', body: 'Connect an artwork’s physical identifiers to its durable digital provenance record.', href: '/artwork/register' },
+                { icon: Boxes, title: 'Custody history', body: 'Keep ownership events and transfer approvals arranged as a readable, auditable timeline.', href: '/collector/dashboard' },
+                { icon: SearchCheck, title: 'Public verification', body: 'Let a collector, institution, or prospective buyer inspect a record with confidence.', href: '/verify' },
+              ].map(({ icon: Icon, title, body, href }) => (
+                <article key={title} className="group rounded-2xl border border-[#EAE6DF] bg-white p-6 shadow-sm transition hover:-translate-y-1 hover:shadow-md">
+                  <div className="grid h-12 w-12 place-items-center rounded-xl bg-[#FDF6EC] text-[#E06D1B]">
+                    <Icon className="h-5 w-5" aria-hidden="true" />
                   </div>
-                  <div className="flex items-start gap-3">
-                    <span className="flex-shrink-0 w-6 h-6 rounded-full bg-indigo-500/20 text-indigo-400 flex items-center justify-center text-xs font-bold">✓</span>
-                    <p><strong className="text-white">Cryptographic Handoff:</strong> Eliminates disputed provenance by requiring digital signatures from both institutions and collectors.</p>
-                  </div>
-                  <div className="flex items-start gap-3">
-                    <span className="flex-shrink-0 w-6 h-6 rounded-full bg-amber-500/20 text-amber-400 flex items-center justify-center text-xs font-bold">✓</span>
-                    <p><strong className="text-white">Perpetual Preservation:</strong> Metadata, spectral scans, and archival appraisals remain accessible across IPFS forever.</p>
-                  </div>
-                </div>
-              </div>
+                  <h3 className="mt-6 text-lg font-bold tracking-tight">{title}</h3>
+                  <p className="mt-2 min-h-14 text-sm leading-6 text-[#52525B]">{body}</p>
+                  <Link to={href} className="mt-5 inline-flex min-h-11 items-center gap-1 text-xs font-bold text-[#9C3D00] dark:text-[#F27A24]">
+                    Explore <ArrowRight className="h-3.5 w-3.5 transition group-hover:translate-x-1" aria-hidden="true" />
+                  </Link>
+                </article>
+              ))}
             </div>
           </div>
-        </div>
-      </section>
+        </section>
 
-      {/* 6. High-End Call To Action Banner */}
-      <section className="py-20 relative overflow-hidden bg-gradient-to-b from-[#0B0F17] via-slate-900/60 to-[#0B0F17] border-t border-slate-800/60">
-        <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 text-center relative z-10">
-          <div className="rounded-3xl p-10 sm:p-14 bg-gradient-to-tr from-slate-900/90 via-indigo-950/40 to-slate-900/90 border border-slate-700/60 shadow-2xl shadow-indigo-950/40 backdrop-blur-xl space-y-6">
-            <span className="inline-block text-xs font-semibold uppercase tracking-widest text-gold-300 px-3.5 py-1 rounded-full bg-gold-500/10 border border-gold-500/20 font-display">
-              Transform Your Gallery
-            </span>
-            <h2 className="text-3xl sm:text-4xl lg:text-5xl font-serif font-light text-white tracking-tight">
-              Ready to Safeguard{' '}
-              <span className="font-serif italic text-gold-gradient font-normal">
-                Artwork Legacies?
+        <section className="bg-[#1E3A2F] px-5 py-16 text-white sm:px-8 sm:py-20">
+          <div className="mx-auto grid max-w-7xl items-center gap-10 lg:grid-cols-[1fr_1.2fr]">
+            <div>
+              <span className="inline-flex items-center gap-2 text-xs font-semibold uppercase tracking-[.18em] text-[#F4A922]">
+                <LockKeyhole className="h-4 w-4" aria-hidden="true" /> Built for institutional trust
               </span>
-            </h2>
-            <p className="text-base text-slate-300 max-w-2xl mx-auto leading-relaxed">
-              Join leading museums, international galleries, and certified appraisers on the standard decentralized provenance protocol.
-            </p>
-            <div className="flex flex-col sm:flex-row items-center justify-center gap-4 pt-4">
-              <Link
-                to="/register"
-                className="w-full sm:w-auto px-8 py-3.5 rounded-xl bg-gradient-to-r from-indigo-600 via-indigo-500 to-violet-600 hover:from-indigo-500 hover:to-violet-500 text-white font-semibold shadow-lg shadow-indigo-600/30 hover:shadow-indigo-600/50 hover:-translate-y-0.5 transition duration-200"
-              >
-                Register as Authenticator
-              </Link>
-              <Link
-                to="/verify"
-                className="w-full sm:w-auto px-8 py-3.5 rounded-xl border border-slate-700 hover:border-slate-500 bg-slate-900/80 hover:bg-slate-800 text-slate-200 font-semibold transition duration-200"
-              >
-                Lookup Artwork History
+              <h2 className="mt-4 max-w-lg text-3xl font-semibold tracking-[-.04em] sm:text-4xl">
+                A durable record for every responsible custodian.
+              </h2>
+              <p className="mt-4 max-w-lg text-sm leading-6 text-white/75">
+                Keep provenance details together, make verification straightforward, and record custody changes with clear accountability.
+              </p>
+              <Link to="/register" className="mt-7 inline-flex min-h-11 items-center gap-2 rounded-full bg-[#F4A922] px-5 py-3 text-sm font-bold text-[#09090B] transition hover:bg-[#ffbf48]">
+                Explore Aureum <ArrowUpRight className="h-4 w-4" aria-hidden="true" />
               </Link>
             </div>
+            <div className="rounded-2xl border border-white/15 bg-white/[.08] p-5 sm:p-7">
+              <div className="mb-6 flex items-center justify-between">
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-[.16em] text-white/60">Custody ledger</p>
+                  <p className="mt-1 text-lg font-semibold">A transparent chain of events</p>
+                </div>
+                <span className="rounded-full bg-white/10 px-3 py-1 text-[10px] font-bold uppercase text-[#F4A922]">Lifecycle preview</span>
+              </div>
+              <div className="space-y-3">
+                {[
+                  ['Registration', 'Institution record created', 'Origin'],
+                  ['Authentication', 'Evidence reviewed and signed', 'Verified'],
+                  ['Custody', 'Transfer event recorded', 'Auditable'],
+                ].map(([label, description, tag], index) => (
+                  <div key={label} className="flex items-center gap-4 rounded-xl border border-white/10 bg-[#10291F]/60 p-4">
+                    <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full border border-[#F4A922]/50 text-xs font-bold text-[#F4A922]">0{index + 1}</span>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm font-semibold">{label}</p>
+                      <p className="mt-0.5 text-xs text-white/60">{description}</p>
+                    </div>
+                    <span className="text-[10px] font-semibold uppercase tracking-wide text-[#F4A922]">{tag}</span>
+                  </div>
+                ))}
+              </div>
+              <div className="mt-5 flex items-center gap-2 text-xs text-white/60">
+                <Link2 className="h-4 w-4 text-[#F4A922]" aria-hidden="true" /> Linked provenance events, ready to inspect
+              </div>
+            </div>
           </div>
-        </div>
-      </section>
+        </section>
 
-      {/* 7. Minimalist Footer */}
-      <footer className="border-t border-slate-800/80 py-12 bg-[#080B11] text-slate-400 text-sm">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between gap-6">
-          <div className="flex items-center gap-2">
-            <span className="font-bold text-white tracking-tight text-base">Aureum</span>
-            <span className="text-xs text-slate-500">• Artchain Provenance Trail</span>
+        <section id="how-it-works" className="scroll-mt-24 px-5 py-20 sm:px-8 sm:py-28">
+          <div className="mx-auto max-w-7xl">
+            <div className="mx-auto mb-14 max-w-2xl text-center">
+              <p className="text-xs font-bold uppercase tracking-[.18em] text-[#E06D1B]">The custody lifecycle</p>
+              <h2 className="mt-4 text-4xl font-semibold tracking-[-.05em] sm:text-5xl">From first record to next custodian.</h2>
+            </div>
+            <div className="custody-timeline grid grid-cols-1 gap-8 md:grid-cols-4">
+              {[
+                ['Register', 'Create an archival record with the artwork’s identifying details.'],
+                ['Authenticate', 'Attach evidence and record the institution’s review.'],
+                ['Certify', 'Anchor a verifiable certificate to the provenance record.'],
+                ['Transfer', 'Record each approved change in custody.'],
+              ].map(([title, body], index) => (
+                <article key={title} className="custody-step relative">
+                  <span className="relative z-10 grid h-10 w-10 place-items-center rounded-full border border-[#E06D1B]/30 bg-[#FDF6EC] text-xs font-bold text-[#E06D1B]">0{index + 1}</span>
+                  <h3 className="mt-5 text-lg font-bold">{title}</h3>
+                  <p className="mt-2 max-w-xs text-sm leading-6 text-[#52525B]">{body}</p>
+                </article>
+              ))}
+            </div>
           </div>
-          <div className="flex items-center gap-6 text-xs text-slate-400">
-            <a
-              href="#hero"
-              onClick={scrollToTop}
-              className="hover:text-slate-200 transition cursor-pointer"
-            >
-              Back to Top
-            </a>
-            <a
-              href="#features"
-              onClick={(e) => handleNavScroll(e, 'features')}
-              className="hover:text-slate-200 transition cursor-pointer"
-            >
-              Features
-            </a>
-            <a
-              href="#how-it-works"
-              onClick={(e) => handleNavScroll(e, 'how-it-works')}
-              className="hover:text-slate-200 transition cursor-pointer"
-            >
-              How It Works
-            </a>
-            <a
-              href="#about"
-              onClick={(e) => handleNavScroll(e, 'about')}
-              className="hover:text-slate-200 transition cursor-pointer"
-            >
-              About
-            </a>
-            <Link to="/verify" className="hover:text-slate-200 transition">
-              Verification Portal
-            </Link>
-          </div>
-          <p className="text-xs text-slate-500">
-            &copy; {new Date().getFullYear()} Aureum Artchain Protocol. All rights reserved.
-          </p>
+        </section>
+      </main>
+
+      <footer className="border-t border-[#EAE6DF] px-5 py-8 sm:px-8">
+        <div className="mx-auto flex max-w-7xl flex-col items-start justify-between gap-4 sm:flex-row sm:items-center">
+          <Link to="/" className="text-lg font-bold tracking-tight text-[#18181B]">Aureum<span className="text-[#E06D1B]">.</span></Link>
+          <p className="text-xs text-[#52525B]">A considered record for art provenance and custody.</p>
+          <Link to="/verify" className="inline-flex items-center gap-1 text-xs font-semibold text-[#E06D1B]">Verify a record <ArrowUpRight className="h-3.5 w-3.5" /></Link>
         </div>
       </footer>
     </div>

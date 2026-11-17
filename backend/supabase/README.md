@@ -57,12 +57,12 @@ FRONTEND_URL=http://localhost:5173
 
 ### Authentication email setup
 
-Email registration, sign-in, and password recovery use Supabase Auth from the frontend. In the Supabase Dashboard:
+Registration uses a confirmation link, email/password is used to sign in, and password recovery uses a reset link. Configure Supabase Auth in the Dashboard:
 
 1. Enable the Email provider and **Confirm email** under **Authentication -> Providers -> Email**.
-2. Keep the **Confirm signup** and **Reset password** templates link-based using `{{ .ConfirmationURL }}`. The app redirects confirmation links to `/auth/callback` and recovery links to `/reset-password`.
+2. Set the **Confirm signup** and **Reset password** templates to use `{{ .ConfirmationURL }}`.
 3. Configure a production SMTP provider for reliable delivery; Supabase's default email service is rate-limited and intended for testing.
-4. Set the **Site URL** to your frontend origin and add `http://localhost:5173/auth/callback` and `http://localhost:5173/reset-password` to the allowed redirect URLs. Add the equivalent production URLs when deploying.
+4. Set the **Site URL** to `https://aureum-app.onrender.com` and add `https://aureum-app.onrender.com/auth/callback*` and `https://aureum-app.onrender.com/reset-password` to the allowed redirect URLs. Keep `http://localhost:5174/auth/callback*` and `http://localhost:5174/reset-password` for local development. The Render deployment sets `VITE_SITE_URL` to the public site so verification links work on other devices.
 5. Copy the project URL and **anon/public** key into `frontend/.env` as `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY`. Never use the service-role key in the frontend.
 
 **RLS warning:** the current schema grants anonymous/authenticated SELECT on every table. A browser Supabase client exposes the anon key by design, so do not use it with sensitive production data until table-specific RLS policies are reviewed and applied. The OTP client only uses Auth, but the exposed key can also be used against the project's Data API.

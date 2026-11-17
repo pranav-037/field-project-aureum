@@ -3,13 +3,15 @@ import { Link, useNavigate } from 'react-router-dom';
 import { useGoogleAuth } from '../hooks/useGoogleAuth';
 import { useAuth } from '../context/AuthContext';
 import { signUpWithEmail } from '../services/supabaseAuth';
+import { REGIONS_AND_INSTITUTIONS } from '../constants/institutionsByRegion';
 import {
   emailSchema,
   fullNameSchema,
-  institutionNameSchema,
   registrationSchema,
   signupPasswordSchema,
 } from '../schemas/authSchemas';
+
+const AVAILABLE_JURISDICTIONS = Object.keys(REGIONS_AND_INSTITUTIONS);
 
 function getDashboardPath(role?: string): string {
   if (role === 'ADMIN' || role === 'AUTHENTICATOR') return '/institution/dashboard';
@@ -17,7 +19,14 @@ function getDashboardPath(role?: string): string {
   return '/profile';
 }
 
-type RegistrationField = 'fullName' | 'email' | 'password' | 'confirmPassword' | 'institutionName';
+type RegistrationField =
+  | 'fullName'
+  | 'email'
+  | 'password'
+  | 'confirmPassword'
+  | 'institutionName'
+  | 'jurisdiction'
+  | 'registrationNumber';
 
 const RegisterPage: React.FC = () => {
   const navigate = useNavigate();
@@ -66,7 +75,18 @@ const RegisterPage: React.FC = () => {
     const { name, id, value, type } = e.target;
     const fieldName = name || id;
 
-    if (type === 'checkbox') {
+    if (fieldName === 'jurisdiction') {
+      setFormData((previous) => ({
+        ...previous,
+        jurisdiction: value,
+        institutionName: '',
+      }));
+      setFieldErrors((previous) => ({
+        ...previous,
+        jurisdiction: undefined,
+        institutionName: undefined,
+      }));
+    } else if (type === 'checkbox') {
       setFormData(prev => ({
         ...prev,
         [fieldName]: (e.target as HTMLInputElement).checked
@@ -77,7 +97,14 @@ const RegisterPage: React.FC = () => {
         [fieldName]: value
       }));
     }
-    if (['fullName', 'email', 'password', 'confirmPassword', 'institutionName'].includes(fieldName)) {
+    if (fieldName !== 'jurisdiction' && [
+      'fullName',
+      'email',
+      'password',
+      'confirmPassword',
+      'institutionName',
+      'registrationNumber',
+    ].includes(fieldName)) {
       setFieldErrors((previous) => ({
         ...previous,
         [fieldName as RegistrationField]: undefined,
@@ -103,8 +130,18 @@ const RegisterPage: React.FC = () => {
       if (!formData.confirmPassword) messages = ['Confirm your password.'];
       else if (formData.password !== formData.confirmPassword) messages = ['Passwords do not match.'];
     } else if (field === 'institutionName' && formData.userType === 'institution') {
-      const result = institutionNameSchema.safeParse(formData.institutionName);
-      if (!result.success) messages = result.error.issues.map((issue) => issue.message);
+      const countryInstitutions = REGIONS_AND_INSTITUTIONS[formData.jurisdiction] || [];
+      if (!countryInstitutions.some((institution) => institution.name === formData.institutionName)) {
+        messages = ['Select an institution listed for the selected country.'];
+      }
+    } else if (field === 'jurisdiction' && formData.userType === 'institution') {
+      if (!AVAILABLE_JURISDICTIONS.includes(formData.jurisdiction)) {
+        messages = ['Select a jurisdiction country.'];
+      }
+    } else if (field === 'registrationNumber') {
+      if (formData.registrationNumber.trim().length > 100) {
+        messages = ['Registration number must be 100 characters or fewer.'];
+      }
     }
 
     setFieldErrors((previous) => ({
@@ -127,7 +164,9 @@ const RegisterPage: React.FC = () => {
           field === 'email' ||
           field === 'password' ||
           field === 'confirmPassword' ||
-          field === 'institutionName'
+          field === 'institutionName' ||
+          field === 'jurisdiction' ||
+          field === 'registrationNumber'
         ) {
           nextErrors[field] = nextErrors[field]
             ? `${nextErrors[field]} ${issue.message}`
@@ -142,11 +181,25 @@ const RegisterPage: React.FC = () => {
     setLoading(true);
     try {
       const role = validation.data.userType === 'institution' ? 'AUTHENTICATOR' : 'COLLECTOR';
+      const institution = validation.data.userType === 'institution'
+        ? REGIONS_AND_INSTITUTIONS[validation.data.jurisdiction ?? '']?.find(
+            (option) => option.name === validation.data.institutionName,
+          )
+        : undefined;
       const data = await signUpWithEmail(validation.data.email, validation.data.password, {
         name: validation.data.fullName,
         role,
         accountType: validation.data.userType,
         institutionName: validation.data.institutionName ?? '',
+        ...(institution && {
+          institution: {
+            name: institution.name,
+            type: institution.type,
+            jurisdiction: validation.data.jurisdiction,
+            registrationNumber: validation.data.registrationNumber?.trim() || undefined,
+            status: 'PENDING',
+          },
+        }),
       });
       if (data.session) {
         navigate(getDashboardPath(role), { replace: true });
@@ -161,7 +214,7 @@ const RegisterPage: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-[#0B0F17] text-slate-100 flex flex-col selection:bg-indigo-500/30 selection:text-indigo-200">
+    <div className="aureum-theme min-h-screen bg-[#FAF9F6] text-[#18181B] flex flex-col selection:bg-orange-100 selection:text-[#1E3A2F]">
       {/* Top Minimal Navigation */}
       <header className="w-full border-b border-slate-800/80 bg-[#0B0F17]/80 backdrop-blur-md">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
@@ -445,24 +498,27 @@ const RegisterPage: React.FC = () => {
                       <label htmlFor="institutionName" className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1.5">
                         Institution Name
                       </label>
-                      <div className="relative">
-                        <input
-                          id="institutionName"
-                          name="institutionName"
-                          type="text"
-                          required
-                          minLength={2}
-                          maxLength={120}
-                          value={formData.institutionName}
-                          onChange={handleChange}
-                          onBlur={() => validateField('institutionName')}
-                          aria-invalid={Boolean(fieldErrors.institutionName)}
-                          aria-describedby={fieldErrors.institutionName ? 'register-institution-error' : undefined}
-                          disabled={loading}
-                          placeholder="e.g., Sotheby's, Christie's, or your gallery name"
-                          className="w-full px-3.5 py-2.5 rounded-xl bg-slate-950/70 border border-slate-700/80 text-white placeholder-slate-500 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition duration-150"
-                        />
-                      </div>
+                      <select
+                        id="institutionName"
+                        name="institutionName"
+                        required
+                        value={formData.institutionName}
+                        onChange={handleChange}
+                        onBlur={() => validateField('institutionName')}
+                        aria-invalid={Boolean(fieldErrors.institutionName)}
+                        aria-describedby={fieldErrors.institutionName ? 'register-institution-error' : undefined}
+                        disabled={loading || !formData.jurisdiction}
+                        className="min-h-11 w-full rounded-xl border border-slate-700/80 bg-slate-950/70 px-3.5 py-2.5 text-sm text-white transition focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 disabled:cursor-not-allowed disabled:opacity-60"
+                      >
+                        <option value="">
+                          {formData.jurisdiction ? 'Select an institution' : 'Select a jurisdiction first'}
+                        </option>
+                        {(REGIONS_AND_INSTITUTIONS[formData.jurisdiction] || []).map((institution) => (
+                          <option key={institution.name} value={institution.name}>
+                            {institution.name} — {institution.type}
+                          </option>
+                        ))}
+                      </select>
                       {fieldErrors.institutionName && (
                         <p id="register-institution-error" className="mt-1 text-xs text-rose-300" role="alert">
                           {fieldErrors.institutionName}
@@ -470,44 +526,65 @@ const RegisterPage: React.FC = () => {
                       )}
                     </div>
 
-                    {/* Jurisdiction & Registration Number Group */}
+                    {/* Jurisdiction & Business Registration Number */}
                     <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-6">
                       {/* Jurisdiction */}
                       <div>
                         <label htmlFor="jurisdiction" className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1.5">
-                          Jurisdiction
+                          Jurisdiction Country
                         </label>
-                        <div className="relative">
-                          <input
-                            id="jurisdiction"
-                            name="jurisdiction"
-                            type="text"
-                            value={formData.jurisdiction}
-                            onChange={handleChange}
-                            disabled={loading}
-                            placeholder="Country and/or state"
-                            className="w-full px-3.5 py-2.5 rounded-xl bg-slate-950/70 border border-slate-700/80 text-white placeholder-slate-500 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition duration-150"
-                          />
-                        </div>
+                        <select
+                          id="jurisdiction"
+                          name="jurisdiction"
+                          required
+                          value={formData.jurisdiction}
+                          onChange={handleChange}
+                          onBlur={() => validateField('jurisdiction')}
+                          aria-invalid={Boolean(fieldErrors.jurisdiction)}
+                          aria-describedby={fieldErrors.jurisdiction ? 'register-jurisdiction-error' : undefined}
+                          disabled={loading}
+                          className="min-h-11 w-full rounded-xl border border-slate-700/80 bg-slate-950/70 px-3.5 py-2.5 text-sm text-white transition focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                        >
+                          <option value="">Select a country</option>
+                          {AVAILABLE_JURISDICTIONS.map((country) => (
+                            <option key={country} value={country}>{country}</option>
+                          ))}
+                        </select>
+                        {fieldErrors.jurisdiction && (
+                          <p id="register-jurisdiction-error" className="mt-1 text-xs text-rose-300" role="alert">
+                            {fieldErrors.jurisdiction}
+                          </p>
+                        )}
                       </div>
 
-                      {/* Registration Number */}
+                      {/* Country-based registration number */}
                       <div>
                         <label htmlFor="registrationNumber" className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1.5">
-                          Registration Number
+                          Business Registration Number
                         </label>
-                        <div className="relative">
-                          <input
-                            id="registrationNumber"
-                            name="registrationNumber"
-                            type="text"
-                            value={formData.registrationNumber}
-                            onChange={handleChange}
-                            disabled={loading}
-                            placeholder="Business registration or license number"
-                            className="w-full px-3.5 py-2.5 rounded-xl bg-slate-950/70 border border-slate-700/80 text-white placeholder-slate-500 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition duration-150"
-                          />
-                        </div>
+                        <input
+                          id="registrationNumber"
+                          name="registrationNumber"
+                          type="text"
+                          maxLength={100}
+                          value={formData.registrationNumber}
+                          onChange={handleChange}
+                          onBlur={() => validateField('registrationNumber')}
+                          aria-invalid={Boolean(fieldErrors.registrationNumber)}
+                          aria-describedby={fieldErrors.registrationNumber ? 'register-registration-error' : 'register-registration-hint'}
+                          disabled={loading}
+                          placeholder={formData.jurisdiction ? `ID issued in ${formData.jurisdiction}` : 'Country-specific legal ID'}
+                          className="min-h-11 w-full rounded-xl border border-slate-700/80 bg-slate-950/70 px-3.5 py-2.5 text-sm text-white placeholder-slate-500 transition focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                        />
+                        {fieldErrors.registrationNumber ? (
+                          <p id="register-registration-error" className="mt-1 text-xs text-rose-300" role="alert">
+                            {fieldErrors.registrationNumber}
+                          </p>
+                        ) : (
+                          <p id="register-registration-hint" className="mt-1 text-[11px] text-slate-400">
+                            Enter the legal registration ID issued in the selected country, if applicable.
+                          </p>
+                        )}
                       </div>
                     </div>
                   </>

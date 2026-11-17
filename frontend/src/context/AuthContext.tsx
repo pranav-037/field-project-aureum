@@ -37,6 +37,29 @@ function parseRoles(value: unknown): AppRole[] {
   });
 }
 
+function parseInstitution(value: unknown): Institution | undefined {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return undefined;
+  const institution = value as Record<string, unknown>;
+  if (typeof institution.name !== 'string' || institution.name.trim().length === 0) {
+    return undefined;
+  }
+
+  return {
+    name: institution.name,
+    ...(typeof institution.id === 'string' ? { id: institution.id } : {}),
+    ...(typeof institution.jurisdiction === 'string' ? { jurisdiction: institution.jurisdiction } : {}),
+    ...(typeof institution.registrationNumber === 'string'
+      ? { registrationNumber: institution.registrationNumber }
+      : {}),
+    ...(typeof institution.walletAddress === 'string' &&
+    /^0x[a-fA-F0-9]{40}$/.test(institution.walletAddress)
+      ? { walletAddress: institution.walletAddress }
+      : {}),
+    ...(typeof institution.status === 'string' ? { status: institution.status } : {}),
+    ...(typeof institution.type === 'string' ? { type: institution.type } : {}),
+  };
+}
+
 function getSessionState(session: Session | null): {
   user: User | null;
   authorization: AuthAuthorization | null;
@@ -74,6 +97,7 @@ function getSessionState(session: Session | null): {
     roles,
     permissions,
     attributes,
+    institution: parseInstitution(metadata.institution),
     walletAddress: walletAddress ?? null,
     avatarUrl: typeof metadata.avatar_url === 'string' ? metadata.avatar_url : null,
     createdAt: session.user.created_at,

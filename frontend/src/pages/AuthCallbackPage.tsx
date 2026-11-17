@@ -28,7 +28,7 @@ const AuthCallbackPage: React.FC = () => {
         : '/profile';
 
   return (
-    <main className="min-h-screen bg-[#0B0F17] px-4 py-12 text-slate-100">
+    <main className="aureum-theme min-h-screen bg-[#FAF9F6] px-4 py-12 text-[#18181B]">
       <div className="mx-auto max-w-md rounded-3xl border border-slate-800 bg-slate-900/80 p-6 shadow-2xl sm:p-9">
         <Link to="/" className="text-sm font-bold text-amber-300">Aureum</Link>
         <div
