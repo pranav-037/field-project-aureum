@@ -109,12 +109,21 @@ export class IndexerService {
             const blockNumber = event?.log?.blockNumber || 0;
             const txHash = event?.log?.transactionHash || '';
             const strTid = transferId.toString();
+            const users = await db.users.findMany('id, walletAddress');
+            const sellerUser = users.find(
+              (user: any) => user.walletAddress?.toLowerCase() === seller.toLowerCase()
+            );
+            const buyerUser = users.find(
+              (user: any) => user.walletAddress?.toLowerCase() === buyer.toLowerCase()
+            );
 
             const existing = await db.transfers.findByBlockchainId(strTid);
 
             if (existing) {
               await db.transfers.update(existing.id, {
                 status: 'PENDING',
+                sellerId: sellerUser?.id || existing.sellerId,
+                buyerId: buyerUser?.id || existing.buyerId || buyer,
                 txHash: txHash || existing.txHash,
                 blockNumber: blockNumber || existing.blockNumber,
               });
@@ -122,8 +131,8 @@ export class IndexerService {
               await db.transfers.create({
                 blockchainTransferId: strTid,
                 artworkId: artworkId.toString(),
-                sellerId: seller,
-                buyerId: buyer,
+                sellerId: sellerUser?.id || seller,
+                buyerId: buyerUser?.id || buyer,
                 transferDate: new Date(Number(transferDate) * 1000).toISOString(),
                 priceVisibility: 'PUBLIC',
                 txHash: txHash,
@@ -155,16 +164,21 @@ export class IndexerService {
             const txHash = event?.log?.transactionHash || '';
             const strTid = transferId.toString();
             const strAid = artworkId.toString();
+            const users = await db.users.findMany('id, walletAddress');
+            const buyerUser = users.find(
+              (user: any) => user.walletAddress?.toLowerCase() === buyer.toLowerCase()
+            );
 
             await db.transfers.updateByBlockchainId(strTid, {
               status: 'FINALIZED',
+              buyerId: buyerUser?.id || buyer,
               txHash: txHash,
               blockNumber: blockNumber,
             });
 
             // Update ownership of artwork
             await db.artworks.updateByBlockchainId(strAid, {
-              ownerId: buyer,
+              ownerId: buyerUser?.id || buyer,
             });
 
             await this.updateLastBlock(blockNumber);

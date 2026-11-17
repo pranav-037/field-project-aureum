@@ -1,19 +1,24 @@
 import react from '@vitejs/plugin-react'
-import { defineConfig } from 'vite'
+import { resolve } from 'node:path'
+import { defineConfig, loadEnv } from 'vite'
 
-// https://vite.dev/config/
-export default defineConfig({
-  plugins: [react()],
-  server: {
-    proxy: {
-      '/api': {
-        target: 'http://localhost:5000',
-        changeOrigin: true,
-      },
-      '/health': {
-        target: 'http://localhost:5000',
-        changeOrigin: true,
+export default defineConfig(({ mode }) => {
+  const backendEnv = loadEnv(mode, resolve(process.cwd(), '../backend'), '')
+  const apiTarget = `http://127.0.0.1:${backendEnv.PORT || '5000'}`
+
+  return {
+    plugins: [react()],
+    server: {
+      proxy: {
+        '/api': {
+          target: apiTarget,
+          changeOrigin: true,
+        },
+        '/health': {
+          target: apiTarget,
+          changeOrigin: true,
+        },
       },
     },
-  },
+  }
 })

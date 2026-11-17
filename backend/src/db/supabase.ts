@@ -76,6 +76,7 @@ export interface DbTransfer {
   artworkId: string;
   sellerId: string;
   buyerId?: string | null;
+  buyerAddress?: string | null;
   transferDate: string;
   priceVisibility: string;
   txHash: string;
@@ -353,7 +354,7 @@ export const db = {
       if (error) throw error;
       return count || 0;
     },
-    async findMany(select = 'id, blockchainTransferId, artworkId, sellerId, buyerId, transferDate, priceVisibility, status, txHash, createdAt'): Promise<any[]> {
+    async findMany(select = '*'): Promise<any[]> {
       const { data, error } = await supabase
         .from('Transfer')
         .select(select)

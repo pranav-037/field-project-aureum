@@ -16,24 +16,86 @@ interface Artwork {
   year: string;
   medium: string;
   dimensions: string;
-  status: 'VERIFIED' | 'PENDING' | 'IN_ESCROW';
+  status: string;
+  ownershipStatus: 'OWNED' | 'OTHER' | 'UNASSIGNED';
   thumbnailGradient: string;
   nfcTag: string;
   authenticator: string;
   imageUrl?: string;
 }
 
+interface ArtworkRecord {
+  id: string;
+  blockchainArtworkId?: string | null;
+  txHash?: string | null;
+  blockNumber?: number | null;
+  title: string;
+  artist: string;
+  year?: string | null;
+  medium?: string | null;
+  dimensions?: string | null;
+  metadataCid?: string | null;
+  imageCids?: string | string[] | null;
+  documentCids?: string | string[] | null;
+  bindingReference?: string | null;
+  status?: string | null;
+  ownerId?: string | null;
+  createdAt?: string | null;
+  updatedAt?: string | null;
+  authenticationMethod?: string | null;
+  edition?: string | null;
+}
+
+interface ArtworkTransferRecord {
+  id: string;
+  blockchainTransferId?: string | null;
+  artworkId: string;
+  sellerId: string;
+  buyerId?: string | null;
+  buyerAddress?: string | null;
+  transferDate?: string | null;
+  priceVisibility?: string | null;
+  status?: string | null;
+  txHash?: string | null;
+  blockNumber?: number | null;
+}
+
 interface TransferItem {
   id: string;
+  artworkId: string;
   blockchainTransferId?: string;
   type: 'INCOMING' | 'OUTGOING' | 'VERIFICATION';
   title: string;
   artist: string;
   counterparty: string;
   date: string;
-  status: 'PENDING_ACCEPTANCE' | 'COMPLETED' | 'IN_PROGRESS';
+  status: 'PENDING_ACCEPTANCE' | 'COMPLETED' | 'IN_PROGRESS' | 'CANCELLED' | 'EXPIRED';
   txHash: string;
+  sellerId?: string;
+  buyerId?: string;
+  buyerAddress?: string;
 }
+
+interface ArtworkProvenance {
+  source?: string;
+  onChain?: unknown;
+}
+
+const parseArtworkList = (value: string | string[] | null | undefined): string[] => {
+  if (Array.isArray(value)) return value.filter((item) => typeof item === 'string' && item.length > 0);
+  if (typeof value !== 'string' || !value) return [];
+
+  try {
+    const parsed: unknown = JSON.parse(value);
+    if (Array.isArray(parsed)) {
+      return parsed.filter((item): item is string => typeof item === 'string' && item.length > 0);
+    }
+  } catch {
+    return [value];
+  }
+
+  return [value];
+};
 
 const CollectorDashboard: React.FC = () => {
   const navigate = useNavigate();
@@ -50,6 +112,11 @@ const CollectorDashboard: React.FC = () => {
   const [selectedIncomingTransfer, setSelectedIncomingTransfer] = useState<TransferItem | null>(null);
   const [incomingAccepted, setIncomingAccepted] = useState(false);
   const [copiedTx, setCopiedTx] = useState<string | null>(null);
+  const [artworkDetails, setArtworkDetails] = useState<ArtworkRecord | null>(null);
+  const [artworkTransfers, setArtworkTransfers] = useState<ArtworkTransferRecord[]>([]);
+  const [artworkProvenance, setArtworkProvenance] = useState<ArtworkProvenance | null>(null);
+  const [isLoadingArtworkDetails, setIsLoadingArtworkDetails] = useState(false);
+  const [artworkDetailsError, setArtworkDetailsError] = useState<string | null>(null);
   const { isConnected, account } = useWallet();
 
   useEffect(() => {
@@ -113,6 +180,7 @@ const CollectorDashboard: React.FC = () => {
       medium: 'Oil on canvas',
       dimensions: '44.5 cm × 39.0 cm',
       status: 'VERIFIED',
+      ownershipStatus: 'UNASSIGNED',
       thumbnailGradient: 'from-amber-700/60 via-amber-900/40 to-slate-900',
       nfcTag: 'NFC-BOUND-VERMEER-1665',
       authenticator: 'Aureum Authentication Guild',
@@ -127,6 +195,7 @@ const CollectorDashboard: React.FC = () => {
       medium: 'Oil and gold leaf on canvas',
       dimensions: '180 cm × 180 cm',
       status: 'VERIFIED',
+      ownershipStatus: 'UNASSIGNED',
       thumbnailGradient: 'from-amber-600/60 via-yellow-700/40 to-slate-900',
       nfcTag: 'NFC-BOUND-KLIMT-1908',
       authenticator: 'Aureum Authentication Guild',
@@ -141,6 +210,7 @@ const CollectorDashboard: React.FC = () => {
       medium: 'Oil on canvas',
       dimensions: '73.7 cm × 92.1 cm',
       status: 'IN_ESCROW',
+      ownershipStatus: 'UNASSIGNED',
       thumbnailGradient: 'from-blue-900/60 via-cyan-900/40 to-slate-900',
       nfcTag: 'NFC-BOUND-VANGOGH-1889',
       authenticator: 'Aureum Authentication Guild',
@@ -152,6 +222,7 @@ const CollectorDashboard: React.FC = () => {
   const defaultTransactions: TransferItem[] = [
     {
       id: 'tx-101',
+      artworkId: 'art-001',
       type: 'INCOMING',
       title: 'The Great Wave off Kanagawa',
       artist: 'Katsushika Hokusai',
@@ -162,6 +233,7 @@ const CollectorDashboard: React.FC = () => {
     },
     {
       id: 'tx-102',
+      artworkId: 'art-002',
       type: 'INCOMING',
       title: 'The Birth of Venus',
       artist: 'Sandro Botticelli',
@@ -172,6 +244,7 @@ const CollectorDashboard: React.FC = () => {
     },
     {
       id: 'tx-103',
+      artworkId: 'art-003',
       type: 'OUTGOING',
       title: 'The Starry Night',
       artist: 'Vincent van Gogh',
@@ -188,7 +261,7 @@ const CollectorDashboard: React.FC = () => {
   const loadData = async (uid: string) => {
     try {
       const res = await artworkApi.getAll();
-      if (res.data && Array.isArray(res.data) && res.data.length > 0) {
+      if (Array.isArray(res.data)) {
         const gradients = [
           'from-amber-700/60 via-amber-900/40 to-slate-900',
           'from-indigo-900/60 via-violet-900/40 to-slate-900',
@@ -196,17 +269,10 @@ const CollectorDashboard: React.FC = () => {
           'from-blue-800/60 via-amber-700/40 to-slate-900',
           'from-amber-600/60 via-yellow-700/40 to-slate-900'
         ];
-        // Sovereign Vault Custody: Show user-owned artworks, or default collection if none owned
-        const ownedArtworks = res.data.filter((a: any) => {
-          if (uid && a.ownerId) {
-            return a.ownerId === uid;
-          }
-          return true;
-        });
-
-        const targetArtworks = ownedArtworks.length > 0 ? ownedArtworks : res.data;
-
-        const mapped: Artwork[] = targetArtworks.map((a: any, idx: number) => {
+        const ownerIds = [uid, currentUser?.walletAddress, currentUser?.institution?.walletAddress, account]
+          .filter((ownerId): ownerId is string => typeof ownerId === 'string' && ownerId.length > 0)
+          .map((ownerId) => ownerId.toLowerCase());
+        const mapped: Artwork[] = res.data.map((a: any, idx: number) => {
           let imgUrl = '';
           if (a.imageCids) {
             try {
@@ -221,20 +287,29 @@ const CollectorDashboard: React.FC = () => {
             }
           }
 
+          const ownerId = typeof a.ownerId === 'string' ? a.ownerId : undefined;
+          const ownershipStatus = !ownerId?.trim()
+            ? 'UNASSIGNED'
+            : ownerIds.includes(ownerId.toLowerCase())
+              ? 'OWNED'
+              : 'OTHER';
+          const rawStatus = typeof a.status === 'string' ? a.status.toUpperCase() : 'PENDING';
+
           return {
             id: a.blockchainArtworkId ? `AUR-${a.blockchainArtworkId}` : (a.id ? `AUR-${a.id.slice(0, 8)}` : `AUR-${idx}`),
             databaseId: a.id,
-            ownerId: a.ownerId,
+            ownerId,
             blockchainArtworkId: a.blockchainArtworkId,
             title: a.title,
             artist: a.artist,
             year: a.year || 'Modern',
             medium: a.medium || 'Fine Art',
             dimensions: a.dimensions || 'Variable',
-            status: a.status === 'VERIFIED' ? 'VERIFIED' : (a.status === 'IN_ESCROW' ? 'IN_ESCROW' : 'PENDING'),
+            status: rawStatus || 'PENDING',
+            ownershipStatus,
             thumbnailGradient: gradients[idx % gradients.length],
             nfcTag: a.bindingReference || `NFC-BOUND-${idx}`,
-            authenticator: 'Aureum Authentication Guild',
+            authenticator: a.authenticationMethod || 'Not recorded',
             imageUrl: imgUrl || undefined,
           };
         });
@@ -246,25 +321,34 @@ const CollectorDashboard: React.FC = () => {
 
     try {
       const transRes = await transferApi.getAll();
-      if (transRes.data && Array.isArray(transRes.data) && transRes.data.length > 0) {
+      if (Array.isArray(transRes.data)) {
         const mappedTrans: TransferItem[] = transRes.data.map((t: any) => {
-          const isOutgoing =
-            t.type === 'OUTGOING' ||
-            (uid && t.sellerId === uid && t.buyerId !== uid);
-          const type: 'INCOMING' | 'OUTGOING' = isOutgoing ? 'OUTGOING' : 'INCOMING';
+          const type: 'INCOMING' | 'OUTGOING' = t.type === 'OUTGOING' ? 'OUTGOING' : 'INCOMING';
+          const isOutgoing = type === 'OUTGOING';
           const counterparty = isOutgoing
             ? (t.buyerName || 'MoMA Custodial Vault Escrow')
             : (t.sellerName || 'Mauritshuis Curatorial Guild');
 
           return {
             id: t.id,
+            artworkId: String(t.artworkId || ''),
+            blockchainTransferId: t.blockchainTransferId || undefined,
             type,
             title: t.artworkTitle || `Artwork #${t.artworkId?.slice(0, 8)}`,
             artist: t.artworkArtist || 'Fine Art Masterpiece',
             counterparty,
             date: new Date(t.transferDate || t.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
-            status: t.status === 'FINALIZED' ? 'COMPLETED' : 'PENDING_ACCEPTANCE',
-            txHash: t.txHash || '0x' + '0'.repeat(40),
+            status: t.status === 'FINALIZED'
+              ? 'COMPLETED'
+              : t.status === 'PENDING'
+                ? 'PENDING_ACCEPTANCE'
+                : t.status === 'CANCELLED' || t.status === 'EXPIRED'
+                  ? t.status
+                  : 'IN_PROGRESS',
+            txHash: t.txHash || '0x' + '0'.repeat(64),
+            sellerId: t.sellerId,
+            buyerId: t.buyerId,
+            buyerAddress: t.buyerAddress,
           };
         });
         setTransactions(mappedTrans);
@@ -280,14 +364,11 @@ const CollectorDashboard: React.FC = () => {
       navigate('/login', { replace: true });
       return;
     }
-    if (currentUser.role === 'AUTHENTICATOR') {
-      navigate('/institution/dashboard', { replace: true });
-      return;
-    }
-
     loadData(currentUser.id);
   }, [account, authLoading, currentUser, navigate]);
 
+  const ownedArtworks = artworks.filter((artwork) => artwork.ownershipStatus === 'OWNED');
+  const transferableArtworks = ownedArtworks.filter((artwork) => Boolean(artwork.ownerId));
   const filteredArtworks = artworks.filter(item => {
     if (filter === 'VERIFIED') return item.status === 'VERIFIED';
     if (filter === 'ESCROW') return item.status === 'IN_ESCROW';
@@ -300,8 +381,69 @@ const CollectorDashboard: React.FC = () => {
   const outgoingCount = outgoingTransfers.length;
   const pendingIncoming = incomingTransfers.filter(t => t.status === 'PENDING_ACCEPTANCE');
   const incomingTransfer = pendingIncoming[0];
-  const verifiedCount = artworks.filter(item => item.status === 'VERIFIED').length;
-  const escrowCount = artworks.filter(item => item.status === 'IN_ESCROW').length;
+  const verifiedCount = ownedArtworks.filter(item => item.status === 'VERIFIED').length;
+  const registryVerifiedCount = artworks.filter(item => item.status === 'VERIFIED').length;
+  const registryEscrowCount = artworks.filter(item => item.status === 'IN_ESCROW').length;
+
+  const openArtworkDetails = async (artwork: Artwork) => {
+    setSelectedArtwork(artwork);
+    setArtworkDetails(null);
+    setArtworkTransfers([]);
+    setArtworkProvenance(null);
+    setArtworkDetailsError(null);
+    setIsLoadingArtworkDetails(true);
+
+    const errors: string[] = [];
+    const [artworkResult, transfersResult, provenanceResult] = await Promise.allSettled([
+      artworkApi.getById(artwork.databaseId),
+      artworkApi.getTransfers(artwork.databaseId),
+      artworkApi.getProvenance(artwork.databaseId),
+    ]);
+
+    if (artworkResult.status === 'fulfilled') {
+      setArtworkDetails(artworkResult.value.data as ArtworkRecord);
+    } else {
+      errors.push(artworkResult.reason instanceof Error ? artworkResult.reason.message : 'Artwork record could not be loaded.');
+    }
+
+    if (transfersResult.status === 'fulfilled' && Array.isArray(transfersResult.value.data)) {
+      setArtworkTransfers(transfersResult.value.data as ArtworkTransferRecord[]);
+    } else if (transfersResult.status === 'rejected') {
+      errors.push(transfersResult.reason instanceof Error ? transfersResult.reason.message : 'Artwork transfer history could not be loaded.');
+    }
+
+    if (provenanceResult.status === 'fulfilled') {
+      setArtworkProvenance(provenanceResult.value.data as ArtworkProvenance);
+    } else {
+      errors.push(provenanceResult.reason instanceof Error ? provenanceResult.reason.message : 'Artwork provenance could not be loaded.');
+    }
+
+    if (errors.length > 0) setArtworkDetailsError(errors.join(' '));
+    setIsLoadingArtworkDetails(false);
+  };
+
+  const openTransferArtworkDetails = (transfer: TransferItem) => {
+    const artwork = artworks.find((item) => item.databaseId === transfer.artworkId);
+    if (artwork) {
+      void openArtworkDetails(artwork);
+      return;
+    }
+
+    void openArtworkDetails({
+      id: `AUR-${transfer.artworkId.slice(0, 8)}`,
+      databaseId: transfer.artworkId,
+      title: transfer.title,
+      artist: transfer.artist,
+      year: 'Not recorded',
+      medium: 'Not recorded',
+      dimensions: 'Not recorded',
+      status: 'PENDING',
+      ownershipStatus: 'OTHER',
+      thumbnailGradient: 'from-slate-800 to-slate-950',
+      nfcTag: 'Not recorded',
+      authenticator: 'Not recorded',
+    });
+  };
 
   const handleCopyTx = (tx: string) => {
     navigator.clipboard?.writeText(tx);
@@ -335,6 +477,7 @@ const CollectorDashboard: React.FC = () => {
       const transfer = response.data;
       setTransactions(prev => [{
         id: transfer.id,
+        artworkId: transferArtwork.databaseId,
         blockchainTransferId: transfer.blockchainTransferId,
         type: 'OUTGOING',
         title: transferArtwork.title,
@@ -343,6 +486,8 @@ const CollectorDashboard: React.FC = () => {
         date: new Date(transfer.transferDate || transfer.createdAt).toLocaleDateString(),
         status: 'PENDING_ACCEPTANCE',
         txHash: transfer.txHash,
+        sellerId: transferArtwork.ownerId,
+        buyerAddress: recipientWallet.trim(),
       }, ...prev]);
       setRecipientWallet('');
       setShowTransferModal(false);
@@ -358,46 +503,38 @@ const CollectorDashboard: React.FC = () => {
     const targetTransfer = selectedIncomingTransfer || incomingTransfer;
     const currentUserId = currentUser?.id;
 
-    if (isConnected) {
-      try {
-        setIsSigningTx(true);
-        // Attempt on-chain signature via MetaMask
-        const transferIndex = targetTransfer?.blockchainTransferId ? Number(targetTransfer.blockchainTransferId) : 1;
-        const receipt = await acceptTransferOnChain(isNaN(transferIndex) ? 1 : transferIndex);
-        setConfirmedTx(receipt.txHash);
-        
-        if (targetTransfer?.id) {
-          try {
-            await transferApi.accept(targetTransfer.id);
-          } catch (apiErr) {
-            console.warn('Backend transfer accept error:', apiErr);
-          }
-        }
+    if (!targetTransfer?.id) {
+      setSigningError('Select a pending transfer to accept.');
+      return;
+    }
 
-        setIncomingAccepted(true);
-        if (currentUserId) {
-          await loadData(currentUserId);
+    try {
+      setIsSigningTx(true);
+      if (targetTransfer.blockchainTransferId) {
+        if (!isConnected) {
+          throw new Error('Connect the recipient wallet to accept this on-chain transfer.');
         }
-        setTimeout(() => setShowIncomingModal(false), 2000);
-      } catch (err: any) {
-        console.warn('On-chain signature error:', err);
-        setSigningError(err?.message || 'Transaction rejected in wallet.');
-      } finally {
-        setIsSigningTx(false);
-      }
-    } else {
-      if (targetTransfer?.id) {
-        try {
-          await transferApi.accept(targetTransfer.id);
-        } catch (apiErr) {
-          console.warn('Backend transfer accept error:', apiErr);
+        const transferIndex = Number(targetTransfer.blockchainTransferId);
+        if (!Number.isSafeInteger(transferIndex) || transferIndex < 1) {
+          throw new Error('This transfer has an invalid blockchain transfer ID.');
         }
+        const receipt = await acceptTransferOnChain(transferIndex);
+        setConfirmedTx(receipt.txHash);
+      } else {
+        const response = await transferApi.accept(targetTransfer.id);
+        setConfirmedTx(response.data.txHash || targetTransfer.txHash);
       }
+
       setIncomingAccepted(true);
       if (currentUserId) {
         await loadData(currentUserId);
       }
       setShowIncomingModal(false);
+    } catch (err: any) {
+      console.warn('Transfer acceptance failed:', err);
+      setSigningError(err?.response?.data?.error || err?.message || 'Could not accept this transfer.');
+    } finally {
+      setIsSigningTx(false);
     }
   };
 
@@ -423,10 +560,10 @@ const CollectorDashboard: React.FC = () => {
               Sovereign Custody Portfolio
             </div>
             <h1 className="text-2xl sm:text-3xl lg:text-4xl font-extrabold text-white tracking-tight">
-              Collector Dashboard
+              {currentUser?.role === 'AUTHENTICATOR' ? 'Institution Custody Dashboard' : 'Collector Dashboard'}
             </h1>
             <p className="text-sm text-slate-400 mt-1">
-              Welcome back, <span className="text-white font-medium">{currentUser?.name || 'Collector'}</span>. Manage your authenticated artworks, track physical custody, and sign transfers.
+              Welcome back, <span className="text-white font-medium">{currentUser?.name || 'Custodian'}</span>. Manage your authenticated artworks, track physical custody, and sign transfers.
             </p>
           </div>
 
@@ -443,11 +580,11 @@ const CollectorDashboard: React.FC = () => {
             </Link>
             <button
               onClick={() => {
-                if (artworks.length === 0) {
+                if (transferableArtworks.length === 0) {
                   alert('You do not have any artworks in your vault to transfer.');
                   return;
                 }
-                setTransferArtwork(artworks[0]);
+                setTransferArtwork(transferableArtworks[0]);
                 setShowTransferModal(true);
               }}
               className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-indigo-600 via-indigo-500 to-violet-600 hover:from-indigo-500 hover:to-violet-500 text-white text-xs sm:text-sm font-semibold shadow-lg shadow-indigo-600/30 hover:shadow-indigo-600/50 hover:-translate-y-0.5 transition duration-200 flex items-center gap-2 cursor-pointer"
@@ -475,8 +612,8 @@ const CollectorDashboard: React.FC = () => {
               </div>
             </div>
             <div className="mt-4 flex items-baseline gap-2">
-              <span className="text-3xl sm:text-4xl font-extrabold text-white tracking-tight">{artworks.length}</span>
-              {artworks.length > 0 && (
+              <span className="text-3xl sm:text-4xl font-extrabold text-white tracking-tight">{ownedArtworks.length}</span>
+              {ownedArtworks.length > 0 && (
                 <span className="text-xs font-semibold text-emerald-400 flex items-center">
                   Active
                 </span>
@@ -484,7 +621,7 @@ const CollectorDashboard: React.FC = () => {
             </div>
             <p className="text-xs text-slate-500 mt-2 flex items-center gap-1.5">
               <span className="w-1.5 h-1.5 rounded-full bg-amber-400"></span>
-              {artworks.length > 0 ? 'All registered on Artchain Ledger' : 'No artworks registered yet'}
+              {ownedArtworks.length > 0 ? 'Owned records in your vault' : 'No owned artworks registered yet'}
             </p>
           </div>
 
@@ -567,7 +704,7 @@ const CollectorDashboard: React.FC = () => {
             <div className="mt-4 flex items-baseline gap-2">
               <span className="text-3xl sm:text-4xl font-extrabold text-emerald-400 tracking-tight">{verifiedCount}</span>
               <span className="text-xs font-semibold text-emerald-300 bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/20">
-                {artworks.length > 0 ? `${Math.round((verifiedCount / artworks.length) * 100)}% Rate` : '0%'}
+                {ownedArtworks.length > 0 ? `${Math.round((verifiedCount / ownedArtworks.length) * 100)}% Rate` : '0%'}
               </span>
             </div>
             <p className="text-xs text-slate-500 mt-2 flex items-center gap-1.5">
@@ -593,9 +730,13 @@ const CollectorDashboard: React.FC = () => {
                   </span>
                   <span className="text-xs text-slate-400">{incomingTransfer.date}</span>
                 </div>
-                <h2 className="text-base font-bold text-white mt-1">
+                <button
+                  type="button"
+                  onClick={() => openTransferArtworkDetails(incomingTransfer)}
+                  className="mt-1 text-left text-base font-bold text-white hover:text-indigo-300 transition"
+                >
                   Incoming Transfer Pending: "{incomingTransfer.title}" by {incomingTransfer.artist}
-                </h2>
+                </button>
                 <p className="text-xs text-slate-400 mt-0.5">
                   Origin: {incomingTransfer.counterparty}. Requires your cryptographic acceptance signature to complete custody transfer.
                 </p>
@@ -623,13 +764,13 @@ const CollectorDashboard: React.FC = () => {
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
             <div>
               <h2 className="text-xl sm:text-2xl font-bold text-white tracking-tight flex items-center gap-2.5">
-                My Collection
+                My Collection & Artwork Registry
                 <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-slate-800 text-slate-300 border border-slate-700">
-                  {filteredArtworks.length} Masterpieces
+                  {filteredArtworks.length} Artworks
                 </span>
               </h2>
               <p className="text-xs sm:text-sm text-slate-400 mt-0.5">
-                Physical fine art custody secured by Artchain cryptographic certificates
+                Your owned works and every other registered artwork linked to custody activity
               </p>
             </div>
 
@@ -653,7 +794,7 @@ const CollectorDashboard: React.FC = () => {
                     : 'text-slate-400 hover:text-slate-200'
                 }`}
               >
-                Verified Provenance ({verifiedCount})
+                Verified Provenance ({registryVerifiedCount})
               </button>
               <button
                 onClick={() => setFilter('ESCROW')}
@@ -663,7 +804,7 @@ const CollectorDashboard: React.FC = () => {
                     : 'text-slate-400 hover:text-slate-200'
                 }`}
               >
-                In Escrow ({escrowCount})
+                In Escrow ({registryEscrowCount})
               </button>
             </div>
           </div>
@@ -678,7 +819,7 @@ const CollectorDashboard: React.FC = () => {
               </div>
               <h3 className="text-lg font-serif font-light text-white tracking-wide">Sovereign Vault Empty</h3>
               <p className="text-xs sm:text-sm text-slate-400 max-w-md mx-auto mt-1.5 leading-relaxed">
-                No authenticated masterworks are currently registered under this account. Verified acquisitions and custody handoffs will appear here with cryptographic certificates.
+                No artwork records are available. Registered works and related custody handoffs will appear here.
               </p>
             </div>
           ) : (
@@ -689,7 +830,19 @@ const CollectorDashboard: React.FC = () => {
                 className="group rounded-2xl bg-slate-900/70 border border-slate-800 hover:border-gold-500/40 shadow-xl backdrop-blur-xl overflow-hidden transition-all duration-300 hover:-translate-y-1 flex flex-col justify-between"
               >
                 {/* Visual Canvas Representation */}
-                <div className="relative h-52 w-full bg-slate-950 p-4 flex flex-col justify-between border-b border-slate-800/80 overflow-hidden">
+                <div
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => void openArtworkDetails(artwork)}
+                  onKeyDown={(event) => {
+                    if (event.key === 'Enter' || event.key === ' ') {
+                      event.preventDefault();
+                      void openArtworkDetails(artwork);
+                    }
+                  }}
+                  aria-label={`View details for ${artwork.title}`}
+                  className="relative h-52 w-full bg-slate-950 p-4 flex flex-col justify-between border-b border-slate-800/80 overflow-hidden cursor-pointer"
+                >
                   <div className={`absolute inset-0 bg-gradient-to-br ${artwork.thumbnailGradient}`}>
                     <div className="absolute inset-0 opacity-20 bg-[radial-gradient(#cbd5e1_1px,transparent_1px)] [background-size:16px_16px]"></div>
                   </div>
@@ -706,7 +859,7 @@ const CollectorDashboard: React.FC = () => {
                   )}
 
                   {/* Dark gradient overlay for optimal readability */}
-                  <div className="absolute inset-0 bg-gradient-to-t from-slate-950/90 via-slate-950/20 to-black/60 pointer-events-none"></div>
+                  <div className="absolute inset-0 bg-gradient-to-t from-slate-950/25 via-slate-950/0 to-black/10 pointer-events-none"></div>
 
                   {/* Top Badges */}
                   <div className="relative z-10 flex items-center justify-between">
@@ -718,10 +871,14 @@ const CollectorDashboard: React.FC = () => {
                         <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse"></span>
                         In Escrow
                       </span>
-                    ) : (
+                    ) : artwork.status === 'VERIFIED' ? (
                       <span className="inline-flex items-center gap-1.5 text-[11px] font-semibold px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 backdrop-blur-md">
                         <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
                         Verified
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center gap-1.5 text-[11px] font-semibold px-2.5 py-0.5 rounded-full bg-slate-700/80 text-slate-200 border border-slate-500/30 backdrop-blur-md">
+                        {artwork.status.replace(/_/g, ' ')}
                       </span>
                     )}
                   </div>
@@ -736,26 +893,34 @@ const CollectorDashboard: React.FC = () => {
                 {/* Artwork Content Info */}
                 <div className="p-5 flex-1 flex flex-col justify-between space-y-4">
                   <div>
-                    <h3 className="text-lg font-bold text-white group-hover:text-amber-300 transition tracking-tight">
+                    <button
+                      type="button"
+                      onClick={() => void openArtworkDetails(artwork)}
+                      className="text-left text-lg font-bold text-white group-hover:text-amber-300 transition tracking-tight"
+                    >
                       {artwork.title}
-                    </h3>
+                    </button>
                     <div className="flex items-center justify-between text-xs text-slate-400 mt-1">
                       <span className="font-medium text-slate-300">{artwork.artist}</span>
                       <span>{artwork.year}</span>
                     </div>
 
                     <p className="text-[11px] text-slate-500 mt-2 line-clamp-1">
-                      Validated by: {artwork.authenticator}
+                      {artwork.ownershipStatus === 'OWNED'
+                        ? 'Owned by this account'
+                        : artwork.ownershipStatus === 'UNASSIGNED'
+                          ? 'Owner not recorded'
+                          : 'Registered to another custodian'}
                     </p>
                   </div>
 
                   {/* Card Action Controls */}
                   <div className="pt-3 border-t border-slate-800/80 flex items-center justify-between gap-2">
                     <button
-                      onClick={() => setSelectedArtwork(artwork)}
+                      onClick={() => void openArtworkDetails(artwork)}
                       className="text-xs font-semibold px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700/80 text-slate-200 hover:text-white transition cursor-pointer flex-1 text-center"
                     >
-                      Certificate
+                      Full Details
                     </button>
                     <Link
                       to="/verify"
@@ -763,18 +928,20 @@ const CollectorDashboard: React.FC = () => {
                     >
                       Audit Trail
                     </Link>
-                    <button
-                      onClick={() => {
-                        setTransferArtwork(artwork);
-                        setShowTransferModal(true);
-                      }}
-                      className="text-xs font-semibold p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white transition cursor-pointer"
-                      title="Initiate Transfer"
-                    >
-                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
-                      </svg>
-                    </button>
+                    {artwork.ownershipStatus === 'OWNED' && artwork.ownerId && (
+                      <button
+                        onClick={() => {
+                          setTransferArtwork(artwork);
+                          setShowTransferModal(true);
+                        }}
+                        className="text-xs font-semibold p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white transition cursor-pointer"
+                        title="Initiate Transfer"
+                      >
+                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
+                        </svg>
+                      </button>
+                    )}
                   </div>
                 </div>
               </div>
@@ -842,11 +1009,11 @@ const CollectorDashboard: React.FC = () => {
 
               <button
                 onClick={() => {
-                  if (artworks.length === 0) {
+                  if (transferableArtworks.length === 0) {
                     alert('You do not have any artworks in your vault to transfer.');
                     return;
                   }
-                  setTransferArtwork(artworks[0]);
+                  setTransferArtwork(transferableArtworks[0]);
                   setShowTransferModal(true);
                 }}
                 className="px-4 py-2 rounded-xl bg-gradient-to-r from-amber-500 to-yellow-600 hover:from-amber-400 hover:to-yellow-500 text-slate-950 font-bold text-xs shadow-lg shadow-amber-500/20 transition flex items-center gap-1.5 cursor-pointer"
@@ -902,9 +1069,13 @@ const CollectorDashboard: React.FC = () => {
                         </span>
                         <span className="text-xs text-slate-400">{incomingTransfer?.date}</span>
                       </div>
-                      <h4 className="text-base font-bold text-white">
+                      <button
+                        type="button"
+                        onClick={() => openTransferArtworkDetails(incomingTransfer)}
+                        className="text-left text-base font-bold text-white hover:text-indigo-300 transition"
+                      >
                         Incoming Custody Transfer: "{incomingTransfer?.title}" by {incomingTransfer?.artist}
-                      </h4>
+                      </button>
                       <p className="text-xs text-slate-300">
                         Origin Custodian: <span className="text-indigo-300 font-semibold">{incomingTransfer?.counterparty}</span>. Cryptographic custody acceptance required to anchor physical transfer.
                       </p>
@@ -960,7 +1131,13 @@ const CollectorDashboard: React.FC = () => {
                                   </svg>
                                 </div>
                                 <div>
-                                  <span className="font-semibold text-white block">{tx.title}</span>
+                                    <button
+                                      type="button"
+                                      onClick={() => openTransferArtworkDetails(tx)}
+                                      className="font-semibold text-white block text-left hover:text-indigo-300 transition"
+                                    >
+                                      {tx.title}
+                                    </button>
                                   <span className="text-[11px] text-slate-400">{tx.artist}</span>
                                 </div>
                               </div>
@@ -992,10 +1169,14 @@ const CollectorDashboard: React.FC = () => {
                                   <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse"></span>
                                   Pending Review
                                 </span>
-                              ) : (
+                              ) : tx.status === 'COMPLETED' ? (
                                 <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-500/10 text-emerald-300 border border-emerald-500/20 text-xs font-semibold">
                                   <span className="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
                                   Verified Anchor
+                                </span>
+                              ) : (
+                                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-slate-700/60 text-slate-300 border border-slate-600/30 text-xs font-semibold">
+                                  {tx.status.replace(/_/g, ' ')}
                                 </span>
                               )}
                             </td>
@@ -1055,11 +1236,11 @@ const CollectorDashboard: React.FC = () => {
 
                 <button
                   onClick={() => {
-                    if (artworks.length === 0) {
+                    if (transferableArtworks.length === 0) {
                       alert('You do not have any artworks in your vault to transfer.');
                       return;
                     }
-                    setTransferArtwork(artworks[0]);
+                    setTransferArtwork(transferableArtworks[0]);
                     setShowTransferModal(true);
                   }}
                   className="px-3.5 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white border border-slate-700 text-xs font-semibold transition flex items-center gap-1.5 cursor-pointer"
@@ -1103,7 +1284,13 @@ const CollectorDashboard: React.FC = () => {
                                   </svg>
                                 </div>
                                 <div>
-                                  <span className="font-semibold text-white block">{tx.title}</span>
+                                  <button
+                                    type="button"
+                                    onClick={() => openTransferArtworkDetails(tx)}
+                                    className="font-semibold text-white block text-left hover:text-violet-300 transition"
+                                  >
+                                    {tx.title}
+                                  </button>
                                   <span className="text-[11px] text-slate-400">{tx.artist}</span>
                                 </div>
                               </div>
@@ -1132,19 +1319,18 @@ const CollectorDashboard: React.FC = () => {
                             <td className="px-5 py-4">
                               <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-violet-500/10 text-violet-300 border border-violet-500/20 text-xs font-semibold">
                                 <span className="w-1.5 h-1.5 rounded-full bg-violet-400"></span>
-                                {tx.status === 'COMPLETED' ? 'Custody Anchored' : 'In Escrow'}
+                                {tx.status === 'COMPLETED'
+                                  ? 'Custody Anchored'
+                                  : tx.status === 'PENDING_ACCEPTANCE'
+                                    ? 'In Escrow'
+                                    : tx.status.replace(/_/g, ' ')}
                               </span>
                             </td>
                             <td className="px-5 py-4 text-right">
                               <div className="flex items-center justify-end gap-2">
                                 <button
                                   onClick={() => {
-                                    const matchingArt = artworks.find(a => a.title === tx.title);
-                                    if (matchingArt) {
-                                      setSelectedArtwork(matchingArt);
-                                    } else {
-                                      navigate('/verify');
-                                    }
+                                    openTransferArtworkDetails(tx);
                                   }}
                                   className="px-3.5 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white text-xs font-semibold transition cursor-pointer"
                                 >
@@ -1205,11 +1391,11 @@ const CollectorDashboard: React.FC = () => {
             {/* Action 2: Initiate Transfer */}
             <button
               onClick={() => {
-                if (artworks.length === 0) {
+                if (transferableArtworks.length === 0) {
                   alert('You do not have any artworks in your vault to transfer.');
                   return;
                 }
-                setTransferArtwork(artworks[0]);
+                setTransferArtwork(transferableArtworks[0]);
                 setShowTransferModal(true);
               }}
               className="p-5 rounded-2xl bg-slate-900/70 border border-slate-800 hover:border-amber-500/50 shadow-xl backdrop-blur-xl group transition-all duration-200 hover:-translate-y-1 text-left cursor-pointer w-full"
@@ -1254,14 +1440,14 @@ const CollectorDashboard: React.FC = () => {
         </section>
       </main>
 
-      {/* 8. Certificate Modal */}
+      {/* 8. Artwork Details Modal */}
       {selectedArtwork && (
         <div className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-black/75 p-2 backdrop-blur-md sm:p-4">
-          <section role="dialog" aria-modal="true" aria-labelledby="certificate-title" className="relative max-h-[90vh] w-[95vw] max-w-lg space-y-6 overflow-y-auto overscroll-contain rounded-2xl border border-slate-700 bg-slate-900 p-4 shadow-2xl sm:p-8">
+          <section role="dialog" aria-modal="true" aria-labelledby="artwork-details-title" className="relative max-h-[90vh] w-[95vw] max-w-3xl space-y-5 overflow-y-auto overscroll-contain rounded-2xl border border-slate-700 bg-slate-900 p-4 shadow-2xl sm:p-8">
             <button
               type="button"
               onClick={() => setSelectedArtwork(null)}
-              aria-label="Close certificate"
+              aria-label="Close artwork details"
               className="absolute right-3 top-3 inline-flex min-h-11 min-w-11 items-center justify-center rounded-full text-slate-400 hover:bg-slate-800 hover:text-white"
             >
               ✕
@@ -1269,51 +1455,129 @@ const CollectorDashboard: React.FC = () => {
 
             <div className="space-y-2 px-7 text-center">
               <span className="text-xs font-semibold uppercase tracking-wider text-amber-400">
-                Digital Certificate of Authenticity
+                Artwork Record
               </span>
-              <h2 id="certificate-title" className="text-2xl font-bold text-white">{selectedArtwork.title}</h2>
-              <p className="text-xs text-slate-400">By {selectedArtwork.artist} • {selectedArtwork.year}</p>
+              <h2 id="artwork-details-title" className="text-2xl font-bold text-white">
+                {artworkDetails?.title || selectedArtwork.title}
+              </h2>
+              <p className="text-xs text-slate-400">
+                By {artworkDetails?.artist || selectedArtwork.artist} • {artworkDetails?.year || selectedArtwork.year}
+              </p>
             </div>
+
+            {isLoadingArtworkDetails && (
+              <p className="rounded-xl border border-slate-700 bg-slate-950/70 p-4 text-center text-sm text-slate-300" role="status">
+                Loading artwork record, custody history, and provenance…
+              </p>
+            )}
+
+            {artworkDetailsError && (
+              <p className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-4 text-sm text-amber-200" role="alert">
+                Some artwork information could not be loaded: {artworkDetailsError}
+              </p>
+            )}
 
             {selectedArtwork.imageUrl && (
               <div className="relative h-48 w-full rounded-xl overflow-hidden border border-slate-700/80 shadow-inner">
                 <img
                   src={selectedArtwork.imageUrl}
-                  alt={selectedArtwork.title}
+                  alt={artworkDetails?.title || selectedArtwork.title}
                   className="w-full h-full object-cover"
                 />
               </div>
             )}
 
-            <div className="p-4 rounded-xl bg-slate-950/80 border border-slate-800 space-y-3 text-xs">
-              <div className="flex justify-between">
-                <span className="text-slate-400">Ledger ID:</span>
-                <span className="font-mono text-white font-semibold">{selectedArtwork.id}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-slate-400">Physical Binding:</span>
-                <span className="font-mono text-emerald-400 font-semibold">{selectedArtwork.nfcTag}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-slate-400">Medium & Dimensions:</span>
-                <span className="text-slate-200">{selectedArtwork.medium} ({selectedArtwork.dimensions})</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-slate-400">Authenticating Authority:</span>
-                <span className="text-slate-200">{selectedArtwork.authenticator}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-slate-400">Provenance Integrity:</span>
-                <span className="text-emerald-400 font-semibold">Zero-Knowledge Proof Verified</span>
-              </div>
-            </div>
+            <section className="rounded-xl border border-slate-800 bg-slate-950/80 p-4">
+              <h3 className="mb-3 text-sm font-semibold text-white">Artwork information</h3>
+              <dl className="grid gap-3 text-xs sm:grid-cols-2">
+                <div><dt className="text-slate-400">Record ID</dt><dd className="mt-1 break-all font-mono text-white">{artworkDetails?.id || selectedArtwork.databaseId}</dd></div>
+                <div><dt className="text-slate-400">Ledger ID</dt><dd className="mt-1 break-all font-mono text-white">{artworkDetails?.blockchainArtworkId || selectedArtwork.blockchainArtworkId || selectedArtwork.id}</dd></div>
+                <div><dt className="text-slate-400">Artist</dt><dd className="mt-1 text-slate-200">{artworkDetails?.artist || selectedArtwork.artist}</dd></div>
+                <div><dt className="text-slate-400">Year</dt><dd className="mt-1 text-slate-200">{artworkDetails?.year || selectedArtwork.year}</dd></div>
+                <div><dt className="text-slate-400">Medium</dt><dd className="mt-1 text-slate-200">{artworkDetails?.medium || selectedArtwork.medium}</dd></div>
+                <div><dt className="text-slate-400">Dimensions</dt><dd className="mt-1 text-slate-200">{artworkDetails?.dimensions || selectedArtwork.dimensions}</dd></div>
+                <div><dt className="text-slate-400">Edition</dt><dd className="mt-1 text-slate-200">{artworkDetails?.edition || 'Not recorded'}</dd></div>
+                <div><dt className="text-slate-400">Authentication method</dt><dd className="mt-1 text-slate-200">{artworkDetails?.authenticationMethod || 'Not recorded'}</dd></div>
+                <div><dt className="text-slate-400">Record status</dt><dd className="mt-1 text-slate-200">{artworkDetails?.status || selectedArtwork.status}</dd></div>
+                <div>
+                  <dt className="text-slate-400">Ownership</dt>
+                  <dd className="mt-1 text-slate-200">
+                    {selectedArtwork.ownershipStatus === 'OWNED'
+                      ? 'Owned by this account'
+                      : selectedArtwork.ownershipStatus === 'UNASSIGNED'
+                        ? 'Owner not recorded'
+                        : 'Registered to another custodian'}
+                  </dd>
+                </div>
+                <div className="sm:col-span-2"><dt className="text-slate-400">Owner ID</dt><dd className="mt-1 break-all font-mono text-slate-200">{artworkDetails?.ownerId || selectedArtwork.ownerId || 'Not recorded'}</dd></div>
+                <div><dt className="text-slate-400">Physical binding / NFC</dt><dd className="mt-1 break-all font-mono text-emerald-300">{artworkDetails?.bindingReference || selectedArtwork.nfcTag}</dd></div>
+                <div><dt className="text-slate-400">Created</dt><dd className="mt-1 text-slate-200">{artworkDetails?.createdAt || 'Not recorded'}</dd></div>
+                <div><dt className="text-slate-400">Last updated</dt><dd className="mt-1 text-slate-200">{artworkDetails?.updatedAt || 'Not recorded'}</dd></div>
+                <div><dt className="text-slate-400">Block number</dt><dd className="mt-1 font-mono text-slate-200">{artworkDetails?.blockNumber ?? 'Not recorded'}</dd></div>
+                <div className="sm:col-span-2"><dt className="text-slate-400">Artwork transaction hash</dt><dd className="mt-1 break-all font-mono text-slate-200">{artworkDetails?.txHash || 'Not recorded'}</dd></div>
+                <div className="sm:col-span-2"><dt className="text-slate-400">Metadata CID</dt><dd className="mt-1 break-all font-mono text-slate-200">{artworkDetails?.metadataCid || 'Not recorded'}</dd></div>
+                <div className="sm:col-span-2">
+                  <dt className="text-slate-400">Image references</dt>
+                  <dd className="mt-1 space-y-1 break-all font-mono text-slate-200">
+                    {parseArtworkList(artworkDetails?.imageCids).length > 0
+                      ? parseArtworkList(artworkDetails?.imageCids).map((reference) => <div key={reference}>{reference}</div>)
+                      : 'Not recorded'}
+                  </dd>
+                </div>
+                <div className="sm:col-span-2">
+                  <dt className="text-slate-400">Supporting documents</dt>
+                  <dd className="mt-1 space-y-1 break-all font-mono text-slate-200">
+                    {parseArtworkList(artworkDetails?.documentCids).length > 0
+                      ? parseArtworkList(artworkDetails?.documentCids).map((reference) => <div key={reference}>{reference}</div>)
+                      : 'Not recorded'}
+                  </dd>
+                </div>
+              </dl>
+            </section>
+
+            <section className="rounded-xl border border-slate-800 bg-slate-950/80 p-4">
+              <h3 className="mb-3 text-sm font-semibold text-white">Custody and transfer history</h3>
+              {artworkTransfers.length === 0 ? (
+                <p className="text-xs text-slate-400">No transfer records are linked to this artwork.</p>
+              ) : (
+                <div className="space-y-3">
+                  {artworkTransfers.map((transfer) => (
+                    <article key={transfer.id} className="rounded-lg border border-slate-800 bg-slate-900/70 p-3 text-xs">
+                      <dl className="grid gap-2 sm:grid-cols-2">
+                        <div><dt className="text-slate-400">Transfer status</dt><dd className="mt-1 text-slate-200">{transfer.status || 'Not recorded'}</dd></div>
+                        <div><dt className="text-slate-400">Transfer date</dt><dd className="mt-1 text-slate-200">{transfer.transferDate || 'Not recorded'}</dd></div>
+                        <div><dt className="text-slate-400">From custodian</dt><dd className="mt-1 break-all font-mono text-slate-200">{transfer.sellerId || 'Not recorded'}</dd></div>
+                        <div><dt className="text-slate-400">To custodian / wallet</dt><dd className="mt-1 break-all font-mono text-slate-200">{transfer.buyerId || transfer.buyerAddress || 'Not recorded'}</dd></div>
+                        <div><dt className="text-slate-400">Transfer record ID</dt><dd className="mt-1 break-all font-mono text-slate-200">{transfer.id}</dd></div>
+                        <div><dt className="text-slate-400">Blockchain transfer ID</dt><dd className="mt-1 break-all font-mono text-slate-200">{transfer.blockchainTransferId || 'Not recorded'}</dd></div>
+                        <div className="sm:col-span-2"><dt className="text-slate-400">Transaction hash</dt><dd className="mt-1 break-all font-mono text-slate-200">{transfer.txHash || 'Not recorded'}</dd></div>
+                        <div><dt className="text-slate-400">Block number</dt><dd className="mt-1 font-mono text-slate-200">{transfer.blockNumber ?? 'Not recorded'}</dd></div>
+                        <div><dt className="text-slate-400">Price visibility</dt><dd className="mt-1 text-slate-200">{transfer.priceVisibility || 'Not recorded'}</dd></div>
+                      </dl>
+                    </article>
+                  ))}
+                </div>
+              )}
+            </section>
+
+            <section className="rounded-xl border border-slate-800 bg-slate-950/80 p-4">
+              <h3 className="mb-3 text-sm font-semibold text-white">Provenance verification</h3>
+              <p className="text-xs text-slate-300">
+                Verification source: {artworkProvenance?.source || 'Not available'}
+              </p>
+              {artworkProvenance?.onChain !== undefined && (
+                <pre className="mt-3 max-h-64 overflow-auto whitespace-pre-wrap break-words rounded-lg bg-slate-900 p-3 text-[11px] text-slate-300">
+                  {JSON.stringify(artworkProvenance.onChain, null, 2) || String(artworkProvenance.onChain)}
+                </pre>
+              )}
+            </section>
 
             <div className="flex flex-col gap-3 sm:flex-row">
               <Link
                 to="/verify"
                 className="flex min-h-11 flex-1 items-center justify-center rounded-xl bg-indigo-600 py-2.5 text-center text-xs font-semibold text-white shadow-md transition hover:bg-indigo-500"
               >
-                Inspect Public Blockchain Proof
+                Open Artwork Verification
               </Link>
               <button
                 type="button"
@@ -1456,12 +1720,12 @@ const CollectorDashboard: React.FC = () => {
                 <select
                   value={transferArtwork?.databaseId || ''}
                   onChange={(e) => {
-                    const found = artworks.find(a => a.databaseId === e.target.value);
+                    const found = transferableArtworks.find(a => a.databaseId === e.target.value);
                     if (found) setTransferArtwork(found);
                   }}
                   className="min-h-11 w-full rounded-xl border border-slate-700 bg-slate-950/80 px-3.5 py-2.5 text-xs text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
                 >
-                  {artworks.map(art => (
+                  {transferableArtworks.map(art => (
                     <option key={art.id} value={art.databaseId}>
                       {art.title} ({art.artist}) - {art.id}
                     </option>
@@ -1470,16 +1734,19 @@ const CollectorDashboard: React.FC = () => {
               </div>
 
               <div>
-                <label className="block text-slate-300 font-semibold mb-1">Recipient Wallet / Institution ID</label>
+                <label className="block text-slate-300 font-semibold mb-1">Recipient wallet address</label>
                 <input
                   type="text"
                   value={recipientWallet}
                   onChange={(e) => setRecipientWallet(e.target.value)}
                   maxLength={42}
                   aria-invalid={Boolean(transferError)}
-                  placeholder="0x recipient wallet address"
+                  placeholder="0x… (linked to the recipient’s Aureum account)"
                   className="min-h-11 w-full rounded-xl border border-slate-700 bg-slate-950/80 px-3.5 py-2.5 text-xs text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
                 />
+                <p className="mt-1 text-[11px] text-slate-500">
+                  The recipient must link this wallet in their Aureum profile to receive and accept the transfer.
+                </p>
               </div>
 
               <div>

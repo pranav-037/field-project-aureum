@@ -314,7 +314,7 @@ const InstitutionDashboard: React.FC = () => {
             </Link>
 
             <Link
-              to="/collector/dashboard"
+              to="/collector/dashboard#transfers"
               className="p-5 rounded-2xl bg-slate-900/70 border border-slate-800 hover:border-indigo-500/50 shadow-xl backdrop-blur-xl group transition hover:-translate-y-1 block"
             >
               <div className="w-10 h-10 rounded-xl bg-indigo-500/10 border border-indigo-500/30 flex items-center justify-center text-indigo-400 mb-3 group-hover:scale-110 transition">

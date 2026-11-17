@@ -584,30 +584,54 @@ app.post('/api/artworks', async (req: Request, res: Response) => {
   }
 });
 
-// Get all transfers
-app.get('/api/transfers', async (req: Request, res: Response) => {
+// Get transfers involving the authenticated user
+app.get('/api/transfers', requireAuth, async (req: Request, res: Response) => {
   try {
-    const transfers = await db.transfers.findMany(
-      'id, blockchainTransferId, artworkId, sellerId, buyerId, transferDate, priceVisibility, status, txHash, createdAt'
-    );
+    if (!req.user) {
+      return res.status(401).json({ error: 'User not authenticated' });
+    }
+
+    const transfers = await db.transfers.findMany('*');
     const artworks = await db.artworks.findMany();
-    const users = await db.users.findMany();
+    const users = await db.users.findMany('id, email, name, role, walletAddress');
     const artMap = new Map((artworks || []).map((a: any) => [a.id, a]));
     const userMap = new Map((users || []).map((u: any) => [u.id, u]));
+    const userByWallet = new Map(
+      (users || [])
+        .filter((u: any) => typeof u.walletAddress === 'string')
+        .map((u: any) => [u.walletAddress.toLowerCase(), u])
+    );
+    const currentUser = userMap.get(req.user.id);
+    const walletAddresses = [req.user.walletAddress, currentUser?.walletAddress]
+      .filter((address): address is string => typeof address === 'string')
+      .map((address) => address.toLowerCase());
+    const userMatches = (idOrAddress?: string | null) =>
+      idOrAddress === req.user!.id ||
+      (typeof idOrAddress === 'string' && walletAddresses.includes(idOrAddress.toLowerCase()));
 
-    const enriched = (transfers || []).map((t: any) => {
+    const visibleTransfers = (transfers || []).filter((t: any) =>
+      userMatches(t.sellerId) ||
+      userMatches(t.buyerId) ||
+      (typeof t.buyerAddress === 'string' && walletAddresses.includes(t.buyerAddress.toLowerCase()))
+    );
+    const enriched = visibleTransfers.map((t: any) => {
       const art = artMap.get(t.artworkId);
-      const seller = userMap.get(t.sellerId);
-      const buyer = userMap.get(t.buyerId);
-      const isOutgoing = (seller?.email === 'pranavthakur037@gmail.com' && buyer?.email !== 'pranavthakur037@gmail.com') ||
-                         (seller?.role === 'COLLECTOR' && buyer?.role !== 'COLLECTOR');
+      const seller = userMap.get(t.sellerId) || userByWallet.get(String(t.sellerId).toLowerCase());
+      const buyer =
+        userMap.get(t.buyerId) ||
+        userByWallet.get(String(t.buyerId || '').toLowerCase()) ||
+        userByWallet.get(String(t.buyerAddress || '').toLowerCase());
+      const isOutgoing = userMatches(t.sellerId);
+      const recipientAddress =
+        t.buyerAddress ||
+        (typeof t.buyerId === 'string' && /^0x[a-fA-F0-9]{40}$/.test(t.buyerId) ? t.buyerId : null);
       return {
         ...t,
         type: isOutgoing ? 'OUTGOING' : 'INCOMING',
         artworkTitle: art?.title || `Artwork #${t.artworkId?.slice(0, 8)}`,
         artworkArtist: art?.artist || 'Fine Art Masterpiece',
-        sellerName: seller?.name || seller?.organizationName || 'Louvre Curatorial Guild',
-        buyerName: buyer?.name || buyer?.organizationName || 'Tate Modern Vault Escrow',
+        sellerName: seller?.name || 'Artwork custodian',
+        buyerName: buyer?.name || (recipientAddress ? `${recipientAddress.slice(0, 6)}...${recipientAddress.slice(-4)}` : 'Recipient'),
       };
     });
     res.json(enriched);
@@ -617,12 +641,15 @@ app.get('/api/transfers', async (req: Request, res: Response) => {
 });
 
 // Create a transfer (initiates on-chain if available)
-app.post('/api/transfers', async (req: Request, res: Response) => {
+app.post('/api/transfers', requireAuth, requireRole(['COLLECTOR', 'AUTHENTICATOR']), async (req: Request, res: Response) => {
   try {
-    const { artworkId, sellerId, buyerId, buyerAddress, transferDate, priceVisibility, priceCommitment, supportingDocCids } = req.body;
-    if (typeof artworkId !== 'string' || !artworkId.trim() ||
-        typeof sellerId !== 'string' || !sellerId.trim()) {
-      return res.status(400).json({ error: 'Artwork ID and seller ID are required' });
+    if (!req.user) {
+      return res.status(401).json({ error: 'User not authenticated' });
+    }
+
+    const { artworkId, buyerAddress, transferDate, priceVisibility, priceCommitment, supportingDocCids } = req.body;
+    if (typeof artworkId !== 'string' || !artworkId.trim()) {
+      return res.status(400).json({ error: 'Artwork ID is required' });
     }
     if (typeof buyerAddress !== 'string' || !/^0x[a-fA-F0-9]{40}$/.test(buyerAddress.trim())) {
       return res.status(400).json({ error: 'A valid recipient wallet address is required.' });
@@ -631,6 +658,40 @@ app.post('/api/transfers', async (req: Request, res: Response) => {
     const artwork = await db.artworks.findUnique(artworkId);
     if (!artwork) {
       return res.status(404).json({ error: 'Artwork not found' });
+    }
+
+    const seller = await db.users.findUnique(req.user.id);
+    const sellerWallets = [req.user.walletAddress, seller?.walletAddress]
+      .filter((address): address is string => typeof address === 'string')
+      .map((address) => address.toLowerCase());
+    const ownsArtwork =
+      artwork.ownerId === req.user.id ||
+      sellerWallets.includes(artwork.ownerId.toLowerCase());
+    if (!ownsArtwork) {
+      return res.status(403).json({ error: 'You can only transfer artwork in your custody.' });
+    }
+
+    const normalizedBuyerAddress = buyerAddress.trim().toLowerCase();
+    if (sellerWallets.includes(normalizedBuyerAddress)) {
+      return res.status(400).json({ error: 'The recipient wallet must be different from your own.' });
+    }
+
+    const existingTransfers = await db.transfers.findByArtworkId(artworkId);
+    if (existingTransfers.some((transfer) => transfer.status === 'PENDING')) {
+      return res.status(409).json({ error: 'This artwork already has a pending transfer.' });
+    }
+
+    const users = await db.users.findMany('id, walletAddress, role');
+    const recipient = users.find(
+      (user: any) => user.walletAddress?.toLowerCase() === normalizedBuyerAddress
+    );
+    if (!recipient || !['COLLECTOR', 'AUTHENTICATOR'].includes(recipient.role || '')) {
+      return res.status(400).json({
+        error: 'The recipient wallet must be linked to a collector or institution Aureum account.',
+      });
+    }
+    if (recipient.id === req.user.id) {
+      return res.status(400).json({ error: 'You cannot transfer artwork to your own account.' });
     }
 
     let onChainTransferId: string | null = null;
@@ -658,8 +719,8 @@ app.post('/api/transfers', async (req: Request, res: Response) => {
 
     const transferData = {
       artworkId,
-      sellerId,
-      buyerId: buyerId || null,
+      sellerId: req.user.id,
+      buyerId: recipient.id,
       transferDate: transferDate ? new Date(transferDate).toISOString() : new Date().toISOString(),
       priceVisibility: priceVisibility || 'PARTIES_AND_AUTHORISED',
       txHash,
@@ -677,7 +738,7 @@ app.post('/api/transfers', async (req: Request, res: Response) => {
     // Record Transfer Initiated activity
     try {
       await db.activities.create({
-        userId: sellerId,
+        userId: req.user.id,
         type: 'TRANSFER',
         title: 'Custody Transfer Initiated',
         detail: `Transfer initiated for "${artwork.title}"`,
@@ -698,12 +759,31 @@ app.post('/api/transfers', async (req: Request, res: Response) => {
 });
 
 // Accept a pending transfer
-app.post('/api/transfers/:id/accept', async (req: Request, res: Response) => {
+app.post('/api/transfers/:id/accept', requireAuth, requireRole(['COLLECTOR', 'AUTHENTICATOR']), async (req: Request, res: Response) => {
   try {
+    if (!req.user) {
+      return res.status(401).json({ error: 'User not authenticated' });
+    }
+
     const { id } = req.params;
     const transfer = await db.transfers.findUnique(id);
     if (!transfer) {
       return res.status(404).json({ error: 'Transfer not found' });
+    }
+
+    const recipient = await db.users.findUnique(req.user.id);
+    const walletAddress = (recipient?.walletAddress || req.user.walletAddress || '').toLowerCase();
+    const isRecipient =
+      transfer.buyerId === req.user.id ||
+      (walletAddress.length > 0 && (
+        transfer.buyerAddress?.toLowerCase() === walletAddress ||
+        transfer.buyerId?.toLowerCase() === walletAddress
+      ));
+    if (!isRecipient) {
+      return res.status(403).json({ error: 'Only the intended recipient can accept this transfer.' });
+    }
+    if (transfer.status !== 'PENDING') {
+      return res.status(409).json({ error: 'This transfer is no longer pending acceptance.' });
     }
 
     if (transfer.blockchainTransferId) {
@@ -714,16 +794,15 @@ app.post('/api/transfers/:id/accept', async (req: Request, res: Response) => {
 
     const updated = await db.transfers.update(id, {
       status: 'FINALIZED',
+      buyerId: req.user.id,
     });
 
-    if (transfer.buyerId) {
-      await db.artworks.update(transfer.artworkId, { ownerId: transfer.buyerId });
-    }
+    await db.artworks.update(transfer.artworkId, { ownerId: req.user.id });
 
     // Record Transfer Finalized activity
     try {
       await db.activities.create({
-        userId: transfer.buyerId || transfer.sellerId,
+        userId: req.user.id,
         type: 'TRANSFER',
         title: 'Custody Transfer Finalized',
         detail: `Transfer finalized on-chain`,
@@ -741,13 +820,28 @@ app.post('/api/transfers/:id/accept', async (req: Request, res: Response) => {
 });
 
 // Cancel a pending transfer
-app.post('/api/transfers/:id/cancel', async (req: Request, res: Response) => {
+app.post('/api/transfers/:id/cancel', requireAuth, requireRole(['COLLECTOR', 'AUTHENTICATOR']), async (req: Request, res: Response) => {
   try {
+    if (!req.user) {
+      return res.status(401).json({ error: 'User not authenticated' });
+    }
+
     const { id } = req.params;
     const { reason } = req.body;
     const transfer = await db.transfers.findUnique(id);
     if (!transfer) {
       return res.status(404).json({ error: 'Transfer not found' });
+    }
+    const owner = await db.users.findUnique(req.user.id);
+    const walletAddress = (owner?.walletAddress || req.user.walletAddress || '').toLowerCase();
+    if (
+      transfer.sellerId !== req.user.id &&
+      (!walletAddress || transfer.sellerId.toLowerCase() !== walletAddress)
+    ) {
+      return res.status(403).json({ error: 'Only the transfer initiator can cancel this transfer.' });
+    }
+    if (transfer.status !== 'PENDING') {
+      return res.status(409).json({ error: 'Only pending transfers can be cancelled.' });
     }
 
     const isChainAvailable = await BlockchainService.isAvailable();

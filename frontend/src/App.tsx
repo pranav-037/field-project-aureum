@@ -58,7 +58,7 @@ function App() {
                   <Route
                     path="/collector/dashboard"
                     element={
-                      <ProtectedRoute requiredRoles={['COLLECTOR']}>
+                      <ProtectedRoute requiredRoles={['COLLECTOR', 'AUTHENTICATOR']}>
                         <CollectorDashboard />
                       </ProtectedRoute>
                     }
