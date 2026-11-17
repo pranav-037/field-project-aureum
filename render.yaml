@@ -10,6 +10,10 @@ services:
         value: production
       - key: VITE_SITE_URL
         value: https://aureum-app.onrender.com
+      - key: VITE_SUPABASE_URL
+        value: https://aqtlhwgvsefngoyvondr.supabase.co
+      - key: VITE_SUPABASE_ANON_KEY
+        value: sb_publishable_NxAwvaNxqNx56GVLYc5S0w_NijT6Ihf
       - key: SUPABASE_URL
         sync: false
       - key: SUPABASE_SERVICE_ROLE_KEY
