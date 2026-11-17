@@ -102,6 +102,52 @@ const CollectorDashboard: React.FC = () => {
   }, []);
 
 
+  // Default Curated Masterpieces for the Collector's Sovereign Vault
+  const defaultMasterpieces: Artwork[] = [
+    {
+      id: 'AUR-fe18b0aa',
+      databaseId: 'art-001',
+      title: 'Girl with a Pearl Earring',
+      artist: 'Johannes Vermeer',
+      year: '1665',
+      medium: 'Oil on canvas',
+      dimensions: '44.5 cm × 39.0 cm',
+      status: 'VERIFIED',
+      thumbnailGradient: 'from-amber-700/60 via-amber-900/40 to-slate-900',
+      nfcTag: 'NFC-BOUND-VERMEER-1665',
+      authenticator: 'Aureum Authentication Guild',
+      imageUrl: '/artworks/girl-pearl-earring.jpg',
+    },
+    {
+      id: 'AUR-8e7fe0c7',
+      databaseId: 'art-002',
+      title: 'The Kiss',
+      artist: 'Gustav Klimt',
+      year: '1908',
+      medium: 'Oil and gold leaf on canvas',
+      dimensions: '180 cm × 180 cm',
+      status: 'VERIFIED',
+      thumbnailGradient: 'from-amber-600/60 via-yellow-700/40 to-slate-900',
+      nfcTag: 'NFC-BOUND-KLIMT-1908',
+      authenticator: 'Aureum Authentication Guild',
+      imageUrl: '/artworks/the-kiss.jpg',
+    },
+    {
+      id: 'AUR-e5e2bcbe',
+      databaseId: 'art-003',
+      title: 'The Starry Night',
+      artist: 'Vincent van Gogh',
+      year: '1889',
+      medium: 'Oil on canvas',
+      dimensions: '73.7 cm × 92.1 cm',
+      status: 'IN_ESCROW',
+      thumbnailGradient: 'from-blue-900/60 via-cyan-900/40 to-slate-900',
+      nfcTag: 'NFC-BOUND-VANGOGH-1889',
+      authenticator: 'Aureum Authentication Guild',
+      imageUrl: '/artworks/starry-night.jpg',
+    },
+  ];
+
   // Default Fallback Transactions: 2 Incoming and 1 Outgoing
   const defaultTransactions: TransferItem[] = [
     {
@@ -109,8 +155,8 @@ const CollectorDashboard: React.FC = () => {
       type: 'INCOMING',
       title: 'The Great Wave off Kanagawa',
       artist: 'Katsushika Hokusai',
-      counterparty: 'Tokyo Curatorial Guild Escrow',
-      date: 'Nov 14, 2026',
+      counterparty: 'Sanjay Rathore',
+      date: 'Nov 13, 2026',
       status: 'PENDING_ACCEPTANCE',
       txHash: '0x8f2d4a1b9c3e7f6a5b4c3d2e1f0a9b8c7d6e5f4a',
     },
@@ -119,8 +165,8 @@ const CollectorDashboard: React.FC = () => {
       type: 'INCOMING',
       title: 'The Birth of Venus',
       artist: 'Sandro Botticelli',
-      counterparty: 'Uffizi Gallery Guild Escrow',
-      date: 'Nov 12, 2026',
+      counterparty: 'Sanjay Rathore',
+      date: 'Nov 10, 2026',
       status: 'PENDING_ACCEPTANCE',
       txHash: '0x7b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5b6c',
     },
@@ -129,14 +175,14 @@ const CollectorDashboard: React.FC = () => {
       type: 'OUTGOING',
       title: 'The Starry Night',
       artist: 'Vincent van Gogh',
-      counterparty: 'MoMA Custodial Vault Escrow',
-      date: 'Nov 11, 2026',
+      counterparty: 'Sanjay Rathore',
+      date: 'Nov 12, 2026',
       status: 'PENDING_ACCEPTANCE',
       txHash: '0x3a4b5c6d7e8f9a0b1c2d3e4f5a6b7c8d9e0f1a2b',
     },
   ];
 
-  const [artworks, setArtworks] = useState<Artwork[]>([]);
+  const [artworks, setArtworks] = useState<Artwork[]>(defaultMasterpieces);
   const [transactions, setTransactions] = useState<TransferItem[]>(defaultTransactions);
 
   const loadData = async (uid: string) => {
@@ -150,7 +196,7 @@ const CollectorDashboard: React.FC = () => {
           'from-blue-800/60 via-amber-700/40 to-slate-900',
           'from-amber-600/60 via-yellow-700/40 to-slate-900'
         ];
-        // Sovereign Vault Custody: Only show artworks owned by current user
+        // Sovereign Vault Custody: Show user-owned artworks, or default collection if none owned
         const ownedArtworks = res.data.filter((a: any) => {
           if (uid && a.ownerId) {
             return a.ownerId === uid;
@@ -158,7 +204,9 @@ const CollectorDashboard: React.FC = () => {
           return true;
         });
 
-        const mapped: Artwork[] = ownedArtworks.map((a: any, idx: number) => {
+        const targetArtworks = ownedArtworks.length > 0 ? ownedArtworks : res.data;
+
+        const mapped: Artwork[] = targetArtworks.map((a: any, idx: number) => {
           let imgUrl = '';
           if (a.imageCids) {
             try {
