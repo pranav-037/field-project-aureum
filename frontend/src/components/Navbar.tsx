@@ -79,7 +79,6 @@ export const Navbar = () => {
   const navLinks = !isAuthenticated
     ? [
         { name: 'Platform', path: '/#features' },
-        { name: 'How it works', path: '/#how-it-works' },
         { name: 'Verify artwork', path: '/verify', badge: true },
       ]
     : [

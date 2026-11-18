@@ -7,14 +7,14 @@ import {
   Boxes,
   Fingerprint,
   Landmark,
-  Link2,
-  LockKeyhole,
   SearchCheck,
   ShieldCheck,
   Sparkles,
 } from 'lucide-react';
 import Navbar from '../components/Navbar';
 import { useAuth } from '../context/AuthContext';
+
+const copyrightYear = new Date().getFullYear();
 
 const LandingPage: React.FC = () => {
   const navigate = useNavigate();
@@ -185,82 +185,16 @@ const LandingPage: React.FC = () => {
           </div>
         </section>
 
-        <section className="bg-[#1E3A2F] px-5 py-16 text-white sm:px-8 sm:py-20">
-          <div className="mx-auto grid max-w-7xl items-center gap-10 lg:grid-cols-[1fr_1.2fr]">
-            <div>
-              <span className="inline-flex items-center gap-2 text-xs font-semibold uppercase tracking-[.18em] text-[#F4A922]">
-                <LockKeyhole className="h-4 w-4" aria-hidden="true" /> Built for institutional trust
-              </span>
-              <h2 className="mt-4 max-w-lg text-3xl font-semibold tracking-[-.04em] sm:text-4xl">
-                A durable record for every responsible custodian.
-              </h2>
-              <p className="mt-4 max-w-lg text-sm leading-6 text-white/75">
-                Keep provenance details together, make verification straightforward, and record custody changes with clear accountability.
-              </p>
-              <Link to="/register" className="mt-7 inline-flex min-h-11 items-center gap-2 rounded-full bg-[#F4A922] px-5 py-3 text-sm font-bold text-[#09090B] transition hover:bg-[#ffbf48]">
-                Explore Aureum <ArrowUpRight className="h-4 w-4" aria-hidden="true" />
-              </Link>
-            </div>
-            <div className="rounded-2xl border border-white/15 bg-white/[.08] p-5 sm:p-7">
-              <div className="mb-6 flex items-center justify-between">
-                <div>
-                  <p className="text-xs font-semibold uppercase tracking-[.16em] text-white/60">Custody ledger</p>
-                  <p className="mt-1 text-lg font-semibold">A transparent chain of events</p>
-                </div>
-                <span className="rounded-full bg-white/10 px-3 py-1 text-[10px] font-bold uppercase text-[#F4A922]">Lifecycle preview</span>
-              </div>
-              <div className="space-y-3">
-                {[
-                  ['Registration', 'Institution record created', 'Origin'],
-                  ['Authentication', 'Evidence reviewed and signed', 'Verified'],
-                  ['Custody', 'Transfer event recorded', 'Auditable'],
-                ].map(([label, description, tag], index) => (
-                  <div key={label} className="flex items-center gap-4 rounded-xl border border-white/10 bg-[#10291F]/60 p-4">
-                    <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full border border-[#F4A922]/50 text-xs font-bold text-[#F4A922]">0{index + 1}</span>
-                    <div className="min-w-0 flex-1">
-                      <p className="text-sm font-semibold">{label}</p>
-                      <p className="mt-0.5 text-xs text-white/60">{description}</p>
-                    </div>
-                    <span className="text-[10px] font-semibold uppercase tracking-wide text-[#F4A922]">{tag}</span>
-                  </div>
-                ))}
-              </div>
-              <div className="mt-5 flex items-center gap-2 text-xs text-white/60">
-                <Link2 className="h-4 w-4 text-[#F4A922]" aria-hidden="true" /> Linked provenance events, ready to inspect
-              </div>
-            </div>
-          </div>
-        </section>
-
-        <section id="how-it-works" className="scroll-mt-24 px-5 py-20 sm:px-8 sm:py-28">
-          <div className="mx-auto max-w-7xl">
-            <div className="mx-auto mb-14 max-w-2xl text-center">
-              <p className="text-xs font-bold uppercase tracking-[.18em] text-[#E06D1B]">The custody lifecycle</p>
-              <h2 className="mt-4 text-4xl font-semibold tracking-[-.05em] sm:text-5xl">From first record to next custodian.</h2>
-            </div>
-            <div className="custody-timeline grid grid-cols-1 gap-8 md:grid-cols-4">
-              {[
-                ['Register', 'Create an archival record with the artwork’s identifying details.'],
-                ['Authenticate', 'Attach evidence and record the institution’s review.'],
-                ['Certify', 'Anchor a verifiable certificate to the provenance record.'],
-                ['Transfer', 'Record each approved change in custody.'],
-              ].map(([title, body], index) => (
-                <article key={title} className="custody-step relative">
-                  <span className="relative z-10 grid h-10 w-10 place-items-center rounded-full border border-[#E06D1B]/30 bg-[#FDF6EC] text-xs font-bold text-[#E06D1B]">0{index + 1}</span>
-                  <h3 className="mt-5 text-lg font-bold">{title}</h3>
-                  <p className="mt-2 max-w-xs text-sm leading-6 text-[#52525B]">{body}</p>
-                </article>
-              ))}
-            </div>
-          </div>
-        </section>
       </main>
 
-      <footer className="border-t border-[#EAE6DF] px-5 py-8 sm:px-8">
-        <div className="mx-auto flex max-w-7xl flex-col items-start justify-between gap-4 sm:flex-row sm:items-center">
+      <footer className="border-t border-[#EAE6DF]">
+        <div className="mx-auto flex max-w-7xl flex-col items-start justify-between gap-4 px-5 py-8 sm:flex-row sm:items-center sm:px-8">
           <Link to="/" className="text-lg font-bold tracking-tight text-[#18181B]">Aureum<span className="text-[#E06D1B]">.</span></Link>
           <p className="text-xs text-[#52525B]">A considered record for art provenance and custody.</p>
           <Link to="/verify" className="inline-flex items-center gap-1 text-xs font-semibold text-[#E06D1B]">Verify a record <ArrowUpRight className="h-3.5 w-3.5" /></Link>
+        </div>
+        <div className="border-t border-[#EAE6DF] px-5 py-4 text-center text-xs text-[#52525B] sm:px-8">
+          &copy; {copyrightYear} Aureum. All rights reserved.
         </div>
       </footer>
     </div>
