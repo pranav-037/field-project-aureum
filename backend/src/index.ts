@@ -86,6 +86,21 @@ const artworkImageUrl = (imageCids: unknown): string | undefined => {
   return imageCids;
 };
 
+const isEmailTransferMigrationMissing = (error: unknown): boolean => {
+  if (!error || typeof error !== 'object') return false;
+  const { code, message } = error as { code?: string; message?: string };
+  if (!['PGRST202', 'PGRST204', '42703', '42883'].includes(code || '')) return false;
+  return /recipientUserId|senderUserId|approve_user_artwork_transfer/i.test(message || '');
+};
+
+const respondWithTransferMigrationError = (res: Response, error: unknown): boolean => {
+  if (!isEmailTransferMigrationMissing(error)) return false;
+  res.status(503).json({
+    error: 'Email transfers are not enabled in the configured database yet. Apply backend/supabase/migrations/20261118000000_email_artwork_transfers.sql in the Supabase SQL Editor, then retry.',
+  });
+  return true;
+};
+
 // Initialize blockchain service and start indexer
 BlockchainService.initialize();
 IndexerService.startListening();
@@ -702,6 +717,7 @@ app.get(
         };
       }));
     } catch (error) {
+      if (respondWithTransferMigrationError(res, error)) return;
       if (error instanceof UserTransferError) {
         return res.status(error.statusCode).json({ error: error.message });
       }
@@ -891,6 +907,7 @@ app.post('/api/transfers', requireAuth, requireRole(['COLLECTOR', 'AUTHENTICATOR
       onChainSynced: Boolean(onChainTransferId),
     });
   } catch (error) {
+    if (respondWithTransferMigrationError(res, error)) return;
     if (error instanceof UserTransferError) {
       return res.status(error.statusCode).json({ error: error.message });
     }
@@ -909,6 +926,7 @@ app.post(
       const transfer = await approveUserTransfer(req.params.id, req.user.id, userTransferRepository);
       res.json(transfer);
     } catch (error) {
+      if (respondWithTransferMigrationError(res, error)) return;
       if (error instanceof UserTransferError) {
         return res.status(error.statusCode).json({ error: error.message });
       }
@@ -933,6 +951,7 @@ app.post(
       const transfer = await rejectUserTransfer(req.params.id, req.user.id, userTransferRepository);
       res.json(transfer);
     } catch (error) {
+      if (respondWithTransferMigrationError(res, error)) return;
       if (error instanceof UserTransferError) {
         return res.status(error.statusCode).json({ error: error.message });
       }
@@ -1044,7 +1063,96 @@ app.post('/api/transfers/:id/cancel', requireAuth, requireRole(['COLLECTOR', 'AU
   }
 });
 
-// Get a specific artwork by ID
+// Resolve public artwork identifiers and wallet-linked custody records.
+app.get('/api/artworks/lookup', async (req: Request, res: Response) => {
+  try {
+    const query = typeof req.query.query === 'string' ? req.query.query.trim() : '';
+    const type = req.query.type;
+    if (!query || !['artworkId', 'wallet'].includes(String(type))) {
+      return res.status(400).json({ error: 'Provide an artworkId or wallet lookup query.' });
+    }
+
+    const [artworks, users] = await Promise.all([
+      db.artworks.findMany('*'),
+      db.users.findMany('id, name, walletAddress'),
+    ]);
+    const userById = new Map(users.map((user) => [String(user.id), user]));
+    let matches: any[];
+
+    if (type === 'wallet') {
+      if (!/^0x[a-fA-F0-9]{40}$/.test(query)) {
+        return res.status(400).json({ error: 'Enter a complete 0x wallet address.' });
+      }
+
+      const normalizedWallet = query.toLowerCase();
+      const walletUserIds = new Set(
+        users
+          .filter((user) => user.walletAddress?.toLowerCase() === normalizedWallet)
+          .map((user) => String(user.id).toLowerCase()),
+      );
+      const ownerIdentifiers = new Set([normalizedWallet, ...walletUserIds]);
+      const transfers = await db.transfers.findMany('*');
+      const historicallyLinkedArtworkIds = new Set(
+        transfers
+          .filter((transfer) => [
+            transfer.sellerId,
+            transfer.buyerId,
+            transfer.senderUserId,
+            transfer.recipientUserId,
+            transfer.buyerAddress,
+          ].some((party) => typeof party === 'string' && (
+            party.toLowerCase() === normalizedWallet ||
+            walletUserIds.has(party.toLowerCase())
+          )))
+          .map((transfer) => String(transfer.artworkId)),
+      );
+
+      matches = artworks.filter((artwork) =>
+        ownerIdentifiers.has(String(artwork.ownerId).toLowerCase()) ||
+        (typeof artwork.ownerAddress === 'string' &&
+          ownerIdentifiers.has(artwork.ownerAddress.toLowerCase())) ||
+        (typeof artwork.ownerWalletAddress === 'string' &&
+          ownerIdentifiers.has(artwork.ownerWalletAddress.toLowerCase())) ||
+        historicallyLinkedArtworkIds.has(String(artwork.id)),
+      );
+    } else {
+      const normalizedQuery = query.toLowerCase();
+      const normalizedIdentifier = query.replace(/^AUR-/i, '').toLowerCase();
+      matches = artworks.filter((artwork) => {
+        const artworkId = String(artwork.id || '').toLowerCase();
+        const blockchainId = String(artwork.blockchainArtworkId || '').toLowerCase();
+        const bindingReference = String(artwork.bindingReference || '').toLowerCase();
+        return artworkId === normalizedQuery ||
+          artworkId === normalizedIdentifier ||
+          blockchainId === normalizedQuery ||
+          blockchainId === normalizedIdentifier ||
+          bindingReference === normalizedQuery ||
+          bindingReference === normalizedIdentifier ||
+          (normalizedIdentifier.length === 8 && artworkId.startsWith(normalizedIdentifier));
+      });
+    }
+
+    const results = matches.map((artwork) => {
+      const ownerId = String(artwork.ownerId || '');
+      const owner = userById.get(ownerId);
+      return {
+        ...artwork,
+        currentOwnerWalletAddress: /^0x[a-fA-F0-9]{40}$/.test(ownerId)
+          ? ownerId
+          : /^0x[a-fA-F0-9]{40}$/.test(artwork.ownerAddress || artwork.ownerWalletAddress || '')
+            ? artwork.ownerAddress || artwork.ownerWalletAddress
+          : owner?.walletAddress || null,
+        currentOwnerName: owner?.name || null,
+      };
+    });
+
+    return res.json({ artworks: results });
+  } catch (error) {
+    console.error('Failed to look up artwork verification records:', error);
+    return res.status(500).json({ error: 'Failed to look up artwork verification records.' });
+  }
+});
+
 app.get('/api/artworks/:id', async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
@@ -1067,9 +1175,20 @@ app.get('/api/artworks/:id', async (req: Request, res: Response) => {
 app.get('/api/artworks/:artworkId/transfers', async (req: Request, res: Response) => {
   try {
     const { artworkId } = req.params;
-    const transfers = await db.transfers.findByArtworkId(artworkId);
-    res.json(transfers);
+    const [transfers, users] = await Promise.all([
+      db.transfers.findByArtworkId(artworkId),
+      db.users.findMany('id, name, walletAddress'),
+    ]);
+    const usersById = new Map(users.map((user) => [String(user.id), user]));
+    res.json(transfers.map((transfer) => ({
+      ...transfer,
+      sellerName: usersById.get(String(transfer.sellerId))?.name || null,
+      sellerWalletAddress: usersById.get(String(transfer.sellerId))?.walletAddress || null,
+      buyerName: usersById.get(String(transfer.buyerId))?.name || null,
+      buyerWalletAddress: usersById.get(String(transfer.buyerId))?.walletAddress || null,
+    })));
   } catch (error) {
+      console.error('Failed to fetch transfers for artwork verification:', error);
     res.status(500).json({ error: 'Failed to fetch transfers for artwork' });
   }
 });

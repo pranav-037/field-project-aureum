@@ -1,4 +1,4 @@
-import React, { createContext, useCallback, useContext, useEffect, useState } from 'react';
+import React, { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import type { Session } from '@supabase/supabase-js';
 import { AppRoleSchema, AuthAttributesSchema } from '../utils/tokenValidator';
@@ -123,13 +123,80 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const [token, setToken] = useState<string | null>(null);
   const [authorization, setAuthorization] = useState<AuthAuthorization | null>(null);
   const [loading, setLoading] = useState(Boolean(supabase));
+  const profileRequestId = useRef(0);
 
   const applySession = useCallback((session: Session | null) => {
+    const requestId = ++profileRequestId.current;
     const state = getSessionState(session);
     setToken(session?.access_token ?? null);
     setUser(state.user);
     setAuthorization(state.authorization);
-    setLoading(false);
+
+    if (!session || !state.user || !state.authorization) {
+      setLoading(false);
+      return;
+    }
+
+    setLoading(true);
+    const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || '/api';
+    const profileUrl = new URL(
+      `${apiBaseUrl.replace(/\/$/, '')}/auth/me`,
+      window.location.origin,
+    );
+
+    void fetch(profileUrl, {
+      headers: { Authorization: `Bearer ${session.access_token}` },
+    })
+      .then(async (response) => {
+        if (!response.ok) {
+          throw new Error(`Profile lookup failed with HTTP ${response.status}.`);
+        }
+        return response.json();
+      })
+      .then((profile: Record<string, unknown>) => {
+        const parsedRole = AppRoleSchema.safeParse(profile.role);
+        if (!parsedRole.success) {
+          throw new Error('The user profile contains an unsupported account role.');
+        }
+        if (requestId !== profileRequestId.current) return;
+
+        const role = parsedRole.data;
+        const walletAddress = typeof profile.walletAddress === 'string' &&
+          /^0x[a-fA-F0-9]{40}$/.test(profile.walletAddress)
+          ? profile.walletAddress
+          : undefined;
+        setUser((current) => current?.id === session.user.id
+          ? {
+              ...current,
+              name: typeof profile.name === 'string' && profile.name.trim()
+                ? profile.name
+                : current.name,
+              role,
+              roles: [role],
+              walletAddress: walletAddress ?? current.walletAddress,
+              attributes: walletAddress
+                ? { ...current.attributes, walletAddress }
+                : current.attributes,
+            }
+          : current);
+        setAuthorization((current) => current?.userId === session.user.id
+          ? {
+              ...current,
+              roles: [role],
+              attributes: walletAddress
+                ? { ...current.attributes, walletAddress }
+                : current.attributes,
+            }
+          : current);
+      })
+      .catch((error: unknown) => {
+        if (requestId === profileRequestId.current) {
+          console.error('Could not load the account role from the user profile:', error);
+        }
+      })
+      .finally(() => {
+        if (requestId === profileRequestId.current) setLoading(false);
+      });
   }, []);
 
   const logout = useCallback(async () => {
