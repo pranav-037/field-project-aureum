@@ -1,5 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import { AuthService, AuthenticatedUser } from '../services/auth.service';
+import { ensureStarterCollection } from '../services/starter-collection.service';
 
 // Extend Express Request interface to include authenticated user
 declare global {
@@ -35,6 +36,13 @@ export async function requireAuth(req: Request, res: Response, next: NextFunctio
     }
 
     req.user = user;
+    try {
+      await ensureStarterCollection(user.id);
+    } catch (error) {
+      console.error('Starter collection setup failed:', error);
+      res.status(503).json({ error: 'Your starter collection could not be prepared. Please try again.' });
+      return;
+    }
     next();
   } catch (error) {
     res.status(401).json({ error: 'Authentication verification failed.' });

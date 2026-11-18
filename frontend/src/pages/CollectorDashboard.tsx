@@ -336,7 +336,7 @@ const CollectorDashboard: React.FC = () => {
 
   const ownedArtworks = artworks.filter((artwork) => artwork.ownershipStatus === 'OWNED');
   const transferableArtworks = ownedArtworks.filter((artwork) => Boolean(artwork.ownerId));
-  const filteredArtworks = artworks.filter(item => {
+  const filteredArtworks = ownedArtworks.filter(item => {
     if (filter === 'VERIFIED') return item.status === 'VERIFIED';
     if (filter === 'ESCROW') return item.status === 'IN_ESCROW';
     return true;
@@ -350,8 +350,7 @@ const CollectorDashboard: React.FC = () => {
   const outgoingCount = new Set(pendingOutgoing.map((transfer) => transfer.artworkId).filter(Boolean)).size;
   const incomingTransfer = pendingIncoming[0];
   const verifiedCount = ownedArtworks.filter(item => item.status === 'VERIFIED').length;
-  const registryVerifiedCount = artworks.filter(item => item.status === 'VERIFIED').length;
-  const registryEscrowCount = artworks.filter(item => item.status === 'IN_ESCROW').length;
+  const escrowCount = ownedArtworks.filter(item => item.status === 'IN_ESCROW').length;
 
   const openArtworkDetails = async (artwork: Artwork) => {
     setSelectedArtwork(artwork);
@@ -593,6 +592,11 @@ const CollectorDashboard: React.FC = () => {
         </div>
 
         {/* 3. Stats Grid (The 4 core metrics) */}
+        {ownedArtworks.some((artwork) => artwork.databaseId.startsWith('starter-')) && (
+          <p className="text-sm text-slate-400">
+            Your starter collection includes sample artworks and transfers for exploring Aureum.
+          </p>
+        )}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
           {/* Stat 1: Owned Artworks */}
           <div className="relative group p-6 rounded-2xl bg-slate-900/70 border border-slate-800 hover:border-amber-500/40 shadow-xl backdrop-blur-xl transition duration-300">
@@ -757,13 +761,13 @@ const CollectorDashboard: React.FC = () => {
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
             <div>
               <h2 className="text-xl sm:text-2xl font-bold text-white tracking-tight flex items-center gap-2.5">
-                My Collection & Artwork Registry
+                My Collection
                 <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-slate-800 text-slate-300 border border-slate-700">
                   {filteredArtworks.length} Artworks
                 </span>
               </h2>
               <p className="text-xs sm:text-sm text-slate-400 mt-0.5">
-                Your owned works and every other registered artwork linked to custody activity
+                Artworks currently in your custody
               </p>
             </div>
 
@@ -777,7 +781,7 @@ const CollectorDashboard: React.FC = () => {
                     : 'text-slate-400 hover:text-slate-200'
                 }`}
               >
-                All Artworks ({artworks.length})
+                All Artworks ({ownedArtworks.length})
               </button>
               <button
                 onClick={() => setFilter('VERIFIED')}
@@ -787,7 +791,7 @@ const CollectorDashboard: React.FC = () => {
                     : 'text-slate-400 hover:text-slate-200'
                 }`}
               >
-                Verified Provenance ({registryVerifiedCount})
+                Verified Provenance ({verifiedCount})
               </button>
               <button
                 onClick={() => setFilter('ESCROW')}
@@ -797,7 +801,7 @@ const CollectorDashboard: React.FC = () => {
                     : 'text-slate-400 hover:text-slate-200'
                 }`}
               >
-                In Escrow ({registryEscrowCount})
+                In Escrow ({escrowCount})
               </button>
             </div>
           </div>
@@ -812,7 +816,9 @@ const CollectorDashboard: React.FC = () => {
               </div>
               <h3 className="text-lg font-serif font-light text-white tracking-wide">Sovereign Vault Empty</h3>
               <p className="text-xs sm:text-sm text-slate-400 max-w-md mx-auto mt-1.5 leading-relaxed">
-                No artwork records are available. Registered works and related custody handoffs will appear here.
+                {ownedArtworks.length === 0
+                  ? 'Artworks you own will appear here after you register or receive them.'
+                  : 'No owned artworks match this filter.'}
               </p>
             </div>
           ) : (

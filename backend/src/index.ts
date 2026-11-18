@@ -9,6 +9,7 @@ import path from 'path';
 import fs from 'fs';
 
 import { AuthService } from './services/auth.service';
+import { uniqueCollectionArtworks } from './services/starter-collection.service';
 import { BlockchainService } from './services/blockchain.service';
 import { IPFSService } from './services/ipfs.service';
 import { IndexerService } from './services/indexer.service';
@@ -513,10 +514,21 @@ const resolveArtworkImageUrl = (imageCids: string | null | undefined): string | 
 };
 
 // Get all artworks
-app.get('/api/artworks', async (req: Request, res: Response) => {
+app.get('/api/artworks', (req, res, next) => {
+  if (req.headers.authorization) return requireAuth(req, res, next);
+  next();
+}, async (req: Request, res: Response) => {
   try {
     const artworks = await db.artworks.findMany('*');
-    const enriched = (artworks || []).map((a: any) => ({
+    const visibleArtworks = (artworks || []).filter((artwork: any) =>
+      !artwork.id.startsWith('starter-') ||
+      (req.user && (
+        artwork.id.startsWith(`starter-${req.user.id}-`) ||
+        artwork.ownerId === req.user.id ||
+        (req.user.walletAddress && artwork.ownerId?.toLowerCase() === req.user.walletAddress.toLowerCase())
+      ))
+    );
+    const enriched = uniqueCollectionArtworks(visibleArtworks, req.user?.id, req.user?.walletAddress).map((a: any) => ({
       ...a,
       imageUrl: resolveArtworkImageUrl(a.imageCids),
     }));

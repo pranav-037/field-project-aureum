@@ -346,7 +346,6 @@ const RegisterPage: React.FC = () => {
                       aria-invalid={Boolean(fieldErrors.email)}
                       aria-describedby={fieldErrors.email ? 'register-email-error' : undefined}
                       disabled={loading}
-                      placeholder="yourname@domain.com"
                       className="w-full px-3.5 py-2.5 rounded-xl bg-slate-950/70 border border-slate-700/80 text-white placeholder-slate-500 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition duration-150"
                     />
                   </div>
@@ -382,7 +381,6 @@ const RegisterPage: React.FC = () => {
                       aria-invalid={Boolean(fieldErrors.password)}
                       aria-describedby={fieldErrors.password ? 'register-password-error' : 'register-password-hint'}
                       disabled={loading}
-                      placeholder="••••••••••••"
                       className="w-full px-3.5 py-2.5 pr-10 rounded-xl bg-slate-950/70 border border-slate-700/80 text-white placeholder-slate-500 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition duration-150"
                     />
                     <button
@@ -433,7 +431,6 @@ const RegisterPage: React.FC = () => {
                       aria-invalid={Boolean(fieldErrors.confirmPassword)}
                       aria-describedby={fieldErrors.confirmPassword ? 'register-confirm-error' : undefined}
                       disabled={loading}
-                      placeholder="••••••••••••"
                       className="w-full px-3.5 py-2.5 pr-10 rounded-xl bg-slate-950/70 border border-slate-700/80 text-white placeholder-slate-500 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition duration-150"
                     />
                     <button

@@ -104,6 +104,8 @@ The script will:
 
 ### Email-based artwork custody transfers
 
+Every account receives a starter collection on its first authenticated API request. An empty account starts with five labeled sample artworks, three initially owned works, two pending incoming transfers, and one pending outgoing transfer. Two of the owned samples have verified status. Existing owned or transfer-linked works with the same title and artist are reused, so an established account's totals can differ. Run `npm run seed:demo` from `backend` to populate existing profiles. The script inserts missing sample records using stable IDs and preserves ownership changes and transfer decisions. Each account's registry shows one entry per demo artwork. Sample transfers use a public sample custodian profile without creating a Supabase Auth login.
+
 For an existing database, apply `migrations/20261118000000_email_artwork_transfers.sql` after the initial schema migration (or run `npx supabase db push`). It adds `senderUserId` and `recipientUserId` references to `User`, a foreign key from each transfer to `Artwork`, pending-recipient indexes, and the `approve_user_artwork_transfer` PostgreSQL function. Foreign keys are added `NOT VALID` to avoid blocking on older transfer history; new writes are still checked.
 
 The authenticated API supports `POST /api/transfers` with `{ "artworkId": "...", "recipientEmail": "..." }`, `GET /api/transfers/incoming`, and recipient-only `POST /api/transfers/:id/approve` or `/reject`. Approval runs in one database function/transaction and moves `Artwork.ownerId` together with the transfer status. The dashboard polls every 15 seconds for sender-side status changes. Existing wallet/on-chain transfer routes remain available.
