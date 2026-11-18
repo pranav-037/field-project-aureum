@@ -1,15 +1,34 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { artworkApi } from '../services/api';
 import Navbar from '../components/Navbar';
 import { useArtchainContract } from '../hooks/useArtchainContract';
+import { QRCodeSVG } from 'qrcode.react';
+
+interface DetectedQrCode {
+  rawValue: string;
+}
+
+interface QrBarcodeDetector {
+  detect(source: HTMLVideoElement | ImageBitmap): Promise<DetectedQrCode[]>;
+}
+
+type QrBarcodeDetectorConstructor = new (options: { formats: string[] }) => QrBarcodeDetector;
+
+interface DemoArtwork {
+  id: string;
+  blockchainArtworkId?: string | null;
+  title: string;
+  artist: string;
+}
 
 interface TransferRecord {
   id: string;
   date: string;
   from: string;
   to: string;
+  status: string;
   priceVisibility: string;
-  txHash: string;
+  txHash?: string;
   blockNumber: number;
 }
 
@@ -26,110 +45,276 @@ interface ArtworkData {
   genesisTxHash: string;
   status: string;
   integrityStatus: string;
+  currentOwnerName?: string | null;
+  currentOwnerWalletAddress?: string | null;
   metadataCid?: string;
   bindingReference?: string;
   onChainVerified?: boolean;
   transfers: TransferRecord[];
 }
 
+function getDisplayArtworkId(artwork: Pick<DemoArtwork, 'id' | 'blockchainArtworkId'>): string {
+  return `AUR-${artwork.blockchainArtworkId || artwork.id.slice(0, 8)}`;
+}
+
+function getArtworkIdFromQr(rawValue: string): string {
+  try {
+    const url = new URL(rawValue);
+    const artworkId = url.searchParams.get('artworkId') || url.searchParams.get('id');
+    if (artworkId) return artworkId;
+    const pathId = url.pathname.match(/\/(?:artworks?|verify)\/([^/]+)\/?$/i)?.[1];
+    if (pathId) return decodeURIComponent(pathId);
+  } catch {
+    // QR payloads may contain a plain artwork identifier instead of a URL.
+  }
+  return rawValue.trim();
+}
+
 const ProvenanceVerification: React.FC = () => {
-  const [searchQuery, setSearchQuery] = useState('');
+  const [searchQuery, setSearchQuery] = useState(() => {
+    const params = new URLSearchParams(window.location.search);
+    return params.get('artworkId') || params.get('id') || '';
+  });
   const [searchBy, setSearchBy] = useState<'artworkId' | 'wallet' | 'qr'>('artworkId');
   const [artworkData, setArtworkData] = useState<ArtworkData | null>(null);
+  const [searchResults, setSearchResults] = useState<ArtworkData[]>([]);
+  const [demoArtworks, setDemoArtworks] = useState<DemoArtwork[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [copiedHash, setCopiedHash] = useState<string | null>(null);
   const [previousOwners, setPreviousOwners] = useState<string[]>([]);
+  const [cameraActive, setCameraActive] = useState(false);
+  const videoRef = useRef<HTMLVideoElement | null>(null);
+  const cameraStreamRef = useRef<MediaStream | null>(null);
+  const scanTimerRef = useRef<number | null>(null);
 
   const { getPreviousOwners } = useArtchainContract();
 
-  const handleSearch = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const performLookup = useCallback(async (query: string, type: 'artworkId' | 'wallet') => {
+    setError(null);
+    setPreviousOwners([]);
+    setLoading(true);
+
+    try {
+      const lookupResponse = await artworkApi.lookup(type, query.trim());
+      const rawArtworks: Record<string, any>[] = Array.isArray(lookupResponse.data?.artworks)
+        ? lookupResponse.data.artworks
+        : [];
+      if (rawArtworks.length === 0) {
+        setSearchResults([]);
+        setArtworkData(null);
+        setError(type === 'wallet'
+          ? `No artwork records are linked to wallet "${query.trim()}". Wallet verification checks current owners and recorded transfer parties.`
+          : `No artwork records were found for "${query.trim()}".`);
+        return;
+      }
+
+      const records = await Promise.all(rawArtworks.map(async (raw): Promise<ArtworkData> => {
+        let onChainVerified = false;
+        try {
+          const provenanceResponse = await artworkApi.getProvenance(raw.id);
+          onChainVerified = provenanceResponse.data?.source === 'BLOCKCHAIN_VERIFIED';
+        } catch (provenanceError) {
+          console.warn(`Could not load provenance status for artwork ${raw.id}:`, provenanceError);
+        }
+
+        let transfers: TransferRecord[] = [];
+        try {
+          const transferResponse = await artworkApi.getTransfers(raw.id);
+          if (Array.isArray(transferResponse.data)) {
+            transfers = transferResponse.data.map((transfer: Record<string, any>) => ({
+              id: transfer.id,
+              date: transfer.transferDate || transfer.createdAt,
+              from: transfer.sellerName || transfer.sellerWalletAddress || transfer.sellerId || 'Initial Registry',
+              to: transfer.buyerName || transfer.buyerWalletAddress || transfer.buyerAddress || transfer.buyerId || 'Custodian',
+              status: transfer.status || 'RECORDED',
+              priceVisibility: transfer.priceVisibility || 'PARTIES_AND_AUTHORISED',
+              txHash: transfer.txHash || undefined,
+              blockNumber: transfer.blockNumber || 0,
+            }));
+          }
+        } catch (transferError) {
+          console.warn(`Could not load transfer history for artwork ${raw.id}:`, transferError);
+        }
+
+        return {
+          id: raw.id,
+          blockchainArtworkId: raw.blockchainArtworkId,
+          title: raw.title,
+          artist: raw.artist,
+          year: raw.year,
+          medium: raw.medium,
+          dimensions: raw.dimensions,
+          authenticator: raw.authenticatorName || 'Aureum Certified Authenticator',
+          genesisTimestamp: raw.createdAt,
+          genesisTxHash: raw.txHash || '',
+          status: raw.status || 'REGISTERED',
+          integrityStatus: onChainVerified
+            ? 'CRYPTOGRAPHICALLY VERIFIED'
+            : raw.blockchainArtworkId
+                ? 'BLOCKCHAIN ID REGISTERED'
+              : 'DATABASE RECORD',
+          currentOwnerName: raw.currentOwnerName,
+          currentOwnerWalletAddress: raw.currentOwnerWalletAddress,
+          metadataCid: raw.metadataCid,
+          bindingReference: raw.bindingReference,
+          onChainVerified,
+          transfers,
+        };
+      }));
+
+      setSearchResults(records);
+      setArtworkData(records[0]);
+    } catch (lookupError: unknown) {
+      const responseError = typeof lookupError === 'object' && lookupError !== null
+        && 'response' in lookupError
+        ? (lookupError as { response?: { data?: { error?: string } } }).response?.data?.error
+        : undefined;
+      setSearchResults([]);
+      setArtworkData(null);
+      setError(responseError || (lookupError instanceof Error
+        ? lookupError.message
+        : 'Unable to verify artwork at this time. Please try again.'));
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  const handleSearch = (event: React.FormEvent) => {
+    event.preventDefault();
     if (!searchQuery.trim()) {
-      setError('Please provide a valid search query.');
+      setError(searchBy === 'wallet'
+        ? 'Enter a complete wallet address.'
+        : 'Please provide an artwork identifier.');
+      return;
+    }
+    void performLookup(searchQuery, searchBy === 'wallet' ? 'wallet' : 'artworkId');
+  };
+
+  const stopQrScan = useCallback(() => {
+    if (scanTimerRef.current !== null) {
+      window.clearTimeout(scanTimerRef.current);
+      scanTimerRef.current = null;
+    }
+    cameraStreamRef.current?.getTracks().forEach((track) => track.stop());
+    cameraStreamRef.current = null;
+    if (videoRef.current) videoRef.current.srcObject = null;
+    setCameraActive(false);
+  }, []);
+
+  const startQrScan = async () => {
+    const Detector = (window as Window & { BarcodeDetector?: QrBarcodeDetectorConstructor }).BarcodeDetector;
+    if (!Detector) {
+      setError('QR scanning is not supported by this browser. Use a current Chrome or Edge browser, or enter the artwork ID from the QR code.');
+      return;
+    }
+    if (!navigator.mediaDevices?.getUserMedia) {
+      setError('Camera access is unavailable. Enter the artwork ID from the QR code instead.');
       return;
     }
 
     setError(null);
-    setLoading(true);
-
     try {
-      let foundData: ArtworkData | null = null;
-      if (searchBy === 'artworkId') {
-        try {
-          const res = await artworkApi.getById(searchQuery.trim());
-          if (res.data) {
-            const raw = res.data;
-            let transfers: TransferRecord[] = [];
-            let onChainVerified = false;
-
-            try {
-              const provRes = await artworkApi.getProvenance(raw.id);
-              if (provRes.data?.source === 'BLOCKCHAIN_VERIFIED') {
-                onChainVerified = true;
-              }
-            } catch {
-              // fallback
-            }
-
-            try {
-              const transferRes = await artworkApi.getTransfers(raw.id);
-              if (Array.isArray(transferRes.data)) {
-                transfers = transferRes.data.map((t: any) => ({
-                  id: t.id,
-                  date: t.transferDate || t.createdAt,
-                  from: t.sellerId || 'Initial Registry',
-                  to: t.buyerId || 'Custodian',
-                  priceVisibility: t.priceVisibility || 'PARTIES_AND_AUTHORISED',
-                  txHash: t.txHash || '0x0000000000000000000000000000000000000000',
-                  blockNumber: t.blockNumber || 0,
-                }));
-              }
-            } catch (tErr) {
-              console.warn('Could not load transfers from backend:', tErr);
-            }
-
-            foundData = {
-              id: raw.id,
-              blockchainArtworkId: raw.blockchainArtworkId,
-              title: raw.title,
-              artist: raw.artist,
-              year: raw.year,
-              medium: raw.medium,
-              dimensions: raw.dimensions,
-              authenticator: 'Aureum Certified Authenticator',
-              genesisTimestamp: raw.createdAt,
-              genesisTxHash: raw.txHash || '0x' + (raw.id.replace(/[^a-fA-F0-9]/g, '') + 'abcdef0123456789').slice(0, 40),
-              status: raw.status || 'VERIFIED',
-              integrityStatus: onChainVerified ? 'CRYPTOGRAPHICALLY_VERIFIED' : (raw.status || 'VERIFIED'),
-              metadataCid: raw.metadataCid,
-              bindingReference: raw.bindingReference,
-              onChainVerified,
-              transfers: transfers,
-            };
-          }
-        } catch (apiErr) {
-          // Artwork not found via API
-        }
-      }
-
-      if (!foundData) {
-        setError(`No verified artwork record found for "${searchQuery.trim()}".`);
-        setArtworkData(null);
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: { ideal: 'environment' } },
+        audio: false,
+      });
+      cameraStreamRef.current = stream;
+      setCameraActive(true);
+      if (!videoRef.current) {
+        stopQrScan();
         return;
       }
+      videoRef.current.srcObject = stream;
+      await videoRef.current.play();
+      const detector = new Detector({ formats: ['qr_code'] });
 
-      setArtworkData(foundData);
-    } catch (err: any) {
-      setError('Unable to verify artwork at this time. Please check your query and try again.');
-    } finally {
-      setLoading(false);
+      const scan = async () => {
+        if (!cameraStreamRef.current?.active || !videoRef.current) return;
+        try {
+          const codes = await detector.detect(videoRef.current);
+          const rawValue = codes[0]?.rawValue;
+          if (rawValue) {
+            const artworkId = getArtworkIdFromQr(rawValue);
+            stopQrScan();
+            setSearchBy('artworkId');
+            setSearchQuery(artworkId);
+            void performLookup(artworkId, 'artworkId');
+            return;
+          }
+          scanTimerRef.current = window.setTimeout(() => { void scan(); }, 180);
+        } catch (scanError) {
+          stopQrScan();
+          setError(scanError instanceof Error ? scanError.message : 'Could not read the QR code.');
+        }
+      };
+      void scan();
+    } catch (cameraError) {
+      stopQrScan();
+      setError(cameraError instanceof Error
+        ? `Could not start the camera: ${cameraError.message}`
+        : 'Could not start the camera. Check browser camera permissions.');
     }
   };
 
-  const handleQRScan = () => {
-    setError('Optical / QR scanner is unavailable. Please enter the Artwork ID or NFC Tag directly in the search input.');
+  const handleQrImage = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    event.target.value = '';
+    if (!file) return;
+
+    const Detector = (window as Window & { BarcodeDetector?: QrBarcodeDetectorConstructor }).BarcodeDetector;
+    if (!Detector) {
+      setError('QR image decoding is not supported by this browser. Use a current Chrome or Edge browser.');
+      return;
+    }
+    try {
+      const image = await createImageBitmap(file);
+      const codes = await new Detector({ formats: ['qr_code'] }).detect(image);
+      image.close();
+      const rawValue = codes[0]?.rawValue;
+      if (!rawValue) {
+        setError('No QR code was found in that image.');
+        return;
+      }
+      const artworkId = getArtworkIdFromQr(rawValue);
+      setSearchBy('artworkId');
+      setSearchQuery(artworkId);
+      void performLookup(artworkId, 'artworkId');
+    } catch (imageError) {
+      setError(imageError instanceof Error ? imageError.message : 'Could not read the QR image.');
+    }
   };
+
+  useEffect(() => {
+    void artworkApi.getAll()
+      .then(({ data }) => {
+        if (Array.isArray(data)) {
+          setDemoArtworks(data.map((artwork: Record<string, any>) => ({
+            id: artwork.id,
+            blockchainArtworkId: artwork.blockchainArtworkId,
+            title: artwork.title,
+            artist: artwork.artist,
+          })));
+        }
+      })
+      .catch((loadError: unknown) => {
+        console.error('Could not load live demo artwork identifiers:', loadError);
+      });
+
+    const params = new URLSearchParams(window.location.search);
+    const artworkId = params.get('artworkId') || params.get('id');
+    const lookupTimer = artworkId
+      ? window.setTimeout(() => { void performLookup(artworkId, 'artworkId'); }, 0)
+      : null;
+    return () => {
+      if (lookupTimer !== null) window.clearTimeout(lookupTimer);
+    };
+  }, [performLookup]);
+
+  useEffect(() => () => {
+    if (scanTimerRef.current !== null) window.clearTimeout(scanTimerRef.current);
+    cameraStreamRef.current?.getTracks().forEach((track) => track.stop());
+  }, []);
 
   const copyToClipboard = (text: string) => {
     navigator.clipboard?.writeText(text);
@@ -151,16 +336,17 @@ const ProvenanceVerification: React.FC = () => {
 
   // Load previous owners when artwork data becomes available
   useEffect(() => {
-    if (!artworkData) return;
+    const blockchainArtworkId = artworkData?.blockchainArtworkId;
+    if (!blockchainArtworkId) return;
     (async () => {
       try {
-        const owners = await getPreviousOwners(artworkData.id);
+        const owners = await getPreviousOwners(blockchainArtworkId);
         setPreviousOwners(owners);
       } catch (e) {
         console.warn('Failed to load previous owners:', e);
       }
     })();
-  }, [artworkData, getPreviousOwners]);
+  }, [artworkData?.blockchainArtworkId, getPreviousOwners]);
 
   return (
     <div className="aureum-theme min-h-screen bg-[#FAF9F6] text-[#18181B] flex flex-col selection:bg-orange-100 selection:text-[#1E3A2F]">
@@ -178,7 +364,7 @@ const ProvenanceVerification: React.FC = () => {
             Provenance Verification
           </h1>
           <p className="text-slate-400 text-base sm:text-lg max-w-2xl mx-auto">
-            Verify the authenticity, custodial chain, and immutable ownership history of accredited fine art.
+            Inspect artwork records, custody history, and available blockchain verification evidence.
           </p>
         </div>
 
@@ -252,16 +438,33 @@ const ProvenanceVerification: React.FC = () => {
                 <div className="space-y-1">
                   <h3 className="text-sm font-semibold text-white">Scan Artwork Physical Seal QR</h3>
                   <p className="text-xs text-slate-400 max-w-sm mx-auto">
-                    Hold the physical NFC certificate or certificate QR up to your device camera to load its provenance record.
+                    Scan a certificate QR with your camera, or upload an image of the QR code.
                   </p>
                 </div>
                 <button
                   type="button"
-                  onClick={handleQRScan}
+                  onClick={() => { void (cameraActive ? stopQrScan() : startQrScan()); }}
                   className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-500 hover:to-violet-500 text-white text-xs font-semibold shadow-lg shadow-indigo-600/30 transition cursor-pointer"
                 >
-                  Simulate QR Scanner Detection
+                  {cameraActive ? 'Stop camera scan' : 'Scan with camera'}
                 </button>
+                <label className="block text-xs text-indigo-300 cursor-pointer">
+                  Or choose a QR image
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={(event) => { void handleQrImage(event); }}
+                    className="sr-only"
+                  />
+                </label>
+                {cameraActive && (
+                  <video
+                    ref={videoRef}
+                    muted
+                    playsInline
+                    className="mx-auto max-h-64 w-full max-w-md rounded-xl border border-slate-700 bg-black"
+                  />
+                )}
               </div>
             ) : (
               <div className="flex flex-col sm:flex-row gap-3">
@@ -279,8 +482,8 @@ const ProvenanceVerification: React.FC = () => {
                     disabled={loading}
                     placeholder={
                       searchBy === 'artworkId'
-                        ? 'Enter Artwork ID (e.g., AUR-1234, AUR-1, or GUID)'
-                        : 'Enter Blockchain Wallet Address (0x...)'
+                        ? 'Enter a registered AUR ID, UUID, or binding reference'
+                        : 'Enter a complete wallet address (0x...)'
                     }
                     className="w-full pl-10 pr-4 py-3 rounded-xl bg-slate-950/80 border border-slate-700/80 text-white placeholder-slate-500 text-sm focus:outline-none focus:ring-2 focus:ring-gold-500/50 focus:border-gold-500/50 transition font-mono"
                   />
@@ -306,30 +509,33 @@ const ProvenanceVerification: React.FC = () => {
             )}
           </form>
 
-          {/* Quick Query Sample Badges */}
-          <div className="flex flex-wrap items-center justify-center gap-2 text-xs text-slate-400 pt-1">
-            <span className="text-[11px] uppercase tracking-wider text-slate-500 font-medium">Quick search sample:</span>
-            <button
-              type="button"
-              onClick={() => { setSearchBy('artworkId'); setSearchQuery('AUR-0842'); }}
-              className="px-2.5 py-0.5 rounded-full bg-slate-900 border border-slate-700 hover:border-gold-500/50 text-slate-300 font-mono text-[11px] transition"
-            >
-              AUR-0842
-            </button>
-            <button
-              type="button"
-              onClick={() => { setSearchBy('artworkId'); setSearchQuery('AUR-1'); }}
-              className="px-2.5 py-0.5 rounded-full bg-slate-900 border border-slate-700 hover:border-gold-500/50 text-slate-300 font-mono text-[11px] transition"
-            >
-              AUR-1
-            </button>
-            <button
-              type="button"
-              onClick={() => { setSearchBy('wallet'); setSearchQuery('0x71C...49A2'); }}
-              className="px-2.5 py-0.5 rounded-full bg-slate-900 border border-slate-700 hover:border-gold-500/50 text-slate-300 font-mono text-[11px] transition"
-            >
-              Collector 0x71C...
-            </button>
+          <div className="space-y-2 pt-1 text-center">
+            <p className="text-[11px] uppercase tracking-wider text-slate-500 font-medium">
+              Live demo artwork IDs ({demoArtworks.length})
+            </p>
+            <div className="flex flex-wrap items-center justify-center gap-2">
+              {demoArtworks.map((artwork) => {
+                const identifier = getDisplayArtworkId(artwork);
+                return (
+                  <button
+                    key={artwork.id}
+                    type="button"
+                    onClick={() => {
+                      setSearchBy('artworkId');
+                      setSearchQuery(identifier);
+                      void performLookup(identifier, 'artworkId');
+                    }}
+                    title={`${artwork.title} — ${artwork.artist}`}
+                    className="px-2.5 py-1 rounded-full bg-slate-900 border border-slate-700 hover:border-gold-500/50 text-slate-300 font-mono text-[11px] transition"
+                  >
+                    {identifier}
+                  </button>
+                );
+              })}
+            </div>
+            <p className="text-[11px] text-slate-500">
+              IDs include every registered artwork, including those involved in incoming and outgoing transfers.
+            </p>
           </div>
 
           {/* Error Message */}
@@ -343,6 +549,39 @@ const ProvenanceVerification: React.FC = () => {
           )}
         </div>
 
+        {searchResults.length > 1 && (
+          <section className="space-y-3" aria-live="polite">
+            <h2 className="text-sm font-semibold text-slate-300">
+              {searchResults.length} artwork records match this wallet
+            </h2>
+            <div className="grid gap-3 sm:grid-cols-2">
+              {searchResults.map((record) => (
+                <button
+                  key={record.id}
+                  type="button"
+                  onClick={() => {
+                    setPreviousOwners([]);
+                    setArtworkData(record);
+                  }}
+                  className={`rounded-xl border p-4 text-left transition ${
+                    artworkData?.id === record.id
+                      ? 'border-amber-500/60 bg-amber-500/10'
+                      : 'border-slate-800 bg-slate-900/60 hover:border-indigo-500/50'
+                  }`}
+                >
+                  <span className="font-mono text-xs text-amber-300">
+                    {getDisplayArtworkId(record)}
+                  </span>
+                  <span className="mt-1 block font-semibold text-white">{record.title}</span>
+                  <span className="mt-1 block text-xs text-slate-400">
+                    {record.artist} · {record.integrityStatus}
+                  </span>
+                </button>
+              ))}
+            </div>
+          </section>
+        )}
+
         {/* 3. Search Results or Empty State */}
         {artworkData ? (
           <div className="space-y-8 animate-fadeIn text-left">
@@ -353,13 +592,17 @@ const ProvenanceVerification: React.FC = () => {
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-6 border-b border-gold-500/20">
                   <div className="space-y-1">
                     <div className="flex items-center gap-2">
-                      <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 shadow-[0_0_8px_#34d399]"></span>
+                      <span className={`w-2.5 h-2.5 rounded-full ${
+                        artworkData.onChainVerified ? 'bg-emerald-400 shadow-[0_0_8px_#34d399]' : 'bg-amber-400'
+                      }`}></span>
                       <span className="text-[10px] uppercase tracking-[0.25em] font-display font-bold text-gold-300">
-                        OFFICIAL CERTIFICATE OF PROVENANCE
+                        ARTWORK VERIFICATION RECORD
                       </span>
                     </div>
                     <p className="text-[11px] font-mono text-slate-400">
-                      ANCHORED VIA ARTCHAIN CONSENSUS PROTOCOL
+                      {artworkData.onChainVerified
+                        ? 'ON-CHAIN PROVENANCE VERIFIED'
+                        : 'DATABASE RECORD — ON-CHAIN VERIFICATION NOT CONFIRMED'}
                     </p>
                   </div>
 
@@ -373,12 +616,14 @@ const ProvenanceVerification: React.FC = () => {
                       </svg>
                       Print Official Record
                     </button>
-                    <button
-                      onClick={() => copyToClipboard(artworkData.genesisTxHash)}
-                      className="px-4 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-700 text-xs font-mono text-slate-300 transition cursor-pointer"
-                    >
-                      {copiedHash === artworkData.genesisTxHash ? 'Copied Hash!' : 'Copy Hash'}
-                    </button>
+                    {artworkData.genesisTxHash && (
+                      <button
+                        onClick={() => copyToClipboard(artworkData.genesisTxHash)}
+                        className="px-4 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-700 text-xs font-mono text-slate-300 transition cursor-pointer"
+                      >
+                        {copiedHash === artworkData.genesisTxHash ? 'Copied Hash!' : 'Copy Hash'}
+                      </button>
+                    )}
                   </div>
                 </div>
 
@@ -389,9 +634,15 @@ const ProvenanceVerification: React.FC = () => {
                       <span className="font-mono text-xs px-2.5 py-0.5 rounded-full bg-black/60 text-gold-300 border border-gold-500/30">
                         {artworkData.id}
                       </span>
-                      <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 text-xs font-semibold">
-                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
-                        {artworkData.integrityStatus} ON-CHAIN
+                      <span className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full border text-xs font-semibold ${
+                        artworkData.onChainVerified
+                          ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-300'
+                          : 'bg-amber-500/10 border-amber-500/30 text-amber-200'
+                      }`}>
+                        <span className={`w-1.5 h-1.5 rounded-full ${
+                          artworkData.onChainVerified ? 'bg-emerald-400 animate-pulse' : 'bg-amber-400'
+                        }`}></span>
+                        {artworkData.integrityStatus}
                       </span>
                     </div>
                     <h2 className="text-3xl sm:text-4xl lg:text-5xl font-serif font-light text-white tracking-tight mt-3">
@@ -412,8 +663,8 @@ const ProvenanceVerification: React.FC = () => {
                       </svg>
                     </div>
                     <div>
-                      <p className="text-[10px] font-display uppercase tracking-widest text-gold-400 font-bold">CERTIFIED SOVEREIGN</p>
-                      <p className="text-[11px] font-mono text-slate-400">AUTHENTICATOR GUILD</p>
+                      <p className="text-[10px] font-display uppercase tracking-widest text-gold-400 font-bold">AUREUM REGISTRY</p>
+                      <p className="text-[11px] font-mono text-slate-400">ARTWORK RECORD</p>
                     </div>
                   </div>
                 </div>
@@ -437,6 +688,42 @@ const ProvenanceVerification: React.FC = () => {
                     <p className="font-mono font-semibold text-gold-300 mt-1">{artworkData.bindingReference || 'NFC-VERIFIED'}</p>
                   </div>
                 </div>
+
+                <div className="grid gap-4 rounded-2xl border border-slate-800 bg-black/30 p-4 sm:grid-cols-[1fr_auto] sm:items-center">
+                  <div className="space-y-2 text-xs">
+                    <p className="text-slate-400">
+                      Public Artwork ID:{' '}
+                      <span className="font-mono text-gold-300">{getDisplayArtworkId(artworkData)}</span>
+                    </p>
+                    <p className="text-slate-400">
+                      Blockchain ID:{' '}
+                      <span className="font-mono text-slate-200">{artworkData.blockchainArtworkId || 'Not anchored'}</span>
+                    </p>
+                    <p className="text-slate-400">
+                      Current custodian:{' '}
+                      <span className="text-slate-200">{artworkData.currentOwnerName || 'Not identified'}</span>
+                    </p>
+                    {artworkData.currentOwnerWalletAddress && (
+                      <button
+                        type="button"
+                        onClick={() => copyToClipboard(artworkData.currentOwnerWalletAddress!)}
+                        className="break-all text-left font-mono text-indigo-300 hover:text-indigo-200"
+                      >
+                        Wallet: {artworkData.currentOwnerWalletAddress}
+                        {copiedHash === artworkData.currentOwnerWalletAddress ? ' (copied)' : ''}
+                      </button>
+                    )}
+                  </div>
+                  <div className="justify-self-center rounded-lg bg-white p-2 text-center">
+                    <QRCodeSVG
+                      value={`${window.location.origin}/verify?artworkId=${encodeURIComponent(getDisplayArtworkId(artworkData))}`}
+                      size={112}
+                      level="M"
+                      title={`Verify ${artworkData.title}`}
+                    />
+                    <p className="mt-1 text-[9px] text-slate-700">Scan to verify</p>
+                  </div>
+                </div>
               </div>
             </div>
 
@@ -449,7 +736,9 @@ const ProvenanceVerification: React.FC = () => {
                     ({artworkData.transfers.length + 1} Records)
                   </span>
                 </h3>
-                <span className="text-xs text-slate-400">Cryptographically Chronological</span>
+                <span className="text-xs text-slate-400">
+                  {artworkData.onChainVerified ? 'Blockchain verified' : 'Database history'}
+                </span>
               </div>
 
               {/* Timeline Container */}
@@ -463,20 +752,26 @@ const ProvenanceVerification: React.FC = () => {
                   <div className="p-4 rounded-xl bg-slate-950/60 border border-slate-800 hover:border-amber-500/40 transition space-y-2">
                     <div className="flex flex-wrap items-center justify-between gap-2">
                       <span className="text-xs font-bold text-amber-300 uppercase tracking-wide">
-                        Genesis Authentication Record
+                        Artwork Registration Record
                       </span>
                       <span className="text-xs text-slate-400 font-mono">
                         {formatDate(artworkData.genesisTimestamp)}
                       </span>
                     </div>
                     <p className="text-xs text-slate-300">
-                      Physical inspection completed and digital certificate sealed by{' '}
+                      Artwork registered in Aureum by{' '}
                       <strong className="text-white font-medium">{artworkData.authenticator}</strong>.
                     </p>
                     <div className="flex items-center gap-3 text-[11px] font-mono text-slate-500 pt-1">
-                      <span>Tx: {artworkData.genesisTxHash.slice(0, 16)}...</span>
-                      <span>•</span>
-                      <span className="text-emerald-400">Block Confirmed</span>
+                      {artworkData.genesisTxHash
+                        ? <span>Tx: {artworkData.genesisTxHash.slice(0, 16)}...</span>
+                        : <span>No genesis transaction hash recorded</span>}
+                      {artworkData.onChainVerified && (
+                        <>
+                          <span>•</span>
+                          <span className="text-emerald-400">Blockchain verified</span>
+                        </>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -505,11 +800,18 @@ const ProvenanceVerification: React.FC = () => {
                       </div>
                       <div className="flex flex-wrap items-center justify-between gap-2 pt-1 text-[11px]">
                         <span className="font-mono text-slate-500">
-                          Tx: {transfer.txHash.slice(0, 16)}... (Block #{transfer.blockNumber})
+                          {transfer.txHash
+                            ? `Tx: ${transfer.txHash.slice(0, 16)}... (Block #${transfer.blockNumber})`
+                            : `Status: ${transfer.status}`}
                         </span>
-                        <span className="px-2 py-0.5 rounded bg-slate-900 border border-slate-800 text-[10px] text-slate-400 font-mono">
-                          Price: {transfer.priceVisibility}
-                        </span>
+                        <div className="flex items-center gap-2">
+                          <span className="px-2 py-0.5 rounded bg-slate-900 border border-slate-800 text-[10px] text-slate-300 font-mono">
+                            {transfer.status}
+                          </span>
+                          <span className="px-2 py-0.5 rounded bg-slate-900 border border-slate-800 text-[10px] text-slate-400 font-mono">
+                            Price: {transfer.priceVisibility}
+                          </span>
+                        </div>
                       </div>
                     </div>
                   </div>
@@ -521,11 +823,12 @@ const ProvenanceVerification: React.FC = () => {
                     <div className="w-1.5 h-1.5 rounded-full bg-violet-400"></div>
                   </div>
                   <div className="p-4 rounded-xl bg-violet-950/20 border border-violet-500/30 text-xs space-y-1">
-                    <span className="text-violet-300 font-semibold uppercase tracking-wider text-[10px]">Current Escrow / Custody</span>
+                    <span className="text-violet-300 font-semibold uppercase tracking-wider text-[10px]">Current Custodian</span>
                     <p className="text-white font-medium">
-                      {artworkData.transfers.length > 0
-                        ? artworkData.transfers[artworkData.transfers.length - 1].to
-                        : artworkData.authenticator}
+                      {artworkData.currentOwnerName ||
+                        artworkData.currentOwnerWalletAddress ||
+                        artworkData.transfers[artworkData.transfers.length - 1]?.to ||
+                        artworkData.authenticator}
                     </p>
                   </div>
                 </div>
@@ -549,9 +852,13 @@ const ProvenanceVerification: React.FC = () => {
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
               </svg>
               <div className="space-y-1 leading-relaxed">
-                <p className="text-slate-300 font-medium">Tamper-Evident Decentralized Record</p>
+                <p className="text-slate-300 font-medium">
+                  {artworkData.onChainVerified ? 'Blockchain-Verified Record' : 'Registered Artwork Record'}
+                </p>
                 <p>
-                  This record is anchored to the decentralized Aureum ledger. Block signatures attest to the cryptographic custody transfer events and physical inspection metadata submitted by accredited authenticators.
+                  {artworkData.onChainVerified
+                    ? 'This artwork has a provenance record confirmed by the Aureum blockchain.'
+                    : 'This artwork is present in the Aureum registry. Its blockchain provenance has not been confirmed, so this page does not claim cryptographic verification.'}
                 </p>
               </div>
             </div>
@@ -567,7 +874,7 @@ const ProvenanceVerification: React.FC = () => {
             <div className="space-y-1.5">
               <h3 className="text-lg font-bold text-white tracking-tight">Enter an Artwork Identifier Above</h3>
               <p className="text-sm text-slate-400 max-w-md mx-auto">
-                Search using an Aureum Artwork ID (such as <code className="text-amber-300 font-mono bg-slate-950 px-1.5 py-0.5 rounded">AUR-1234</code>), a collector wallet address, or simulate scanning a physical seal.
+                    Search the live registry by artwork ID or wallet address, or scan a certificate QR code.
               </p>
             </div>
           </div>
@@ -577,7 +884,7 @@ const ProvenanceVerification: React.FC = () => {
         <section className="pt-8 border-t border-slate-800/80 space-y-6">
           <div className="text-center space-y-1">
             <h3 className="text-xl font-bold text-white tracking-tight">What You Can Verify on Aureum</h3>
-            <p className="text-xs text-slate-400">Cryptographically guaranteed fine art records</p>
+            <p className="text-xs text-slate-400">Artwork identity, recorded custody, and available chain evidence</p>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6 text-left">
@@ -589,7 +896,7 @@ const ProvenanceVerification: React.FC = () => {
               </div>
               <h4 className="text-sm font-bold text-white tracking-tight">Physical Medium & Identity</h4>
               <p className="text-xs text-slate-400 leading-relaxed">
-                Cryptographic bindings between the physical art piece, high-resolution condition reports, and tamper-resistant NFC tags.
+                Review the artwork's registered medium, dimensions, and physical seal reference.
               </p>
             </div>
 
@@ -601,7 +908,7 @@ const ProvenanceVerification: React.FC = () => {
               </div>
               <h4 className="text-sm font-bold text-white tracking-tight">Unbroken Ownership Chain</h4>
               <p className="text-xs text-slate-400 leading-relaxed">
-                Every sale, museum exhibition transit, and dual-custody exchange recorded immutably with timestamped blockchain consensus.
+                Inspect the ownership and transfer events recorded for this artwork.
               </p>
             </div>
 

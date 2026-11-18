@@ -92,6 +92,8 @@ export const activityApi = {
 export const artworkApi = {
   getAll: () => api.get('/artworks'),
   getById: (id: string) => api.get(`/artworks/${id}`),
+  lookup: (type: 'artworkId' | 'wallet', query: string) =>
+    api.get('/artworks/lookup', { params: { type, query } }),
   getTransfers: (artworkId: string) => api.get(`/artworks/${artworkId}/transfers`),
   getProvenance: (id: string) => api.get(`/artworks/${id}/provenance`),
   verifyCid: (id: string) => api.get(`/artworks/${id}/verify-cid`),
