@@ -1,5 +1,4 @@
 import { decode, verify } from 'jsonwebtoken';
-import https from 'https';
 import { supabase } from '../db/supabase';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'aureum-dev-secret-change-in-production';
@@ -50,39 +49,6 @@ function getFrontendAuthRedirect(path: string): string {
     throw new Error('FRONTEND_URL must use HTTP or HTTPS.');
   }
   return new URL(path, frontendUrl).toString();
-}
-
-/** Subset of the Google tokeninfo payload */
-interface GoogleTokenPayload {
-  sub: string;
-  email: string;
-  name: string;
-  picture?: string;
-  email_verified: string | boolean;
-  aud: string;
-  error?: string;
-}
-
-/** Verify a Google ID token by calling Google's tokeninfo endpoint */
-function verifyGoogleToken(idToken: string): Promise<GoogleTokenPayload> {
-  return new Promise((resolve, reject) => {
-    const url = `https://oauth2.googleapis.com/tokeninfo?id_token=${encodeURIComponent(idToken)}`;
-    https.get(url, (res) => {
-      let data = '';
-      res.on('data', (chunk) => (data += chunk));
-      res.on('end', () => {
-        try {
-          const payload = JSON.parse(data) as GoogleTokenPayload;
-          if (payload.error) {
-            return reject(new Error(`Google token verification failed: ${payload.error}`));
-          }
-          resolve(payload);
-        } catch {
-          reject(new Error('Failed to parse Google tokeninfo response'));
-        }
-      });
-    }).on('error', reject);
-  });
 }
 
 export class AuthService {
@@ -320,117 +286,6 @@ export class AuthService {
       token,
       user: userProfile,
     };
-  }
-
-  /**
-   * Verify a Google ID token and sync user profile in Supabase
-   */
-  static async loginWithGoogle(idToken: string, defaultRole: string = 'COLLECTOR'): Promise<LoginResponse> {
-    const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID;
-    const payload = await verifyGoogleToken(idToken);
-
-    if (GOOGLE_CLIENT_ID && payload.aud !== GOOGLE_CLIENT_ID) {
-      throw new Error('Google ID token audience mismatch');
-    }
-
-    if (!payload.email) {
-      throw new Error('Google account does not expose a verified email');
-    }
-
-    const normalizedEmail = payload.email.toLowerCase();
-    const userName = payload.name || payload.email.split('@')[0];
-
-    // Check if user exists in Supabase "User" table
-    const { data: existingUser } = await supabase
-      .from('User')
-      .select('*')
-      .or(`googleId.eq.${payload.sub},email.eq.${normalizedEmail}`)
-      .single();
-
-    let userProfile: AuthenticatedUser;
-
-    if (existingUser) {
-      const { data: updated } = await supabase
-        .from('User')
-        .update({
-          googleId: payload.sub,
-          avatarUrl: payload.picture || existingUser.avatarUrl,
-          updatedAt: new Date().toISOString(),
-        })
-        .eq('id', existingUser.id)
-        .select()
-        .single();
-
-      userProfile = updated || existingUser;
-    } else {
-      const { data: created, error } = await supabase
-        .from('User')
-        .insert({
-          email: normalizedEmail,
-          name: userName,
-          role: defaultRole,
-          password: '',
-          googleId: payload.sub,
-          avatarUrl: payload.picture || null,
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
-        })
-        .select()
-        .single();
-
-      if (error || !created) {
-        throw new Error(`Failed to create Google user: ${error?.message || 'Database insert failed'}`);
-      }
-      userProfile = created;
-    }
-
-    // Generate or obtain session token
-    let token = '';
-    try {
-      const { data: sessionData } = await supabase.auth.signInWithIdToken({
-        provider: 'google',
-        token: idToken,
-      });
-      token = sessionData?.session?.access_token || '';
-    } catch {
-      // Fallback to signed JWT
-    }
-
-    if (!token) {
-      const { sign } = await import('jsonwebtoken');
-      const attributes =
-        userProfile.walletAddress && /^0x[a-fA-F0-9]{40}$/.test(userProfile.walletAddress)
-          ? { walletAddress: userProfile.walletAddress }
-          : {};
-      token = sign(
-        {
-          userId: userProfile.id,
-          email: userProfile.email,
-          role: userProfile.role,
-          roles: [userProfile.role],
-          permissions: [],
-          attributes,
-        },
-        JWT_SECRET,
-        { expiresIn: '7d' }
-      );
-    }
-
-    // Log activity
-    try {
-      await supabase.from('Activity').insert({
-        userId: userProfile.id,
-        userEmail: userProfile.email,
-        type: 'LOGIN',
-        title: 'Google Sign-In',
-        detail: `${userProfile.name} signed in with Google (${userProfile.role})`,
-        badge: 'GOOGLE-AUTH',
-      });
-    } catch (actErr) {
-      console.warn('Failed to log Google login activity:', actErr);
-    }
-
-    return { token, user: userProfile };
   }
 
   /**

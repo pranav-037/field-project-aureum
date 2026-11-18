@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useWallet } from '../contexts/WalletContext';
 import { useArtchainContract } from '../hooks/useArtchainContract';
@@ -186,98 +186,23 @@ const CollectorDashboard: React.FC = () => {
   }, []);
 
 
-  // Default Curated Masterpieces for the Collector's Sovereign Vault
-  const defaultMasterpieces: Artwork[] = [
-    {
-      id: 'AUR-fe18b0aa',
-      databaseId: 'art-001',
-      title: 'Girl with a Pearl Earring',
-      artist: 'Johannes Vermeer',
-      year: '1665',
-      medium: 'Oil on canvas',
-      dimensions: '44.5 cm × 39.0 cm',
-      status: 'VERIFIED',
-      ownershipStatus: 'UNASSIGNED',
-      thumbnailGradient: 'from-amber-700/60 via-amber-900/40 to-slate-900',
-      nfcTag: 'NFC-BOUND-VERMEER-1665',
-      authenticator: 'Aureum Authentication Guild',
-      imageUrl: '/artworks/girl-pearl-earring.jpg',
-    },
-    {
-      id: 'AUR-8e7fe0c7',
-      databaseId: 'art-002',
-      title: 'The Kiss',
-      artist: 'Gustav Klimt',
-      year: '1908',
-      medium: 'Oil and gold leaf on canvas',
-      dimensions: '180 cm × 180 cm',
-      status: 'VERIFIED',
-      ownershipStatus: 'UNASSIGNED',
-      thumbnailGradient: 'from-amber-600/60 via-yellow-700/40 to-slate-900',
-      nfcTag: 'NFC-BOUND-KLIMT-1908',
-      authenticator: 'Aureum Authentication Guild',
-      imageUrl: '/artworks/the-kiss.jpg',
-    },
-    {
-      id: 'AUR-e5e2bcbe',
-      databaseId: 'art-003',
-      title: 'The Starry Night',
-      artist: 'Vincent van Gogh',
-      year: '1889',
-      medium: 'Oil on canvas',
-      dimensions: '73.7 cm × 92.1 cm',
-      status: 'IN_ESCROW',
-      ownershipStatus: 'UNASSIGNED',
-      thumbnailGradient: 'from-blue-900/60 via-cyan-900/40 to-slate-900',
-      nfcTag: 'NFC-BOUND-VANGOGH-1889',
-      authenticator: 'Aureum Authentication Guild',
-      imageUrl: '/artworks/starry-night.jpg',
-    },
-  ];
-
-  // Default Fallback Transactions: 2 Incoming and 1 Outgoing
-  const defaultTransactions: TransferItem[] = [
-    {
-      id: 'tx-101',
-      artworkId: 'art-001',
-      type: 'INCOMING',
-      title: 'The Great Wave off Kanagawa',
-      artist: 'Katsushika Hokusai',
-      counterparty: 'Sanjay Rathore',
-      date: 'Nov 13, 2026',
-      status: 'PENDING_ACCEPTANCE',
-      txHash: '0x8f2d4a1b9c3e7f6a5b4c3d2e1f0a9b8c7d6e5f4a',
-    },
-    {
-      id: 'tx-102',
-      artworkId: 'art-002',
-      type: 'INCOMING',
-      title: 'The Birth of Venus',
-      artist: 'Sandro Botticelli',
-      counterparty: 'Sanjay Rathore',
-      date: 'Nov 10, 2026',
-      status: 'PENDING_ACCEPTANCE',
-      txHash: '0x7b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5b6c',
-    },
-    {
-      id: 'tx-103',
-      artworkId: 'art-003',
-      type: 'OUTGOING',
-      title: 'The Starry Night',
-      artist: 'Vincent van Gogh',
-      counterparty: 'Sanjay Rathore',
-      date: 'Nov 12, 2026',
-      status: 'PENDING_ACCEPTANCE',
-      txHash: '0x3a4b5c6d7e8f9a0b1c2d3e4f5a6b7c8d9e0f1a2b',
-    },
-  ];
-
-  const [artworks, setArtworks] = useState<Artwork[]>(defaultMasterpieces);
-  const [transactions, setTransactions] = useState<TransferItem[]>(defaultTransactions);
+  const [artworks, setArtworks] = useState<Artwork[]>([]);
+  const [transactions, setTransactions] = useState<TransferItem[]>([]);
+  const [artworkLoad, setArtworkLoad] = useState<'loading' | 'ready' | 'error'>('loading');
+  const [transferLoad, setTransferLoad] = useState<'loading' | 'ready' | 'error'>('loading');
+  const latestRequest = useRef(0);
 
   const loadData = useCallback(async (uid: string) => {
+    const request = ++latestRequest.current;
+    const [artworkResult, transfersResult] = await Promise.allSettled([
+      artworkApi.getAll(),
+      transferApi.getAll(),
+    ]);
+    if (request !== latestRequest.current) return;
+
     try {
-      const res = await artworkApi.getAll();
+      if (artworkResult.status === 'rejected') throw artworkResult.reason;
+      const res = artworkResult.value;
       if (Array.isArray(res.data)) {
         const gradients = [
           'from-amber-700/60 via-amber-900/40 to-slate-900',
@@ -333,32 +258,20 @@ const CollectorDashboard: React.FC = () => {
           };
         });
         setArtworks(mapped);
+        setArtworkLoad('ready');
+      } else {
+        setArtworkLoad('error');
       }
     } catch (err) {
+      setArtworkLoad('error');
       console.warn('Could not fetch artworks:', err);
     }
 
     try {
-      const [transfersResult, incomingResult] = await Promise.allSettled([
-        transferApi.getAll(),
-        transferApi.getIncoming(),
-      ]);
       if (transfersResult.status === 'rejected') throw transfersResult.reason;
       const transRes = transfersResult.value;
-      const incomingData = incomingResult.status === 'fulfilled' && Array.isArray(incomingResult.value.data)
-        ? incomingResult.value.data
-        : [];
-      if (incomingResult.status === 'rejected') {
-        console.warn('Could not fetch pending incoming transfers:', incomingResult.reason);
-      }
       if (Array.isArray(transRes.data)) {
-        const transfersById = new Map<string, any>(
-          transRes.data.map((transfer: any) => [transfer.id, transfer])
-        );
-        incomingData.forEach((transfer: any) => {
-          transfersById.set(transfer.id, { ...transfersById.get(transfer.id), ...transfer });
-        });
-        const mappedTrans: TransferItem[] = [...transfersById.values()].map((t: any) => {
+        const mappedTrans: TransferItem[] = transRes.data.map((t: any) => {
           const type: 'INCOMING' | 'OUTGOING' = t.type === 'OUTGOING' ? 'OUTGOING' : 'INCOMING';
           const isOutgoing = type === 'OUTGOING';
           const counterparty = isOutgoing
@@ -392,8 +305,12 @@ const CollectorDashboard: React.FC = () => {
           };
         });
         setTransactions(mappedTrans);
+        setTransferLoad('ready');
+      } else {
+        setTransferLoad('error');
       }
     } catch (transErr) {
+      setTransferLoad('error');
       console.warn('Could not fetch transfers:', transErr);
     }
   }, [account, currentUser]);
@@ -404,11 +321,17 @@ const CollectorDashboard: React.FC = () => {
       navigate('/login', { replace: true });
       return;
     }
-    void loadData(currentUser.id);
-    const refreshTimer = window.setInterval(() => {
-      void loadData(currentUser.id);
-    }, 15000);
-    return () => window.clearInterval(refreshTimer);
+    let active = true;
+    let refreshTimer: number | undefined;
+    const refresh = async () => {
+      await loadData(currentUser.id);
+      if (active) refreshTimer = window.setTimeout(refresh, 15000);
+    };
+    void refresh();
+    return () => {
+      active = false;
+      window.clearTimeout(refreshTimer);
+    };
   }, [account, authLoading, currentUser, loadData, navigate]);
 
   const ownedArtworks = artworks.filter((artwork) => artwork.ownershipStatus === 'OWNED');
@@ -421,9 +344,10 @@ const CollectorDashboard: React.FC = () => {
 
   const incomingTransfers = transactions.filter(t => t.type === 'INCOMING');
   const outgoingTransfers = transactions.filter(t => t.type === 'OUTGOING');
-  const incomingCount = incomingTransfers.length;
-  const outgoingCount = outgoingTransfers.length;
-  const pendingIncoming = incomingTransfers.filter(t => t.status === 'PENDING_ACCEPTANCE');
+  const pendingIncoming = incomingTransfers.filter((transfer) => transfer.status === 'PENDING_ACCEPTANCE');
+  const pendingOutgoing = outgoingTransfers.filter((transfer) => transfer.status === 'PENDING_ACCEPTANCE');
+  const incomingCount = new Set(pendingIncoming.map((transfer) => transfer.artworkId).filter(Boolean)).size;
+  const outgoingCount = new Set(pendingOutgoing.map((transfer) => transfer.artworkId).filter(Boolean)).size;
   const incomingTransfer = pendingIncoming[0];
   const verifiedCount = ownedArtworks.filter(item => item.status === 'VERIFIED').length;
   const registryVerifiedCount = artworks.filter(item => item.status === 'VERIFIED').length;
@@ -532,7 +456,7 @@ const CollectorDashboard: React.FC = () => {
         buyerId: transfer.recipientUserId,
         imageUrl: transferArtwork.imageUrl,
         isEmailTransfer: true,
-      }, ...prev]);
+      }, ...prev.filter((item) => item.id !== transfer.id)]);
       setRecipientEmail('');
       setShowTransferModal(false);
       setTransferToast('Transfer request sent');
@@ -682,17 +606,12 @@ const CollectorDashboard: React.FC = () => {
                 </svg>
               </div>
             </div>
-            <div className="mt-4 flex items-baseline gap-2">
-              <span className="text-3xl sm:text-4xl font-extrabold text-white tracking-tight">{ownedArtworks.length}</span>
-              {ownedArtworks.length > 0 && (
-                <span className="text-xs font-semibold text-emerald-400 flex items-center">
-                  Active
-                </span>
-              )}
-            </div>
+            <p className="mt-4 text-3xl sm:text-4xl font-extrabold text-white tracking-tight">
+              {artworkLoad === 'ready' ? ownedArtworks.length : '—'}
+            </p>
             <p className="text-xs text-slate-500 mt-2 flex items-center gap-1.5">
               <span className="w-1.5 h-1.5 rounded-full bg-amber-400"></span>
-              {ownedArtworks.length > 0 ? 'Owned records in your vault' : 'No owned artworks registered yet'}
+              {artworkLoad === 'error' ? 'Artwork count unavailable' : artworkLoad === 'loading' ? 'Loading artworks…' : 'Artworks in your custody'}
             </p>
           </div>
 
@@ -717,9 +636,9 @@ const CollectorDashboard: React.FC = () => {
             </div>
             <div className="mt-4 flex items-baseline gap-2">
               <span className="text-3xl sm:text-4xl font-extrabold text-white tracking-tight">
-                {incomingCount}
+                {transferLoad === 'ready' ? incomingCount : '—'}
               </span>
-              {pendingIncoming.length > 0 && (
+              {transferLoad === 'ready' && pendingIncoming.length > 0 && (
                 <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-300 border border-amber-500/20">
                   Awaiting sign-off
                 </span>
@@ -727,7 +646,7 @@ const CollectorDashboard: React.FC = () => {
             </div>
             <p className="text-xs text-slate-500 mt-2 flex items-center gap-1.5">
               <span className="w-1.5 h-1.5 rounded-full bg-indigo-400"></span>
-              {pendingIncoming.length > 0 ? `${pendingIncoming.length} transfer ready for acceptance` : 'No pending requests'}
+              {transferLoad === 'error' ? 'Transfer count unavailable' : transferLoad === 'loading' ? 'Loading transfers…' : 'Artworks awaiting your acceptance'}
             </p>
           </div>
 
@@ -750,13 +669,12 @@ const CollectorDashboard: React.FC = () => {
                 </svg>
               </div>
             </div>
-            <div className="mt-4 flex items-baseline gap-2">
-              <span className="text-3xl sm:text-4xl font-extrabold text-white tracking-tight">{outgoingCount}</span>
-              <span className="text-xs font-semibold text-slate-400">Active</span>
-            </div>
+            <p className="mt-4 text-3xl sm:text-4xl font-extrabold text-white tracking-tight">
+              {transferLoad === 'ready' ? outgoingCount : '—'}
+            </p>
             <p className="text-xs text-slate-500 mt-2 flex items-center gap-1.5">
               <span className="w-1.5 h-1.5 rounded-full bg-slate-400"></span>
-              Full custody retained in your vault
+              {transferLoad === 'error' ? 'Transfer count unavailable' : transferLoad === 'loading' ? 'Loading transfers…' : 'Artworks awaiting recipient acceptance'}
             </p>
           </div>
 
@@ -773,14 +691,18 @@ const CollectorDashboard: React.FC = () => {
               </div>
             </div>
             <div className="mt-4 flex items-baseline gap-2">
-              <span className="text-3xl sm:text-4xl font-extrabold text-emerald-400 tracking-tight">{verifiedCount}</span>
-              <span className="text-xs font-semibold text-emerald-300 bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/20">
-                {ownedArtworks.length > 0 ? `${Math.round((verifiedCount / ownedArtworks.length) * 100)}% Rate` : '0%'}
+              <span className="text-3xl sm:text-4xl font-extrabold text-emerald-400 tracking-tight">
+                {artworkLoad === 'ready' ? verifiedCount : '—'}
               </span>
+              {artworkLoad === 'ready' && ownedArtworks.length > 0 && (
+                <span className="text-xs font-semibold text-emerald-300 bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/20">
+                  {Math.round((verifiedCount / ownedArtworks.length) * 100)}% verified
+                </span>
+              )}
             </div>
             <p className="text-xs text-slate-500 mt-2 flex items-center gap-1.5">
               <span className="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
-              All records anchored with NFC binding
+              {artworkLoad === 'error' ? 'Verification count unavailable' : artworkLoad === 'loading' ? 'Loading artworks…' : 'Verified artworks in your custody'}
             </p>
           </div>
         </div>

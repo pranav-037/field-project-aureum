@@ -1,6 +1,6 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
+import { Eye, EyeOff } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
-import { useGoogleAuth } from '../hooks/useGoogleAuth';
 import { useAuth } from '../context/AuthContext';
 import { emailSchema, loginPasswordSchema } from '../schemas/authSchemas';
 import { resendSignupVerification, signInWithEmail } from '../services/supabaseAuth';
@@ -16,6 +16,7 @@ const LoginPage: React.FC = () => {
   const { user, loading: authLoading } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [fieldErrors, setFieldErrors] = useState<Partial<Record<'email' | 'password', string>>>({});
   const [isInstitution, setIsInstitution] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -23,30 +24,12 @@ const LoginPage: React.FC = () => {
   const [needsEmailVerification, setNeedsEmailVerification] = useState(false);
   const [loading, setLoading] = useState(false);
   const [resendingVerification, setResendingVerification] = useState(false);
-  const googleBtnRef = useRef<HTMLDivElement>(null);
-
-  const currentRole = isInstitution ? 'AUTHENTICATOR' : 'COLLECTOR';
 
   useEffect(() => {
     if (!authLoading && user) {
       navigate(getDashboardPath(user.role), { replace: true });
     }
   }, [authLoading, navigate, user]);
-
-  const { isConfigured, renderButton } = useGoogleAuth({
-    role: currentRole,
-    onSuccess: ({ role }) => {
-      navigate(getDashboardPath(role), { replace: true });
-    },
-    onError: (msg) => setError(msg),
-  });
-
-  // Re-render the Google button whenever role changes or ref mounts
-  useEffect(() => {
-    if (isConfigured && googleBtnRef.current) {
-      renderButton(googleBtnRef.current);
-    }
-  }, [isConfigured, renderButton, isInstitution]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -209,17 +192,6 @@ const LoginPage: React.FC = () => {
                 </button>
               )}
 
-              {/* Google Sign-In */}
-              {isConfigured && (
-                <div className="mb-4">
-                  <div ref={googleBtnRef} className="w-full flex justify-center" />
-                  <div className="flex items-center gap-3 mt-5 mb-5">
-                    <div className="flex-1 h-px bg-slate-800" />
-                    <span className="text-xs text-slate-500 font-medium">or continue with email</span>
-                    <div className="flex-1 h-px bg-slate-800" />
-                  </div>
-                </div>
-              )}
 
               {/* Login Form */}
               <form onSubmit={handleSubmit} noValidate autoComplete="on" className="space-y-4 text-left">
@@ -268,28 +240,39 @@ const LoginPage: React.FC = () => {
                   <label htmlFor="password" className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-slate-300">
                     Password
                   </label>
-                  <input
-                    id="password"
-                    type="password"
-                    autoComplete="current-password"
-                    value={password}
-                    aria-invalid={Boolean(fieldErrors.password)}
-                    aria-describedby={fieldErrors.password ? 'login-password-error' : undefined}
-                    onChange={(e) => {
-                      setPassword(e.target.value);
-                      setFieldErrors((previous) => ({ ...previous, password: undefined }));
-                      setError(null);
-                    }}
-                    onBlur={() => {
-                      const result = loginPasswordSchema.safeParse(password);
-                      setFieldErrors((previous) => ({
-                        ...previous,
-                        password: result.success ? undefined : result.error.issues[0]?.message,
-                      }));
-                    }}
-                    disabled={loading}
-                    className="w-full px-3.5 py-2.5 rounded-xl bg-slate-950/70 border border-slate-700/80 text-white text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition duration-150"
-                  />
+                  <div className="relative">
+                    <input
+                      id="password"
+                      type={showPassword ? 'text' : 'password'}
+                      autoComplete="current-password"
+                      value={password}
+                      aria-invalid={Boolean(fieldErrors.password)}
+                      aria-describedby={fieldErrors.password ? 'login-password-error' : undefined}
+                      onChange={(e) => {
+                        setPassword(e.target.value);
+                        setFieldErrors((previous) => ({ ...previous, password: undefined }));
+                        setError(null);
+                      }}
+                      onBlur={() => {
+                        const result = loginPasswordSchema.safeParse(password);
+                        setFieldErrors((previous) => ({
+                          ...previous,
+                          password: result.success ? undefined : result.error.issues[0]?.message,
+                        }));
+                      }}
+                      disabled={loading}
+                      className="w-full rounded-xl border border-slate-700/80 bg-slate-950/70 py-2.5 pl-3.5 pr-12 text-sm text-white transition duration-150 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    />
+                    <button
+                      type="button"
+                      aria-controls="password"
+                      aria-label={showPassword ? 'Hide password' : 'Show password'}
+                      onClick={() => setShowPassword((visible) => !visible)}
+                      className="absolute inset-y-0 right-0 grid w-11 place-items-center rounded-r-xl text-slate-400 transition hover:text-slate-200 focus-visible:outline focus-visible:outline-2 focus-visible:outline-indigo-400"
+                    >
+                      {showPassword ? <EyeOff size={16} aria-hidden="true" /> : <Eye size={16} aria-hidden="true" />}
+                    </button>
+                  </div>
                   {fieldErrors.password && (
                     <p id="login-password-error" className="mt-1 text-xs text-rose-300" role="alert">
                       {fieldErrors.password}

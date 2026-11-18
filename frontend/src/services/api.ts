@@ -72,7 +72,6 @@ export const authApi = {
   completePasswordReset: (data: { accessToken: string; password: string }) =>
     api.post('/auth/reset-password', data),
   getMe: () => api.get('/auth/me'),
-  googleLogin: (data: { idToken: string; role?: string }) => api.post('/auth/google', data),
 };
 
 // Activity History API

@@ -1,6 +1,5 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { useGoogleAuth } from '../hooks/useGoogleAuth';
 import { useAuth } from '../context/AuthContext';
 import { signUpWithEmail } from '../services/supabaseAuth';
 import { REGIONS_AND_INSTITUTIONS } from '../constants/institutionsByRegion';
@@ -47,29 +46,12 @@ const RegisterPage: React.FC = () => {
   const [notice, setNotice] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<Partial<Record<RegistrationField, string>>>({});
   const [loading, setLoading] = useState(false);
-  const googleBtnRef = useRef<HTMLDivElement>(null);
-
-  const currentRole = formData.userType === 'institution' ? 'AUTHENTICATOR' : 'COLLECTOR';
 
   useEffect(() => {
     if (!authLoading && user) {
       navigate(getDashboardPath(user.role), { replace: true });
     }
   }, [authLoading, navigate, user]);
-
-  const { isConfigured, renderButton } = useGoogleAuth({
-    role: currentRole,
-    onSuccess: ({ role }) => {
-      navigate(getDashboardPath(role), { replace: true });
-    },
-    onError: (msg) => setError(msg),
-  });
-
-  useEffect(() => {
-    if (isConfigured && googleBtnRef.current) {
-      renderButton(googleBtnRef.current);
-    }
-  }, [isConfigured, renderButton, formData.userType]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     const { name, id, value, type } = e.target;
@@ -311,17 +293,6 @@ const RegisterPage: React.FC = () => {
                 </div>
               )}
 
-              {/* Google Sign-Up */}
-              {isConfigured && (
-                <div className="mb-4">
-                  <div ref={googleBtnRef} className="w-full flex justify-center" />
-                  <div className="flex items-center gap-3 mt-5 mb-5">
-                    <div className="flex-1 h-px bg-slate-800" />
-                    <span className="text-xs text-slate-500 font-medium">or register with email</span>
-                    <div className="flex-1 h-px bg-slate-800" />
-                  </div>
-                </div>
-              )}
 
               {/* Registration Form */}
               <form onSubmit={handleSubmit} noValidate autoComplete="on" className="space-y-4 text-left">

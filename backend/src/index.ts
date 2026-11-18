@@ -143,20 +143,6 @@ app.post(['/api/login', '/api/auth/login'], async (req: Request, res: Response) 
   }
 });
 
-// Google OAuth sign-in / sign-up
-app.post('/api/auth/google', async (req: Request, res: Response) => {
-  try {
-    const { idToken, role } = req.body;
-    if (!idToken) {
-      return res.status(400).json({ error: 'Google ID token is required' });
-    }
-    const result = await AuthService.loginWithGoogle(idToken, role || 'COLLECTOR');
-    res.json(result);
-  } catch (error) {
-    res.status(401).json({ error: (error as Error).message || 'Google authentication failed' });
-  }
-});
-
 // Resend the Supabase sign-up confirmation email
 app.post('/api/auth/resend-verification', async (req: Request, res: Response) => {
   try {
@@ -718,9 +704,11 @@ app.get('/api/transfers', requireAuth, async (req: Request, res: Response) => {
       return res.status(401).json({ error: 'User not authenticated' });
     }
 
-    const transfers = await db.transfers.findMany('*');
-    const artworks = await db.artworks.findMany();
-    const users = await db.users.findMany('id, email, name, role, walletAddress');
+    const [transfers, artworks, users] = await Promise.all([
+      db.transfers.findMany(),
+      db.artworks.findMany('id, title, artist, imageCids'),
+      db.users.findMany('id, name, walletAddress'),
+    ]);
     const artMap = new Map((artworks || []).map((a: any) => [a.id, a]));
     const userMap = new Map((users || []).map((u: any) => [u.id, u]));
     const userByWallet = new Map(
@@ -737,6 +725,8 @@ app.get('/api/transfers', requireAuth, async (req: Request, res: Response) => {
       (typeof idOrAddress === 'string' && walletAddresses.includes(idOrAddress.toLowerCase()));
 
     const visibleTransfers = (transfers || []).filter((t: any) =>
+      t.senderUserId === req.user!.id ||
+      t.recipientUserId === req.user!.id ||
       userMatches(t.sellerId) ||
       userMatches(t.buyerId) ||
       (typeof t.buyerAddress === 'string' && walletAddresses.includes(t.buyerAddress.toLowerCase()))
@@ -748,7 +738,7 @@ app.get('/api/transfers', requireAuth, async (req: Request, res: Response) => {
         userMap.get(t.buyerId) ||
         userByWallet.get(String(t.buyerId || '').toLowerCase()) ||
         userByWallet.get(String(t.buyerAddress || '').toLowerCase());
-      const isOutgoing = userMatches(t.sellerId);
+      const isOutgoing = t.senderUserId === req.user!.id || userMatches(t.sellerId);
       const recipientAddress =
         t.buyerAddress ||
         (typeof t.buyerId === 'string' && /^0x[a-fA-F0-9]{40}$/.test(t.buyerId) ? t.buyerId : null);

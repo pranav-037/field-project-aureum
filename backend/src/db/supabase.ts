@@ -133,6 +133,22 @@ export interface DbActivity {
   createdAt: string;
 }
 
+async function fetchRowsByCreationDate(table: 'Artwork' | 'Transfer', columns: string): Promise<any[]> {
+  const pageSize = 500;
+  const rows: any[] = [];
+  for (let offset = 0; ; offset += pageSize) {
+    const { data, error } = await supabase
+      .from(table)
+      .select(columns)
+      .order('createdAt', { ascending: false })
+      .order('id', { ascending: false })
+      .range(offset, offset + pageSize - 1);
+    if (error) throw error;
+    rows.push(...data);
+    if (data.length < pageSize) return rows;
+  }
+}
+
 /**
  * Clean Supabase Typed Database Client
  * Replaces all Prisma ORM operations across Aureum platform.
@@ -253,12 +269,7 @@ export const db = {
       return count || 0;
     },
     async findMany(select = 'id, blockchainArtworkId, txHash, title, artist, status, createdAt'): Promise<any[]> {
-      const { data, error } = await supabase
-        .from('Artwork')
-        .select(select)
-        .order('createdAt', { ascending: false });
-      if (error) throw error;
-      return (data as any) || [];
+      return fetchRowsByCreationDate('Artwork', select);
     },
     async findUnique(id: string): Promise<DbArtwork | null> {
       const { data, error } = await supabase
@@ -357,12 +368,7 @@ export const db = {
       return count || 0;
     },
     async findMany(select = '*'): Promise<any[]> {
-      const { data, error } = await supabase
-        .from('Transfer')
-        .select(select)
-        .order('createdAt', { ascending: false });
-      if (error) throw error;
-      return (data as any) || [];
+      return fetchRowsByCreationDate('Transfer', select);
     },
     async findUnique(id: string): Promise<DbTransfer | null> {
       const { data, error } = await supabase
