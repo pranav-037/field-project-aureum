@@ -349,6 +349,8 @@ const CollectorDashboard: React.FC = () => {
   const incomingCount = new Set(pendingIncoming.map((transfer) => transfer.artworkId).filter(Boolean)).size;
   const outgoingCount = new Set(pendingOutgoing.map((transfer) => transfer.artworkId).filter(Boolean)).size;
   const incomingTransfer = pendingIncoming[0];
+  const activeIncomingTransfer = selectedIncomingTransfer || incomingTransfer;
+  const requiresWalletApproval = Boolean(activeIncomingTransfer?.blockchainTransferId && !activeIncomingTransfer.isEmailTransfer);
   const verifiedCount = ownedArtworks.filter(item => item.status === 'VERIFIED').length;
   const escrowCount = ownedArtworks.filter(item => item.status === 'IN_ESCROW').length;
 
@@ -481,9 +483,9 @@ const CollectorDashboard: React.FC = () => {
 
     try {
       setIsSigningTx(true);
+      setConfirmedTx(null);
       if (targetTransfer.isEmailTransfer) {
         await transferApi.approve(targetTransfer.id);
-        setConfirmedTx(targetTransfer.txHash);
       } else if (targetTransfer.blockchainTransferId) {
         if (!isConnected) {
           throw new Error('Connect the recipient wallet to accept this on-chain transfer.');
@@ -500,6 +502,8 @@ const CollectorDashboard: React.FC = () => {
       }
 
       setIncomingAccepted(true);
+      setTransferToast('Transfer accepted. The artwork is now in your collection.');
+      window.setTimeout(() => setTransferToast(null), 4000);
       if (currentUserId) {
         await loadData(currentUserId);
       }
@@ -557,7 +561,7 @@ const CollectorDashboard: React.FC = () => {
               {currentUser?.role === 'AUTHENTICATOR' ? 'Institution Custody Dashboard' : 'Collector Dashboard'}
             </h1>
             <p className="text-sm text-slate-400 mt-1">
-              Welcome back, <span className="text-white font-medium">{currentUser?.name || 'Custodian'}</span>. Manage your authenticated artworks, track physical custody, and sign transfers.
+              Welcome back, <span className="text-white font-medium">{currentUser?.name || 'Custodian'}</span>. Manage your authenticated artworks, track physical custody, and approve transfers.
             </p>
           </div>
 
@@ -735,7 +739,7 @@ const CollectorDashboard: React.FC = () => {
                   Incoming Transfer Pending: "{incomingTransfer.title}" by {incomingTransfer.artist}
                 </button>
                 <p className="text-xs text-slate-400 mt-0.5">
-                  Origin: {incomingTransfer.counterparty}. Requires your cryptographic acceptance signature to complete custody transfer.
+                  Origin: {incomingTransfer.counterparty}. Review and accept to add this artwork to your collection.
                 </p>
               </div>
             </div>
@@ -966,7 +970,7 @@ const CollectorDashboard: React.FC = () => {
                 Custody Transfers Management
               </h2>
               <p className="text-xs sm:text-sm text-slate-400 mt-0.5">
-                Dedicated portals to review, sign, and monitor your inbound and outbound fine art transactions
+                Review, approve, and monitor your incoming and outgoing artwork transfers
               </p>
             </div>
 
@@ -1054,7 +1058,7 @@ const CollectorDashboard: React.FC = () => {
                 {pendingIncoming.length > 0 && (
                   <span className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-500/10 text-amber-300 border border-amber-500/30 text-xs font-semibold">
                     <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse"></span>
-                    {pendingIncoming.length} Requires Your Signature
+                    {pendingIncoming.length} Awaiting Your Approval
                   </span>
                 )}
               </div>
@@ -1654,30 +1658,30 @@ const CollectorDashboard: React.FC = () => {
                 Custody Handoff Protocol
               </span>
               <h2 id="incoming-transfer-title" className="mt-2 text-xl font-bold text-white">Incoming Custody Transfer</h2>
-              <p className="text-xs text-slate-400">Review signatures and verify NFC binding before acceptance</p>
+              <p className="text-xs text-slate-400">Review the artwork and sender before accepting custody.</p>
             </div>
 
             <div className="p-4 rounded-xl bg-slate-950/80 border border-slate-800 space-y-3 text-xs">
               <div className="flex justify-between">
                 <span className="text-slate-400">Artwork:</span>
-                <span className="text-white font-semibold">{(selectedIncomingTransfer || incomingTransfer)?.title || 'The Great Wave off Kanagawa'}</span>
+                <span className="text-white font-semibold">{activeIncomingTransfer?.title}</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-slate-400">Artist:</span>
-                <span className="text-slate-200">{(selectedIncomingTransfer || incomingTransfer)?.artist || 'Katsushika Hokusai'}</span>
+                <span className="text-slate-200">{activeIncomingTransfer?.artist}</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-slate-400">From Custodian:</span>
-                <span className="text-slate-200">{(selectedIncomingTransfer || incomingTransfer)?.counterparty || 'Tokyo Curatorial Guild Escrow'}</span>
+                <span className="text-slate-200">{activeIncomingTransfer?.counterparty}</span>
               </div>
               <div className="flex justify-between">
-                <span className="text-slate-400">Escrow Contract:</span>
-                <span className="font-mono text-indigo-400">0x8f2d...29b1</span>
+                <span className="text-slate-400">Transfer ID:</span>
+                <span className="break-all font-mono text-indigo-400">{activeIncomingTransfer?.id}</span>
               </div>
               <div className="flex justify-between">
-                <span className="text-slate-400">Recipient Signer:</span>
+                <span className="text-slate-400">{requiresWalletApproval ? 'Recipient wallet:' : 'Recipient email:'}</span>
                 <span className="font-mono text-amber-300">
-                  {account ? `${account.slice(0, 8)}...${account.slice(-6)}` : 'Demo Wallet (Not Connected)'}
+                  {requiresWalletApproval ? account || 'Connect your recipient wallet' : currentUser?.email}
                 </span>
               </div>
             </div>
@@ -1714,14 +1718,14 @@ const CollectorDashboard: React.FC = () => {
                       <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                       <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path>
                     </svg>
-                    Signing in MetaMask...
+                    {requiresWalletApproval ? 'Confirming in wallet...' : 'Accepting transfer...'}
                   </>
                 ) : (
                   <>
                     <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" />
                     </svg>
-                    {isConnected ? 'Sign in MetaMask & Accept Custody' : 'Accept Physical Custody'}
+                    {requiresWalletApproval ? 'Confirm in Wallet & Accept' : 'Accept Artwork'}
                   </>
                 )}
               </button>
@@ -1731,7 +1735,7 @@ const CollectorDashboard: React.FC = () => {
                 disabled={isSigningTx}
                 className="min-h-11 rounded-xl bg-slate-800 px-4 py-3 text-xs font-semibold text-slate-300 transition hover:bg-slate-700"
               >
-                Decline
+                Close
               </button>
             </div>
           </section>
@@ -1756,7 +1760,7 @@ const CollectorDashboard: React.FC = () => {
                 Peer-To-Peer Custody Transfer
               </span>
               <h2 id="initiate-transfer-title" className="mt-2 text-xl font-bold text-white">Initiate Custody Transfer</h2>
-              <p className="text-xs text-slate-400">Hand over physical artwork provenance to a verified recipient</p>
+              <p className="text-xs text-slate-400">Send an artwork to a registered account using its email address.</p>
             </div>
 
             <div className="space-y-4 text-xs text-left">
@@ -1779,29 +1783,22 @@ const CollectorDashboard: React.FC = () => {
               </div>
 
               <div>
-                <label className="block text-slate-300 font-semibold mb-1">Recipient email address</label>
+                <label htmlFor="transfer-recipient-email" className="block text-slate-300 font-semibold mb-1">Recipient email address</label>
                 <input
+                  id="transfer-recipient-email"
                   type="email"
                   value={recipientEmail}
                   onChange={(e) => setRecipientEmail(e.target.value)}
                   maxLength={254}
                   autoComplete="email"
                   aria-invalid={Boolean(transferError)}
-                  placeholder="name@example.com"
                   className="min-h-11 w-full rounded-xl border border-slate-700 bg-slate-950/80 px-3.5 py-2.5 text-xs text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
                 />
                 <p className="mt-1 text-[11px] text-slate-500">
-                  The email must belong to a registered collector or institution account.
+                  The recipient must have a registered collector or institution account. They approve the transfer from their account.
                 </p>
               </div>
 
-              <div>
-                <label className="block text-slate-300 font-semibold mb-1">Transfer Price Visibility</label>
-                <select className="min-h-11 w-full rounded-xl border border-slate-700 bg-slate-950/80 px-3.5 py-2.5 text-xs text-white focus:outline-none focus:ring-2 focus:ring-indigo-500">
-                  <option>Transacting Parties Only (Encrypted)</option>
-                  <option>Public Chain of Custody</option>
-                </select>
-              </div>
             </div>
 
             {transferError && (
@@ -1815,7 +1812,7 @@ const CollectorDashboard: React.FC = () => {
                 disabled={isCreatingTransfer}
                 className="min-h-11 flex-1 rounded-xl bg-gradient-to-r from-indigo-600 to-violet-600 py-3 text-xs font-semibold text-white shadow-lg transition hover:from-indigo-500 hover:to-violet-500 disabled:cursor-not-allowed disabled:opacity-50"
               >
-                {isCreatingTransfer ? 'Initiating...' : 'Initiate Secure Escrow'}
+                {isCreatingTransfer ? 'Sending request...' : 'Send Transfer Request'}
               </button>
               <button
                 type="button"

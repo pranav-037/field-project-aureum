@@ -58,6 +58,8 @@ FRONTEND_URL=http://localhost:5173
 
 ### Authentication email setup
 
+Browser authentication uses tab-specific session storage and separate Supabase auth channels. Opening or pasting a URL as a fresh navigation requires signing in, including when the browser copies storage from another tab. Refreshing a signed-in tab restores its session. Email confirmation and password recovery accept session links only on `/auth/callback` and `/reset-password`. Existing sessions in local storage are ignored after this change.
+
 Registration uses a confirmation link, email/password is used to sign in, and password recovery uses a reset link. Configure Supabase Auth in the Dashboard:
 
 1. Enable the Email provider and **Confirm email** under **Authentication -> Providers -> Email**.
@@ -109,6 +111,8 @@ Every account receives a starter collection on its first authenticated API reque
 For an existing database, apply `migrations/20261118000000_email_artwork_transfers.sql` after the initial schema migration (or run `npx supabase db push`). It adds `senderUserId` and `recipientUserId` references to `User`, a foreign key from each transfer to `Artwork`, pending-recipient indexes, and the `approve_user_artwork_transfer` PostgreSQL function. Foreign keys are added `NOT VALID` to avoid blocking on older transfer history; new writes are still checked.
 
 The authenticated API supports `POST /api/transfers` with `{ "artworkId": "...", "recipientEmail": "..." }`, `GET /api/transfers/incoming`, and recipient-only `POST /api/transfers/:id/approve` or `/reject`. Approval runs in one database function/transaction and moves `Artwork.ownerId` together with the transfer status. The dashboard polls every 15 seconds for sender-side status changes. Existing wallet/on-chain transfer routes remain available.
+
+For email transfers, the sender selects an owned artwork and enters a registered collector or institution email. The recipient signs into that account and chooses **Accept Artwork**. These steps use the account session and database ownership records. MetaMask is optional for this flow. On acceptance the artwork appears in the recipient's owned collection and leaves the sender's collection.
 
 Run the backend service tests with `cd backend && npm test`; they cover request validation, duplicate requests, recipient listing, approval, rejection, and custody changes.
 

@@ -100,6 +100,8 @@ async function expectStatus(promise: Promise<unknown>, statusCode: number) {
 
 async function run() {
   const repository = new InMemoryTransferRepository();
+  repository.sender.walletAddress = null;
+  repository.recipient.walletAddress = null;
   const created = await initiateUserTransfer({
     senderUserId: repository.sender.id,
     artworkId: repository.artwork.id,
@@ -107,6 +109,8 @@ async function run() {
   }, repository);
   assert.equal(created.status, 'pending');
   assert.equal(created.recipientUserId, repository.recipient.id);
+  assert.equal(created.senderUserId, repository.sender.id);
+  assert.equal(repository.artwork.ownerId, repository.sender.id);
   assert.equal((await listIncomingUserTransfers(repository.recipient.id, repository)).length, 1);
 
   await expectStatus(initiateUserTransfer({
@@ -115,6 +119,8 @@ async function run() {
     recipientEmail: repository.recipient.email,
   }, repository), 409);
 
+  await expectStatus(approveUserTransfer(created.id, repository.sender.id, repository), 404);
+  assert.equal(repository.artwork.ownerId, repository.sender.id);
   const accepted = await approveUserTransfer(created.id, repository.recipient.id, repository);
   assert.equal(accepted.status, 'accepted');
   assert.equal(repository.artwork.ownerId, repository.recipient.id);
